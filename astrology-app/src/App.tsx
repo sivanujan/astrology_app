@@ -5,6 +5,7 @@ import InputForm from './components/InputForm';
 import SouthIndianChart from './components/SouthIndianChart';
 import ChartAnalysis from './components/ChartAnalysis';
 import AIPredictions from './components/AIPredictions';
+import DashaPeriods from './components/DashaPeriods';
 
 // Placeholder components until we implement them
 const Placeholder = ({ title }: { title: string }) => (
@@ -16,7 +17,7 @@ const Placeholder = ({ title }: { title: string }) => (
 
 function App() {
   // Global state for chart data
-  const [chartData, setChartData] = useState < any > (null);
+  const [chartData, setChartData] = useState<any>(null);
 
   return (
     <Router>
@@ -30,6 +31,10 @@ function App() {
           <Route
             path="/analysis"
             element={chartData ? <ChartAnalysis data={chartData} /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/dasha"
+            element={chartData ? <DashaPeriods data={chartData} /> : <Navigate to="/" />}
           />
           <Route
             path="/predictions"

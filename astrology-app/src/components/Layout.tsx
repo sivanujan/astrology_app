@@ -1,17 +1,20 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { language, setLanguage, t } = useLanguage();
 
     const steps = [
-        { path: '/', label: 'Birth Details', icon: MapPin },
-        { path: '/chart', label: 'Vedic Chart', icon: Moon },
-        { path: '/analysis', label: 'Analysis', icon: Sun },
-        { path: '/predictions', label: 'AI Insights', icon: Sparkles },
+        { path: '/', label: t.nav.birthDetails, icon: MapPin },
+        { path: '/chart', label: t.nav.chart, icon: Moon },
+        { path: '/analysis', label: t.nav.analysis, icon: Sun },
+        { path: '/dasha', label: t.dasha.title, icon: Clock },
+        { path: '/predictions', label: t.nav.predictions, icon: Sparkles },
     ];
 
     const currentStepIndex = steps.findIndex(s => s.path === location.pathname);
@@ -49,7 +52,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                 <Star className="w-5 h-5 text-white fill-white" />
                             </div>
                             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                                VedicAI
+                                {t.appTitle}
                             </span>
                         </div>
 
@@ -75,6 +78,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                 );
                             })}
                         </div>
+
+                        {/* Language Toggle */}
+                        <button
+                            onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 transition-colors text-sm font-medium"
+                        >
+                            <Languages className="w-4 h-4 text-purple-400" />
+                            <span>{language === 'en' ? 'தமிழ்' : 'English'}</span>
+                        </button>
                     </div>
                 </div>
             </nav>

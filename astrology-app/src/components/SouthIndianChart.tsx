@@ -1,12 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { TAMIL_RASI_NAMES, PLANET_SYMBOLS } from '../utils/constants';
+import { TAMIL_PLANET_ABBREVIATIONS, TAMIL_PLANET_NAMES } from '../utils/translations';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SouthIndianChartProps {
     data: any;
 }
 
 const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
+    const { t, language } = useLanguage();
     if (!data) return null;
 
     const { planets, ascendant } = data;
@@ -19,19 +22,6 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
     };
 
     // South Indian Chart Layout (Fixed Signs)
-    // We need to map the 12 signs to the 12 grid positions.
-    // Grid is 4x4.
-    // Row 1: Pisces(11), Aries(0), Taurus(1), Gemini(2)
-    // Row 2: Aquarius(10), Center, Center, Cancer(3)
-    // Row 3: Capricorn(9), Center, Center, Leo(4)
-    // Row 4: Sagittarius(8), Scorpio(7), Libra(6), Virgo(5)
-
-    // We can represent this as a flat array of 16 cells for a 4x4 grid.
-    // 0: Pisces, 1: Aries, 2: Taurus, 3: Gemini
-    // 4: Aquarius, 5: null, 6: null, 7: Cancer
-    // 8: Capricorn, 9: null, 10: null, 11: Leo
-    // 12: Sagittarius, 13: Scorpio, 14: Libra, 15: Virgo
-
     const gridMap = [
         11, 0, 1, 2,
         10, -1, -1, 3,
@@ -47,7 +37,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                 className="text-center mb-8"
             >
                 <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                    South Indian Chart
+                    {t.chart.title}
                 </h2>
                 <p className="text-slate-400">
                     {data.userDetails.name} • {new Date(data.userDetails.date).toLocaleDateString()}
@@ -64,7 +54,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                                     <div key={gridIndex} className="col-span-2 row-span-2 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm border border-slate-800/50 m-1 rounded-lg">
                                         <div className="text-center p-4">
                                             <div className="text-4xl font-serif text-slate-700 opacity-20 mb-2">ॐ</div>
-                                            <div className="text-sm text-slate-500">Lagna (Asc): {TAMIL_RASI_NAMES[ascendant.signIndex]}</div>
+                                            <div className="text-sm text-slate-500">{t.chart.lagna}: {TAMIL_RASI_NAMES[ascendant.signIndex]}</div>
                                             <div className="text-xs text-slate-600 mt-1">
                                                 {Math.floor(ascendant.degree)}° {Math.round((ascendant.degree % 1) * 60)}'
                                             </div>
@@ -98,7 +88,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                                 {/* Ascendant Marker */}
                                 {isAscendant && (
                                     <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] px-1 rounded-bl shadow-sm z-10">
-                                        Lagna
+                                        {t.chart.lagna}
                                     </div>
                                 )}
 
@@ -121,9 +111,9 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                                                                         planet.name === 'Saturn' ? 'text-blue-300' :
                                                                             'text-slate-300'}
                       `}
-                                            title={`${planet.name}: ${Math.floor(planet.degree)}°`}
+                                            title={`${language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}: ${Math.floor(planet.degree)}°`}
                                         >
-                                            {PLANET_SYMBOLS[planet.name as keyof typeof PLANET_SYMBOLS]}
+                                            {language === 'ta' ? TAMIL_PLANET_ABBREVIATIONS[planet.name] : PLANET_SYMBOLS[planet.name as keyof typeof PLANET_SYMBOLS]}
                                             <span className="text-[8px] opacity-70 ml-0.5">
                                                 {Math.floor(planet.degree)}°
                                             </span>
@@ -138,7 +128,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
 
             <div className="mt-8 text-center">
                 <p className="text-sm text-slate-500">
-                    * Chart calculated using Lahiri Ayanamsa (Sidereal)
+                    {t.chart.note}
                 </p>
             </div>
         </div>

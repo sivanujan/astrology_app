@@ -7,6 +7,196 @@ import {
     SiderealTime
 } from 'astronomy-engine';
 import * as Astronomy from 'astronomy-engine';
+import {
+    PLANET_RELATIONSHIPS,
+    EXALTATION_POINTS,
+    DEBILITATION_POINTS,
+    OWN_SIGNS,
+    SIGN_LORDS,
+    PLANETS
+} from './constants';
+
+// --- Advanced Calculation Functions ---
+
+// 1. Calculate Planetary Dignity
+export const calculateDignity = (planet: string, signIndex: number, degree: number, allPlanets: any[]) => {
+    // Exaltation
+    const exalt = EXALTATION_POINTS[planet as keyof typeof EXALTATION_POINTS];
+    if (exalt && exalt.sign === signIndex) {
+        // Check deep exaltation (within 5 degrees)
+        if (Math.abs(degree - exalt.degree) <= 5) return 'exalted'; // Deep exaltation
+        return 'exalted';
+    }
+
+    // Debilitation
+    const debilitation = DEBILITATION_POINTS[planet as keyof typeof DEBILITATION_POINTS];
+    if (debilitation && debilitation.sign === signIndex) {
+        return 'debilitated';
+    }
+
+    // Own Sign
+    const ownSigns = OWN_SIGNS[planet as keyof typeof OWN_SIGNS];
+    if (ownSigns && ownSigns.includes(signIndex)) {
+        return 'ownSign';
+    }
+
+    // Friendship/Enmity
+    const signLord = SIGN_LORDS[signIndex];
+
+    // If planet is in sign of a friend
+    const relationships = PLANET_RELATIONSHIPS[planet as keyof typeof PLANET_RELATIONSHIPS];
+    if (relationships) {
+        if (relationships.friends.includes(signLord)) {
+            // Check for Adhi Mithra (Temporary friendship due to placement)
+            // Temporary friend: Planet in 2, 3, 4, 10, 11, 12 from planet
+            // For simplicity, we'll stick to natural friendship first, or implement compound later
+            return 'friend';
+        }
+        if (relationships.enemies.includes(signLord)) {
+            return 'enemy';
+        }
+    }
+
+    return 'neutral';
+};
+
+// 2. Check Neecha Bhanga (Cancellation of Debilitation)
+export const checkNeechaBhanga = (planet: any, allPlanets: any[], ascendant: any) => {
+    if (calculateDignity(planet.name, planet.signIndex, planet.degree, allPlanets) !== 'debilitated') {
+        return false;
+    }
+
+    const signLordName = SIGN_LORDS[planet.signIndex];
+    const signLord = allPlanets.find(p => p.name === signLordName);
+
+    const exaltationSignIndex = EXALTATION_POINTS[planet.name as keyof typeof EXALTATION_POINTS]?.sign;
+    const exaltationLordName = SIGN_LORDS[exaltationSignIndex];
+    const exaltationLord = allPlanets.find(p => p.name === exaltationLordName);
+
+    // Condition 1: Sign Lord in Kendra from Lagna or Moon
+    const moon = allPlanets.find(p => p.name === 'Moon');
+
+    const isKendra = (p: any, ref: any) => {
+        if (!p || !ref) return false;
+        const house = (p.signIndex - ref.signIndex + 12) % 12 + 1;
+        return [1, 4, 7, 10].includes(house);
+    };
+
+    if (isKendra(signLord, ascendant) || isKendra(signLord, moon)) return true;
+
+    // Condition 2: Exaltation Lord in Kendra from Lagna or Moon
+    if (isKendra(exaltationLord, ascendant) || isKendra(exaltationLord, moon)) return true;
+
+    // Condition 3: Aspect from Exalted Planet (Simplified check)
+    // This requires full aspect calculation logic, which we'll add below.
+
+    // Condition 4: Parivartana with Sign Lord
+    // If sign lord is in the debilitated planet's sign (which is impossible if it's debilitated, unless exchange)
+    // Actually, if Planet A is in Sign B (debilitated) and Planet B is in Sign A.
+    // Example: Sun in Libra (Debilitated), Venus in Leo.
+    if (signLord) {
+        const signLordOwnSigns = OWN_SIGNS[signLord.name as keyof typeof OWN_SIGNS];
+        if (signLordOwnSigns && signLordOwnSigns.includes(planet.signIndex)) {
+            // Wait, Parivartana is mutual exchange.
+            // Planet A is in Sign B. Planet B is in Sign A.
+            // Planet A is 'planet'. Sign B is 'planet.signIndex'. Lord of Sign B is 'signLord'.
+            // We need to check if 'signLord' is in a sign owned by 'planet'.
+            const planetOwnSigns = OWN_SIGNS[planet.name as keyof typeof OWN_SIGNS];
+            if (planetOwnSigns && planetOwnSigns.includes(signLord.signIndex)) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+// 3. Check Parivartana Yoga
+export const checkParivartana = (allPlanets: any[]) => {
+    const exchanges: { p1: string; p2: string }[] = [];
+
+    for (let i = 0; i < allPlanets.length; i++) {
+        for (let j = i + 1; j < allPlanets.length; j++) {
+            const p1 = allPlanets[i];
+            const p2 = allPlanets[j];
+
+            // Skip Rahu and Ketu for Parivartana
+            if (['Rahu', 'Ketu'].includes(p1.name) || ['Rahu', 'Ketu'].includes(p2.name)) continue;
+
+            // P1 in P2's sign
+            const p2OwnSigns = OWN_SIGNS[p2.name as keyof typeof OWN_SIGNS] || [];
+            const p1InP2Sign = p2OwnSigns.includes(p1.signIndex);
+
+            // P2 in P1's sign
+            const p1OwnSigns = OWN_SIGNS[p1.name as keyof typeof OWN_SIGNS] || [];
+            const p2InP1Sign = p1OwnSigns.includes(p2.signIndex);
+
+            if (p1InP2Sign && p2InP1Sign) {
+                exchanges.push({ p1: p1.name, p2: p2.name });
+            }
+        }
+    }
+    return exchanges;
+};
+
+// 4. Calculate Planetary Strength (Simplified Shadbala-like)
+export const calculateStrength = (planet: any, ascendant: any, timeOfDay: 'day' | 'night' = 'day') => {
+    let points = 0;
+    const maxPoints = 10;
+
+    // 1. Sthana Bala (Positional) - based on Dignity
+    // We need to pass allPlanets to calculateDignity, but here we might not have it easily available in this signature.
+    // Let's assume we call this with dignity already known or calculate it.
+    // For now, let's just use a simplified dignity check or require dignity as input.
+    // Refactoring to take dignity as input would be better, but let's re-calculate for now.
+    // We need allPlanets for dignity... let's adjust signature later or assume basic dignity.
+
+    // Let's assume we can get dignity from context or pass it.
+    // For this implementation, we will return a raw score based on available data.
+
+    return points; // Placeholder, will implement full logic in component or helper
+};
+
+// 5. Calculate Aspects
+export const calculateAspects = (planet: any, allPlanets: any[]) => {
+    const aspects: { planet: string; type: string; strength: number }[] = [];
+    const planetSign = planet.signIndex;
+
+    // Standard 7th aspect
+    const seventhHouseIndex = (planetSign + 6) % 12;
+
+    // Special Aspects
+    const specialAspects: number[] = [];
+    if (planet.name === 'Mars') specialAspects.push(3, 7); // 4th and 8th (index +3, +7)
+    if (planet.name === 'Jupiter') specialAspects.push(4, 8); // 5th and 9th
+    if (planet.name === 'Saturn') specialAspects.push(2, 9); // 3rd and 10th
+    if (planet.name === 'Rahu' || planet.name === 'Ketu') specialAspects.push(4, 8); // 5th and 9th (often considered)
+
+    // Check which planets are in these signs
+    allPlanets.forEach(target => {
+        if (target.name === planet.name) return;
+
+        // 7th Aspect
+        if (target.signIndex === seventhHouseIndex) {
+            aspects.push({ planet: target.name, type: '7th', strength: 100 });
+        }
+
+        // Special Aspects
+        specialAspects.forEach(offset => {
+            const aspectIndex = (planetSign + offset) % 12;
+            if (target.signIndex === aspectIndex) {
+                let type = `${offset + 1}th`;
+                let strength = 75; // Default for special
+                if (planet.name === 'Mars' && (offset === 3 || offset === 7)) strength = offset === 3 ? 75 : 75; // 4th/8th
+                // Adjust strength values as per requirement
+                if (planet.name === 'Mars') strength = offset === 6 ? 100 : 75; // 7th is 100
+
+                aspects.push({ planet: target.name, type, strength });
+            }
+        });
+    });
+
+    return aspects;
+};
 
 // Approximate Lahiri Ayanamsa calculation
 // Based on 23° 51' 11" at J2000 (Jan 1 2000, 12:00 UTC)
@@ -128,4 +318,174 @@ export const getNakshatra = (longitude: number) => {
     const index = Math.floor(longitude / nakshatraSpan);
     const pada = Math.floor((longitude % nakshatraSpan) / 3.333333) + 1;
     return { index, pada };
+};
+
+// Vimshottari Dasha Constants
+export const DASHA_YEARS: Record<string, number> = {
+    Ketu: 7,
+    Venus: 20,
+    Sun: 6,
+    Moon: 10,
+    Mars: 7,
+    Rahu: 18,
+    Jupiter: 16,
+    Saturn: 19,
+    Mercury: 17
+};
+
+export const DASHA_ORDER = [
+    'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury'
+];
+
+export const PLANET_COLORS: Record<string, string> = {
+    Ketu: '#8B4513',
+    Venus: '#FF69B4',
+    Sun: '#FF6347',
+    Moon: '#C0C0C0',
+    Mars: '#DC143C',
+    Rahu: '#2C3E50',
+    Jupiter: '#FFD700',
+    Saturn: '#4169E1',
+    Mercury: '#32CD32'
+};
+
+export const NAKSHATRA_LORDS = [
+    'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
+    'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
+    'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury'
+];
+
+export interface DashaPeriod {
+    planet: string;
+    startDate: Date;
+    endDate: Date;
+    durationYears: number;
+    subPeriods?: DashaPeriod[];
+    level: 'Maha' | 'Bhukti' | 'Antaram';
+}
+
+// Helper to add years (fractional) to date
+const addYears = (date: Date, years: number): Date => {
+    const result = new Date(date);
+    const totalDays = years * 365.2425; // Use Gregorian year avg
+    result.setTime(result.getTime() + totalDays * 24 * 60 * 60 * 1000);
+    return result;
+};
+
+const generateSubPeriods = (parentPlanet: string, startDate: Date, parentDuration: number, level: 'Bhukti' | 'Antaram', grandParentPlanet?: string): DashaPeriod[] => {
+    const subPeriods: DashaPeriod[] = [];
+    let currentSubDate = new Date(startDate);
+
+    // Sequence starts from the parent planet
+    const startIndex = DASHA_ORDER.indexOf(parentPlanet);
+
+    for (let i = 0; i < 9; i++) {
+        const planetIndex = (startIndex + i) % 9;
+        const planet = DASHA_ORDER[planetIndex];
+
+        let durationYears = 0;
+
+        if (level === 'Bhukti') {
+            // Bhukti = (Maha Years * Bhukti Years) / 120
+            durationYears = (parentDuration * DASHA_YEARS[planet]) / 120;
+        } else {
+            // Antaram = (Bhukti Years * Antaram Years) / 120 (relative to Bhukti duration)
+            durationYears = parentDuration * (DASHA_YEARS[planet] / 120);
+        }
+
+        const endDate = addYears(currentSubDate, durationYears);
+
+        subPeriods.push({
+            planet,
+            startDate: new Date(currentSubDate),
+            endDate: new Date(endDate),
+            durationYears,
+            level
+        });
+
+        currentSubDate = endDate;
+    }
+
+    return subPeriods;
+};
+
+export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) => {
+    // 1. Calculate Nakshatra and Balance
+    const nakshatraSpan = 13 + (20 / 60); // 13.3333 degrees
+    let nakshatraIndex = Math.floor(moonLongitude / nakshatraSpan);
+
+    // Safety bounds check
+    if (nakshatraIndex >= 27) nakshatraIndex = 0;
+    if (nakshatraIndex < 0) nakshatraIndex = 0;
+
+    const longitudeInNakshatra = moonLongitude % nakshatraSpan;
+    const percentagePassed = longitudeInNakshatra / nakshatraSpan;
+    const percentageRemaining = 1 - percentagePassed;
+
+    const birthLord = NAKSHATRA_LORDS[nakshatraIndex];
+    if (!birthLord) {
+        console.error("Invalid nakshatra index or lord:", nakshatraIndex, birthLord);
+        return [];
+    }
+
+    const birthLordIndexInOrder = DASHA_ORDER.indexOf(birthLord);
+
+    const birthDashaTotalYears = DASHA_YEARS[birthLord];
+    const birthDashaBalanceYears = birthDashaTotalYears * percentageRemaining;
+
+    const periods: DashaPeriod[] = [];
+    let currentDate = new Date(birthDate);
+
+    // 2. Generate Maha Dashas for 120 years
+    // First period (Balance)
+    let endDate = addYears(currentDate, birthDashaBalanceYears);
+    periods.push({
+        planet: birthLord,
+        startDate: new Date(currentDate),
+        endDate: new Date(endDate),
+        durationYears: birthDashaBalanceYears,
+        level: 'Maha'
+    });
+    currentDate = endDate;
+
+    // Subsequent periods
+    let currentLordIndex = (birthLordIndexInOrder + 1) % 9;
+    while (periods.length < 9) { // Usually cover full cycle or until 120 years
+        const planet = DASHA_ORDER[currentLordIndex];
+        const duration = DASHA_YEARS[planet];
+        endDate = addYears(currentDate, duration);
+
+        periods.push({
+            planet,
+            startDate: new Date(currentDate),
+            endDate: new Date(endDate),
+            durationYears: duration,
+            level: 'Maha'
+        });
+
+        currentDate = endDate;
+        currentLordIndex = (currentLordIndex + 1) % 9;
+    }
+
+    // 3. Generate Bhuktis and Antarams for each Maha Dasha
+    periods.forEach(maha => {
+        maha.subPeriods = generateSubPeriods(maha.planet, maha.startDate, maha.durationYears, 'Bhukti');
+
+        // Generate Antarams for current Bhukti
+        maha.subPeriods.forEach(bhukti => {
+            bhukti.subPeriods = generateSubPeriods(bhukti.planet, bhukti.startDate, bhukti.durationYears, 'Antaram', maha.planet);
+        });
+    });
+
+    return periods;
+};
+
+export const getCurrentDasha = (periods: DashaPeriod[], date: Date = new Date()) => {
+    const maha = periods.find(p => date >= p.startDate && date < p.endDate);
+    if (!maha) return null;
+
+    const bhukti = maha.subPeriods?.find(p => date >= p.startDate && date < p.endDate);
+    const antaram = bhukti?.subPeriods?.find(p => date >= p.startDate && date < p.endDate);
+
+    return { maha, bhukti, antaram };
 };

@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Star, AlertTriangle, Crown } from 'lucide-react';
+import { ChevronDown, ChevronUp, Star, AlertTriangle, Crown, Activity, Eye, ArrowRight } from 'lucide-react';
 import { NAKSHATRAS, ZODIAC_SIGNS, TAMIL_RASI_NAMES } from '../utils/constants';
-import { getNakshatra } from '../utils/astrology';
+import {
+    getNakshatra,
+    calculateDignity,
+    checkNeechaBhanga,
+    checkParivartana,
+    calculateAspects,
+    calculateStrength
+} from '../utils/astrology';
+import { useLanguage } from '../contexts/LanguageContext';
+import { TAMIL_PLANET_NAMES, TAMIL_NAKSHATRAS } from '../utils/translations';
 
 interface ChartAnalysisProps {
     data: any;
 }
 
 const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
+    const { t, language } = useLanguage();
     if (!data) return null;
 
     const { planets, ascendant } = data;
@@ -19,8 +29,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
         const yogas = [];
         const doshas = [];
 
-        // Simple Gajakesari Yoga (Jupiter in Kendra from Moon) - Simplified check
-        // Need house positions relative to Moon.
+        // Simple Gajakesari Yoga (Jupiter in Kendra from Moon)
         const moon = planets.find((p: any) => p.name === 'Moon');
         const jupiter = planets.find((p: any) => p.name === 'Jupiter');
 
@@ -34,12 +43,34 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
         // Manglik Dosha (Mars in 1, 2, 4, 7, 8, 12 from Ascendant)
         const mars = planets.find((p: any) => p.name === 'Mars');
         if (mars) {
-            // Calculate house of Mars relative to Ascendant
             let house = (mars.signIndex - ascendant.signIndex + 12) % 12 + 1;
             if ([1, 2, 4, 7, 8, 12].includes(house)) {
                 doshas.push({ name: 'Manglik Dosha', description: 'Mars is in a position that may cause delay or difficulty in marriage.' });
             }
         }
+
+        // Advanced Yogas
+        // Parivartana
+        const exchanges = checkParivartana(planets);
+        exchanges.forEach(ex => {
+            const p1Name = language === 'ta' ? TAMIL_PLANET_NAMES[ex.p1] : ex.p1;
+            const p2Name = language === 'ta' ? TAMIL_PLANET_NAMES[ex.p2] : ex.p2;
+            yogas.push({
+                name: t.advancedYogas.parivartana,
+                description: `${p1Name} & ${p2Name} exchange signs.`
+            });
+        });
+
+        // Neecha Bhanga
+        planets.forEach((p: any) => {
+            if (checkNeechaBhanga(p, planets, ascendant)) {
+                const pName = language === 'ta' ? TAMIL_PLANET_NAMES[p.name] : p.name;
+                yogas.push({
+                    name: t.advancedYogas.neechaBhangaRajaYoga,
+                    description: `${pName} gets cancellation of debilitation.`
+                });
+            }
+        });
 
         return { yogas, doshas };
     };
@@ -50,6 +81,21 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
         setExpandedSection(expandedSection === section ? null : section);
     };
 
+    const getDignityColor = (dignity: string) => {
+        switch (dignity) {
+            case 'exalted': return 'text-yellow-400 font-bold';
+            case 'ownSign': return 'text-green-400 font-semibold';
+            case 'friend': return 'text-blue-300';
+            case 'debilitated': return 'text-red-400';
+            case 'enemy': return 'text-orange-300';
+            default: return 'text-slate-400';
+        }
+    };
+
+    const getDignityLabel = (dignity: string) => {
+        return t.dignity[dignity as keyof typeof t.dignity] || dignity;
+    };
+
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <motion.div
@@ -58,9 +104,9 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                 className="text-center mb-8"
             >
                 <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                    Detailed Analysis
+                    {t.analysis.title}
                 </h2>
-                <p className="text-slate-400">Planetary Positions & Yogas</p>
+                <p className="text-slate-400">{t.analysis.subtitle}</p>
             </motion.div>
 
             {/* Planetary Positions Table */}
@@ -71,7 +117,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                 >
                     <div className="flex items-center gap-2">
                         <Star className="w-5 h-5 text-purple-400" />
-                        <h3 className="text-lg font-semibold">Planetary Positions</h3>
+                        <h3 className="text-lg font-semibold">{t.analysis.planets}</h3>
                     </div>
                     {expandedSection === 'planets' ? <ChevronUp /> : <ChevronDown />}
                 </button>
@@ -88,30 +134,48 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
-                                            <th className="p-4">Planet</th>
-                                            <th className="p-4">Sign (Rasi)</th>
-                                            <th className="p-4">Degree</th>
-                                            <th className="p-4">Nakshatra</th>
-                                            <th className="p-4">Pada</th>
+                                            <th className="p-4">{t.analysis.table.planet}</th>
+                                            <th className="p-4">{t.analysis.table.sign}</th>
+                                            <th className="p-4">{t.analysis.table.degree}</th>
+                                            <th className="p-4">{t.analysis.table.nakshatra}</th>
+                                            <th className="p-4">Dignity</th>
+                                            <th className="p-4">Aspects</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800">
                                         <tr className="bg-purple-900/10">
-                                            <td className="p-4 font-medium text-purple-300">Ascendant</td>
+                                            <td className="p-4 font-medium text-purple-300">{t.chart.lagna}</td>
                                             <td className="p-4">{TAMIL_RASI_NAMES[ascendant.signIndex]} ({ZODIAC_SIGNS[ascendant.signIndex]})</td>
                                             <td className="p-4">{Math.floor(ascendant.degree)}° {Math.round((ascendant.degree % 1) * 60)}'</td>
-                                            <td className="p-4">{NAKSHATRAS[getNakshatra(ascendant.longitude).index]}</td>
-                                            <td className="p-4">{getNakshatra(ascendant.longitude).pada}</td>
+                                            <td className="p-4">{language === 'ta' ? TAMIL_NAKSHATRAS[getNakshatra(ascendant.longitude).index] : NAKSHATRAS[getNakshatra(ascendant.longitude).index]}</td>
+                                            <td className="p-4">-</td>
+                                            <td className="p-4">-</td>
                                         </tr>
                                         {planets.map((planet: any) => {
                                             const nak = getNakshatra(planet.longitude);
+                                            const dignity = calculateDignity(planet.name, planet.signIndex, planet.degree, planets);
+                                            const aspects = calculateAspects(planet, planets);
+
                                             return (
                                                 <tr key={planet.name} className="hover:bg-slate-800/30 transition-colors">
-                                                    <td className="p-4 font-medium">{planet.name}</td>
+                                                    <td className="p-4 font-medium">{language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}</td>
                                                     <td className="p-4">{TAMIL_RASI_NAMES[planet.signIndex]} ({ZODIAC_SIGNS[planet.signIndex]})</td>
                                                     <td className="p-4">{Math.floor(planet.degree)}° {Math.round((planet.degree % 1) * 60)}'</td>
-                                                    <td className="p-4">{NAKSHATRAS[nak.index]}</td>
-                                                    <td className="p-4">{nak.pada}</td>
+                                                    <td className="p-4">{language === 'ta' ? TAMIL_NAKSHATRAS[nak.index] : NAKSHATRAS[nak.index]}</td>
+                                                    <td className={`p-4 ${getDignityColor(dignity)}`}>
+                                                        {getDignityLabel(dignity)}
+                                                    </td>
+                                                    <td className="p-4 text-xs">
+                                                        {aspects.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {aspects.map((asp, i) => (
+                                                                    <span key={i} className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
+                                                                        {language === 'ta' ? TAMIL_PLANET_NAMES[asp.planet] : asp.planet} ({asp.type})
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : '-'}
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
@@ -129,7 +193,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                 <div className="glass-panel p-6">
                     <div className="flex items-center gap-2 mb-4">
                         <Crown className="w-5 h-5 text-yellow-400" />
-                        <h3 className="text-lg font-semibold">Yogas (Fortunes)</h3>
+                        <h3 className="text-lg font-semibold">{t.analysis.yogas}</h3>
                     </div>
                     {yogas.length > 0 ? (
                         <ul className="space-y-3">
@@ -141,7 +205,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-slate-500 italic">No major yogas detected in this simplified analysis.</p>
+                        <p className="text-slate-500 italic">{t.analysis.noYogas}</p>
                     )}
                 </div>
 
@@ -149,7 +213,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                 <div className="glass-panel p-6">
                     <div className="flex items-center gap-2 mb-4">
                         <AlertTriangle className="w-5 h-5 text-red-400" />
-                        <h3 className="text-lg font-semibold">Doshas (Challenges)</h3>
+                        <h3 className="text-lg font-semibold">{t.analysis.doshas}</h3>
                     </div>
                     {doshas.length > 0 ? (
                         <ul className="space-y-3">
@@ -161,7 +225,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-slate-500 italic">No major doshas detected.</p>
+                        <p className="text-slate-500 italic">{t.analysis.noDoshas}</p>
                     )}
                 </div>
             </div>

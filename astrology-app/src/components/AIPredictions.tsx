@@ -2,13 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Send, Bot, User, Key, AlertCircle } from 'lucide-react';
 import { NAKSHATRAS, ZODIAC_SIGNS, TAMIL_RASI_NAMES } from '../utils/constants';
-import { getNakshatra } from '../utils/astrology';
+import { getNakshatra, calculateDashaPeriods, getCurrentDasha } from '../utils/astrology';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface AIPredictionsProps {
     data: any;
 }
 
 const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
+    const { t, language } = useLanguage();
     const [apiKey, setApiKey] = useState('');
     const [prediction, setPrediction] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +38,17 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
         const ascendantDetail = `Ascendant in ${TAMIL_RASI_NAMES[ascendant.signIndex]} (${ZODIAC_SIGNS[ascendant.signIndex]})`;
 
+        // Calculate Dasha
+        const moon = planets.find((p: any) => p.name === 'Moon');
+        let dashaText = '';
+        if (moon) {
+            const periods = calculateDashaPeriods(userDetails.birthDate, moon.longitude);
+            const current = getCurrentDasha(periods);
+            if (current) {
+                dashaText = `Current Vimshottari Dasha Period: ${current.maha.planet} Maha Dasha, ${current.bhukti?.planet} Bhukti, ${current.antaram?.planet} Antaram.`;
+            }
+        }
+
         return `
       You are an expert Vedic Astrologer. Analyze this birth chart:
       Name: ${userDetails.name}
@@ -47,11 +60,14 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
       ${ascendantDetail}
       ${planetDetails}
       
+      ${dashaText}
+      
       ${context}
       
       Provide predictions for career, relationships, health, and favorable periods. 
       Consider planetary positions, house placements, and current dasha period (estimate).
       Be positive but realistic. Use Vedic terminology where appropriate but explain it.
+      ${language === 'ta' ? 'Please provide the response in Tamil language.' : ''}
     `;
     };
 
@@ -74,7 +90,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     'x-api-key': apiKey,
                     'anthropic-version': '2023-06-01',
                     'content-type': 'application/json',
-                    'dangerously-allow-browser': 'true' // Only for demo/local apps
+                    'dangerously-allow-browser': 'true'
                 },
                 body: JSON.stringify({
                     model: "claude-3-sonnet-20240229",
@@ -91,7 +107,6 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             const data = await response.json();
             const text = data.content[0].text;
 
-            // Simulate streaming effect
             let i = 0;
             const interval = setInterval(() => {
                 setPrediction(prev => prev + text.charAt(i));
@@ -158,22 +173,22 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 className="text-center flex-shrink-0"
             >
                 <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                    AI Astrologer
+                    {t.predictions.title}
                 </h2>
-                <p className="text-slate-400">Powered by Claude 3.5 Sonnet</p>
+                <p className="text-slate-400">{t.predictions.subtitle}</p>
             </motion.div>
 
             {/* API Key Input */}
             {!prediction && chatHistory.length === 0 && (
                 <div className="glass-panel p-6 max-w-md mx-auto w-full">
                     <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                        <Key className="w-4 h-4" /> Enter Anthropic API Key
+                        <Key className="w-4 h-4" /> {t.predictions.apiKeyLabel}
                     </label>
                     <input
                         type="password"
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="sk-ant-..."
+                        placeholder={t.predictions.apiKeyPlaceholder}
                         className="w-full bg-slate-900/50 border border-slate-700 rounded px-4 py-2 mb-4 focus:ring-2 focus:ring-purple-500 outline-none"
                     />
                     {error && (
@@ -187,10 +202,10 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                         className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         {isLoading ? <Sparkles className="animate-spin" /> : <Sparkles />}
-                        Generate Full Reading
+                        {t.predictions.generateBtn}
                     </button>
                     <p className="text-xs text-slate-500 mt-4 text-center">
-                        Your key is used directly in your browser and not stored.
+                        {t.predictions.note}
                     </p>
                 </div>
             )}
@@ -228,7 +243,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                             type="text"
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
-                            placeholder="Ask a follow-up question..."
+                            placeholder={t.predictions.askPlaceholder}
                             className="flex-1 bg-slate-950 border border-slate-700 rounded-full px-6 py-3 focus:ring-2 focus:ring-purple-500 outline-none"
                         />
                         <button

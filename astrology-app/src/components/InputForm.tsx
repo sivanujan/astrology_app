@@ -8,8 +8,11 @@ interface InputFormProps {
     setChartData: (data: any) => void;
 }
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
     const navigate = useNavigate();
+    const { t } = useLanguage();
     const [formData, setFormData] = useState({
         name: '',
         date: '',
@@ -96,17 +99,16 @@ const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
             >
                 <div className="text-center mb-10">
                     <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 mb-4">
-                        Discover Your Cosmic Blueprint
+                        {t.input.title}
                     </h1>
                     <p className="text-slate-400 text-lg">
-                        Enter your birth details to generate an authentic South Indian Vedic chart.
+                        {t.input.subtitle}
                     </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* Name Input */}
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300 ml-1">Full Name</label>
+                        <label className="text-sm font-medium text-slate-300 ml-1">{t.input.name}</label>
                         <input
                             type="text"
                             required
@@ -121,7 +123,7 @@ const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
                         {/* Date Input */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> Date of Birth
+                                <Calendar className="w-4 h-4" /> {t.input.dob}
                             </label>
                             <input
                                 type="date"
@@ -135,7 +137,7 @@ const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
                         {/* Time Input */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
-                                <Clock className="w-4 h-4" /> Time of Birth
+                                <Clock className="w-4 h-4" /> {t.input.tob}
                             </label>
                             <input
                                 type="time"
@@ -147,10 +149,9 @@ const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
                         </div>
                     </div>
 
-                    {/* City Search */}
                     <div className="space-y-2 relative">
                         <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
-                            <MapPin className="w-4 h-4" /> Place of Birth
+                            <MapPin className="w-4 h-4" /> {t.input.pob}
                         </label>
                         <div className="relative">
                             <input
@@ -159,7 +160,7 @@ const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
                                 value={citySearch}
                                 onChange={(e) => setCitySearch(e.target.value)}
                                 className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
-                                placeholder="Search city..."
+                                placeholder={t.input.searchPlaceholder}
                             />
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                             {isSearching && (
@@ -196,11 +197,11 @@ const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
                         {isGenerating ? (
                             <>
                                 <Loader2 className="w-5 h-5 animate-spin" />
-                                Calculating Planetary Positions...
+                                {t.input.generating}
                             </>
                         ) : (
                             <>
-                                Generate Vedic Chart
+                                {t.input.generateBtn}
                                 <SparklesIcon />
                             </>
                         )}
