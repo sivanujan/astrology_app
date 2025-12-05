@@ -439,7 +439,7 @@ const generateSubPeriods = (parentPlanet: string, startDate: Date, parentDuratio
 
 export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) => {
     // 1. Calculate Nakshatra and Balance
-    const nakshatraSpan = 13 + (20 / 60); // 13.3333 degrees
+    const nakshatraSpan = 13.333333; // 13 degrees 20 minutes
     let nakshatraIndex = Math.floor(moonLongitude / nakshatraSpan);
 
     // Safety bounds check
@@ -516,4 +516,75 @@ export const getCurrentDasha = (periods: DashaPeriod[], date: Date = new Date())
     const antaram = bhukti?.subPeriods?.find(p => date >= p.startDate && date < p.endDate);
 
     return { maha, bhukti, antaram };
+};
+
+// --- Navamsa Calculation ---
+
+export const calculateNavamsa = (longitude: number) => {
+    // 1. Get Sign and Degree
+    const signIndex = Math.floor(longitude / 30);
+    const degreeInSign = longitude % 30;
+
+    // 2. Get Pada (1-9)
+    // Each Pada is 3deg 20min = 3.3333 degrees
+    const pada = Math.floor(degreeInSign / 3.3333333333) + 1;
+
+    // 3. Determine Navamsa Sign based on Element
+    // Movable: Aries (0), Cancer (3), Libra (6), Capricorn (9) -> Start from Sign itself
+    // Fixed: Taurus (1), Leo (4), Scorpio (7), Aquarius (10) -> Start from 9th from Sign
+    // Dual: Gemini (2), Virgo (5), Sagittarius (8), Pisces (11) -> Start from 5th from Sign
+
+    let startSignIndex = 0;
+
+    // Determine Quality: 0=Movable, 1=Fixed, 2=Dual
+    // Aries(0) -> Movable (0%3=0)
+    // Taurus(1) -> Fixed (1%3=1)
+    // Gemini(2) -> Dual (2%3=2)
+    // Cancer(3) -> Movable (3%3=0)
+    const quality = signIndex % 3;
+
+    if (quality === 0) { // Movable
+        startSignIndex = signIndex;
+    } else if (quality === 1) { // Fixed
+        // 9th from Sign = Sign + 8
+        startSignIndex = (signIndex + 8) % 12;
+    } else { // Dual
+        // 5th from Sign = Sign + 4
+        startSignIndex = (signIndex + 4) % 12;
+    }
+
+    // Calculate final sign
+    // 1st Pada = StartSign
+    // 2nd Pada = StartSign + 1
+    // ...
+    const navamsaSignIndex = (startSignIndex + (pada - 1)) % 12;
+
+    return {
+        signIndex: navamsaSignIndex,
+        pada: pada
+    };
+};
+
+export const getNavamsaChartData = (rasiData: any) => {
+    if (!rasiData) return null;
+
+    const navamsaPlanets = rasiData.planets.map((p: any) => {
+        const navamsa = calculateNavamsa(p.longitude);
+        return {
+            ...p,
+            signIndex: navamsa.signIndex,
+            navamsaPada: navamsa.pada
+        };
+    });
+
+    const navamsaAscendant = {
+        ...rasiData.ascendant,
+        signIndex: calculateNavamsa(rasiData.ascendant.longitude).signIndex
+    };
+
+    return {
+        planets: navamsaPlanets,
+        ascendant: navamsaAscendant,
+        userDetails: rasiData.userDetails
+    };
 };

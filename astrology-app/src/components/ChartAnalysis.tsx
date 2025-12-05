@@ -11,6 +11,7 @@ import {
     calculateStrength
 } from '../utils/astrology';
 import { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } from '../utils/subathuvam';
+import { calculateAdityaGurujiSubathuvam, calculateDigbalaAndYogas, getFunctionalNature, generateSpecialPredictions } from '../utils/adityaGurujiSubathuvam';
 import { useLanguage } from '../contexts/LanguageContext';
 import { TAMIL_PLANET_NAMES, TAMIL_NAKSHATRAS } from '../utils/translations';
 
@@ -372,6 +373,191 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                {/* Aditya Guruji Subathuvam Analysis */}
+                <div className="mt-8">
+                    <h4 className="text-md font-semibold text-slate-300 mb-4">Aditya Guruji Subathuvam Method</h4>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
+                                    <th className="p-4">Planet</th>
+                                    <th className="p-4 text-center">Rasi Score</th>
+                                    <th className="p-4 text-center">Navamsa Score</th>
+                                    <th className="p-4 text-center">Total Score</th>
+                                    <th className="p-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                                {planets.map((planet: any) => {
+                                    const agScores = calculateAdityaGurujiSubathuvam(planets);
+                                    const pScore = agScores[planet.name];
+                                    if (!pScore) return null;
+
+                                    return (
+                                        <tr key={planet.name} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="p-4 font-medium">
+                                                {language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}
+                                                {pScore.details.length > 0 && (
+                                                    <div className="text-xs text-slate-500 mt-1">
+                                                        {pScore.details.join(', ')}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-center text-slate-300">{pScore.rasiScore}</td>
+                                            <td className="p-4 text-center text-slate-300">{pScore.navamsaScore}</td>
+                                            <td className="p-4 text-center">
+                                                <span className={`font-bold ${pScore.totalScore >= 50 ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                    {pScore.totalScore}
+                                                </span>
+                                            </td>
+                                            <td className="p-4">
+                                                {pScore.isSubathuva ? (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-400 border border-green-700/50">
+                                                        Subathuva Planet
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                                                        Normal
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Final Prediction Outcome (Digbala + Subathuvam + Adhipathiyam) */}
+                <div className="mt-8">
+                    <h4 className="text-md font-semibold text-slate-300 mb-4">Final Prediction Outcome (Digbala + Subathuvam + Adhipathiyam)</h4>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
+                                    <th className="p-4">Planet</th>
+                                    <th className="p-4 text-center">Digbala</th>
+                                    <th className="p-4">Prediction Outcome</th>
+                                    <th className="p-4">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                                {planets.map((planet: any) => {
+                                    if (['Rahu', 'Ketu'].includes(planet.name)) return null;
+
+                                    const agScores = calculateAdityaGurujiSubathuvam(planets);
+                                    const yogaResults = calculateDigbalaAndYogas(planets, data.ascendant.signIndex, agScores);
+                                    const result = yogaResults[planet.name];
+
+                                    if (!result) return null;
+
+                                    let statusColor = 'text-slate-400';
+                                    if (result.yogaStatus === 'Rajayogam' || result.yogaStatus === 'Jackpot' || result.yogaStatus === 'Good') {
+                                        statusColor = 'text-green-400';
+                                    } else if (result.yogaStatus === 'Dangerously Strong' || result.yogaStatus === 'Severe Trouble') {
+                                        statusColor = 'text-red-400';
+                                    }
+
+                                    return (
+                                        <tr key={planet.name} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="p-4 font-medium">
+                                                {language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {result.digbalaStatus !== 'None' ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900/30 text-blue-300 border border-blue-700/30">
+                                                        {result.digbalaStatus} ({result.digbalaScore})
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-600">-</span>
+                                                )}
+                                            </td>
+                                            <td className={`p-4 font-bold ${statusColor}`}>
+                                                {result.yogaStatus}
+                                            </td>
+                                            <td className="p-4 text-sm text-slate-400">
+                                                {result.description}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Comprehensive Analysis (Functional Status & Special Predictions) */}
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Functional Status Table */}
+                    <div>
+                        <h4 className="text-md font-semibold text-slate-300 mb-4">Functional Status (Lagna Based)</h4>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
+                                        <th className="p-4">Planet</th>
+                                        <th className="p-4">Nature</th>
+                                        <th className="p-4">Roles</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {planets.map((planet: any) => {
+                                        const functionalNature = getFunctionalNature(data.ascendant.signIndex);
+                                        const status = functionalNature[planet.name];
+                                        if (!status) return null;
+
+                                        let natureColor = 'text-slate-400';
+                                        if (status.nature === 'Yogakaraka' || status.nature === 'Benefic') natureColor = 'text-green-400';
+                                        else if (status.nature === 'Malefic' || status.nature === 'Maraka') natureColor = 'text-red-400';
+
+                                        return (
+                                            <tr key={planet.name} className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="p-4 font-medium">
+                                                    {language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}
+                                                </td>
+                                                <td className={`p-4 font-bold ${natureColor}`}>
+                                                    {status.nature}
+                                                </td>
+                                                <td className="p-4 text-xs text-slate-500">
+                                                    {status.roles.join(', ')}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Special Predictions */}
+                    <div>
+                        <h4 className="text-md font-semibold text-slate-300 mb-4">Special Predictions (Subathuvam Filtered)</h4>
+                        <div className="space-y-4">
+                            {(() => {
+                                const agScores = calculateAdityaGurujiSubathuvam(planets);
+                                const predictions = generateSpecialPredictions(planets, data.ascendant.signIndex, agScores);
+
+                                if (predictions.length === 0) {
+                                    return <div className="text-slate-500 italic p-4">No special placements detected for this chart.</div>;
+                                }
+
+                                return predictions.map((pred, idx) => (
+                                    <div key={idx} className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="font-bold text-purple-400">{pred.planet}</span>
+                                            <span className="text-xs text-slate-500 uppercase tracking-wider">{pred.type}</span>
+                                        </div>
+                                        <p className="text-slate-300 text-sm leading-relaxed">
+                                            {pred.prediction}
+                                        </p>
+                                    </div>
+                                ));
+                            })()}
+                        </div>
                     </div>
                 </div>
             </div>
