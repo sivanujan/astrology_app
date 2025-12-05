@@ -157,41 +157,69 @@ export const calculateStrength = (planet: any, ascendant: any, timeOfDay: 'day' 
 };
 
 // 5. Calculate Aspects
+// 5. Calculate Aspects
 export const calculateAspects = (planet: any, allPlanets: any[]) => {
-    const aspects: { planet: string; type: string; strength: number }[] = [];
+    const aspects: {
+        type: string;
+        strength: number;
+        signIndex: number;
+        planets: string[]
+    }[] = [];
     const planetSign = planet.signIndex;
 
-    // Standard 7th aspect
-    const seventhHouseIndex = (planetSign + 6) % 12;
+    // Define aspect rules based on planet
+    let aspectRules: { offset: number; strength: number }[] = [];
 
-    // Special Aspects
-    const specialAspects: number[] = [];
-    if (planet.name === 'Mars') specialAspects.push(3, 7); // 4th and 8th (index +3, +7)
-    if (planet.name === 'Jupiter') specialAspects.push(4, 8); // 5th and 9th
-    if (planet.name === 'Saturn') specialAspects.push(2, 9); // 3rd and 10th
-    if (planet.name === 'Rahu' || planet.name === 'Ketu') specialAspects.push(4, 8); // 5th and 9th (often considered)
+    switch (planet.name) {
+        case 'Mars':
+            aspectRules = [
+                { offset: 3, strength: 75 },  // 4th
+                { offset: 6, strength: 100 }, // 7th
+                { offset: 7, strength: 75 }   // 8th
+            ];
+            break;
+        case 'Jupiter':
+            aspectRules = [
+                { offset: 4, strength: 75 },  // 5th
+                { offset: 6, strength: 100 }, // 7th
+                { offset: 8, strength: 75 }   // 9th
+            ];
+            break;
+        case 'Saturn':
+            aspectRules = [
+                { offset: 2, strength: 75 },  // 3rd
+                { offset: 6, strength: 100 }, // 7th
+                { offset: 9, strength: 75 }   // 10th
+            ];
+            break;
+        case 'Rahu':
+        case 'Ketu':
+            aspectRules = [
+                { offset: 6, strength: 100 }  // 7th only
+            ];
+            break;
+        default:
+            // Sun, Moon, Mercury, Venus
+            aspectRules = [
+                { offset: 6, strength: 100 }  // 7th
+            ];
+            break;
+    }
 
-    // Check which planets are in these signs
-    allPlanets.forEach(target => {
-        if (target.name === planet.name) return;
+    // Calculate aspects for each rule
+    aspectRules.forEach(rule => {
+        const targetSignIndex = (planetSign + rule.offset) % 12;
 
-        // 7th Aspect
-        if (target.signIndex === seventhHouseIndex) {
-            aspects.push({ planet: target.name, type: '7th', strength: 100 });
-        }
+        // Find planets in this sign
+        const planetsInSign = allPlanets
+            .filter(p => p.signIndex === targetSignIndex && p.name !== planet.name)
+            .map(p => p.name);
 
-        // Special Aspects
-        specialAspects.forEach(offset => {
-            const aspectIndex = (planetSign + offset) % 12;
-            if (target.signIndex === aspectIndex) {
-                let type = `${offset + 1}th`;
-                let strength = 75; // Default for special
-                if (planet.name === 'Mars' && (offset === 3 || offset === 7)) strength = offset === 3 ? 75 : 75; // 4th/8th
-                // Adjust strength values as per requirement
-                if (planet.name === 'Mars') strength = offset === 6 ? 100 : 75; // 7th is 100
-
-                aspects.push({ planet: target.name, type, strength });
-            }
+        aspects.push({
+            type: `${rule.offset + 1}th`,
+            strength: rule.strength,
+            signIndex: targetSignIndex,
+            planets: planetsInSign
         });
     });
 

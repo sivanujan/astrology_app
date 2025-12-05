@@ -92,6 +92,11 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                                     </div>
                                 )}
 
+                                {/* House Number */}
+                                <div className="absolute top-0 left-0 text-[10px] text-slate-500 font-mono px-1">
+                                    {((signIndex - ascendant.signIndex + 12) % 12) + 1}
+                                </div>
+
                                 {/* Planets Grid */}
                                 <div className="relative z-10 grid grid-cols-2 gap-0.5 mt-auto">
                                     {cellPlanets.map((planet: any, i: number) => (
@@ -101,7 +106,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.5 + (i * 0.1) }}
                                             className={`
-                        text-[10px] md:text-xs font-medium px-1 py-0.5 rounded
+                        text-xs md:text-sm font-medium px-1 py-0.5 rounded
                         ${planet.name === 'Sun' ? 'text-yellow-400' :
                                                     planet.name === 'Moon' ? 'text-white' :
                                                         planet.name === 'Mars' ? 'text-red-400' :
@@ -114,7 +119,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                                             title={`${language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}: ${Math.floor(planet.degree)}°`}
                                         >
                                             {language === 'ta' ? TAMIL_PLANET_ABBREVIATIONS[planet.name] : PLANET_SYMBOLS[planet.name as keyof typeof PLANET_SYMBOLS]}
-                                            <span className="text-[8px] opacity-70 ml-0.5">
+                                            <span className="text-[10px] opacity-70 ml-0.5">
                                                 {Math.floor(planet.degree)}°
                                             </span>
                                         </motion.div>

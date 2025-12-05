@@ -10,6 +10,7 @@ import {
     calculateAspects,
     calculateStrength
 } from '../utils/astrology';
+import { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } from '../utils/subathuvam';
 import { useLanguage } from '../contexts/LanguageContext';
 import { TAMIL_PLANET_NAMES, TAMIL_NAKSHATRAS } from '../utils/translations';
 
@@ -169,8 +170,18 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                                         {aspects.length > 0 ? (
                                                             <div className="flex flex-wrap gap-1">
                                                                 {aspects.map((asp, i) => (
-                                                                    <span key={i} className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
-                                                                        {language === 'ta' ? TAMIL_PLANET_NAMES[asp.planet] : asp.planet} ({asp.type})
+                                                                    <span
+                                                                        key={i}
+                                                                        className={`px-1.5 py-0.5 rounded text-slate-900 font-medium ${asp.strength === 100 ? 'bg-green-400' : 'bg-yellow-400'
+                                                                            }`}
+                                                                        title={`${asp.strength}% Strength`}
+                                                                    >
+                                                                        {TAMIL_RASI_NAMES[asp.signIndex]} ({asp.type})
+                                                                        {asp.planets.length > 0 && (
+                                                                            <span className="ml-1 opacity-75">
+                                                                                [{asp.planets.map(p => language === 'ta' ? TAMIL_PLANET_NAMES[p] : p).join(', ')}]
+                                                                            </span>
+                                                                        )}
                                                                     </span>
                                                                 ))}
                                                             </div>
@@ -227,6 +238,141 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                     ) : (
                         <p className="text-slate-500 italic">{t.analysis.noDoshas}</p>
                     )}
+                </div>
+            </div>
+            {/* Subathuvam & Pavathuvam Analysis */}
+            <div className="glass-panel p-6 mt-6">
+                <div className="flex items-center gap-2 mb-4">
+                    <Activity className="w-5 h-5 text-blue-400" />
+                    <h3 className="text-lg font-semibold">{t.subathuvam.title}</h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
+                                <th className="p-4">{t.analysis.table.planet}</th>
+                                <th className="p-4 text-green-400">{t.subathuvam.subathuvam}</th>
+                                <th className="p-4 text-red-400">{t.subathuvam.pavathuvam}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                            {planets.map((planet: any) => {
+                                const scores = calculateSubathuvamPavathuvam(planets);
+                                const pScores = scores[planet.name];
+                                if (!pScores) return null;
+
+                                return (
+                                    <tr key={planet.name} className="hover:bg-slate-800/30 transition-colors">
+                                        <td className="p-4 font-medium">
+                                            {language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-green-500"
+                                                            style={{ width: `${Math.min(pScores.subathuvam.score, 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="font-bold text-green-400">{pScores.subathuvam.score}</span>
+                                                </div>
+                                                {pScores.subathuvam.details.length > 0 && (
+                                                    <div className="text-xs text-slate-400">
+                                                        {pScores.subathuvam.details.join(', ')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-red-500"
+                                                            style={{ width: `${Math.min(pScores.pavathuvam.score, 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="font-bold text-red-400">{pScores.pavathuvam.score}</span>
+                                                </div>
+                                                {pScores.pavathuvam.details.length > 0 && (
+                                                    <div className="text-xs text-slate-400">
+                                                        {pScores.pavathuvam.details.join(', ')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="mt-8">
+                    <h4 className="text-md font-semibold text-slate-300 mb-4">{t.subathuvam.houseTitle}</h4>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
+                                    <th className="p-4">{t.subathuvam.house}</th>
+                                    <th className="p-4 text-green-400">{t.subathuvam.subathuvam}</th>
+                                    <th className="p-4 text-red-400">{t.subathuvam.pavathuvam}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map((houseNum) => {
+                                    const houseScores = calculateHouseSubathuvamPavathuvam(ascendant.signIndex, planets);
+                                    const hScores = houseScores[houseNum];
+                                    if (!hScores) return null;
+
+                                    return (
+                                        <tr key={houseNum} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="p-4 font-medium">
+                                                House {houseNum}
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-green-500"
+                                                                style={{ width: `${Math.min(hScores.subathuvam.score, 100)}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="font-bold text-green-400">{hScores.subathuvam.score}</span>
+                                                    </div>
+                                                    {hScores.subathuvam.details.length > 0 && (
+                                                        <div className="text-xs text-slate-400">
+                                                            {hScores.subathuvam.details.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-red-500"
+                                                                style={{ width: `${Math.min(hScores.pavathuvam.score, 100)}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="font-bold text-red-400">{hScores.pavathuvam.score}</span>
+                                                    </div>
+                                                    {hScores.pavathuvam.details.length > 0 && (
+                                                        <div className="text-xs text-slate-400">
+                                                            {hScores.pavathuvam.details.join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

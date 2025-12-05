@@ -87,6 +87,13 @@ export const translations = {
             kahalaParivartana: "Kahala Parivartana",
             dainyaParivartana: "Dainya Parivartana",
             neechaBhangaRajaYoga: "Neecha Bhanga Raja Yoga"
+        },
+        subathuvam: {
+            title: "Subathuvam & Pavathuvam Analysis",
+            houseTitle: "House Analysis (Bhava Subathuvam)",
+            subathuvam: "Subathuvam (Goodness)",
+            pavathuvam: "Pavathuvam (Badness)",
+            house: "House"
         }
     },
     ta: {
@@ -177,6 +184,13 @@ export const translations = {
             kahalaParivartana: "காஹள பரிவர்த்தனை",
             dainyaParivartana: "தைன்ய பரிவர்த்தனை",
             neechaBhangaRajaYoga: "நீச பங்க ராஜ யோகம்"
+        },
+        subathuvam: {
+            title: "சுபத்துவம் & பாத்துவம் ஆய்வு",
+            houseTitle: "பாவ சுபத்துவம் (வீடு ஆய்வு)",
+            subathuvam: "சுபத்துவம் (நன்மை)",
+            pavathuvam: "பாத்துவம் (தீமை)",
+            house: "பாவம்"
         }
     }
 };
