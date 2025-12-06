@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -15,6 +15,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         { path: '/analysis', label: t.nav.analysis, icon: Sun },
         { path: '/dasha', label: t.dasha.title, icon: Clock },
         { path: '/predictions', label: t.nav.predictions, icon: Sparkles },
+        { path: '/predictions-faq', label: "Basic Question and Answers", icon: MessageCircle },
+        { path: '/daily-snapshot', label: "Daily Snapshot", icon: Sun },
     ];
 
     const currentStepIndex = steps.findIndex(s => s.path === location.pathname);

@@ -1,6 +1,6 @@
 export const translations = {
     en: {
-        appTitle: "VedicAI",
+        appTitle: "SivaAstro",
         nav: {
             birthDetails: "Birth Details",
             chart: "Vedic Chart",

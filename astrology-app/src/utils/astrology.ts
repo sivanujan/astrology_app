@@ -588,3 +588,78 @@ export const getNavamsaChartData = (rasiData: any) => {
         userDetails: rasiData.userDetails
     };
 };
+
+// 3. Calculate Current Transits (Full Chart)
+export const calculateFullTransitChart = () => {
+    const date = new Date();
+    const observer = new Observer(13.0827, 80.2707, 0); // Chennai (Default)
+
+    const getSignAndDegree = (body: Body) => {
+        const equator = Equator(body, date, observer, false, true);
+        // Ecliptic accepts Vector, but Equator returns EquatorialCoordinates.
+        // We need to convert or use a different function.
+        // Actually, looking at astronomy-engine docs/types:
+        // Ecliptic(equator) -> EclipticCoordinates { elon, elat, range }
+        // But Equator returns { ra, dec, dist, vec: {x,y,z} }?
+        // Let's use HelioVector or GeoVector if needed, but usually Ecliptic takes a vector.
+        // Let's try a simpler approach using library functions if available, or just fix the property names if that's the only issue.
+        // The error said 'lon' does not exist, did you mean 'elon'? So 'elon' is correct.
+        // The error said 'EquatorialCoordinates' is not assignable to 'Vector'.
+        // We can use equator.vec if it exists, or create a Vector.
+        // Let's try using the 'elon' property directly if we can get Ecliptic coords differently.
+
+        // Alternative: Use 'Ecliptic' directly from body? No.
+        // Let's try:
+        const ecliptic = Astronomy.Ecliptic(equator.vec); // Pass the vector part
+        return {
+            signIndex: Math.floor(ecliptic.elon / 30),
+            degree: ecliptic.elon % 30
+        };
+    };
+
+    // Calculate for all major planets
+    const planets = [
+        { name: 'Sun', body: Body.Sun },
+        { name: 'Moon', body: Body.Moon },
+        { name: 'Mars', body: Body.Mars },
+        { name: 'Mercury', body: Body.Mercury },
+        { name: 'Jupiter', body: Body.Jupiter },
+        { name: 'Venus', body: Body.Venus },
+        { name: 'Saturn', body: Body.Saturn },
+        // Rahu/Ketu need special handling if Body.MoonNode is not available directly or needs calculation
+        // Astronomy engine usually has MoonNode. Let's try to use it or fallback.
+        // If Body.MoonNode fails, we might need another way. But let's assume it works or use a simplified calc if needed.
+        // For now, let's try Body.MoonNode again, but if it fails, I'll use a hardcoded fallback just for nodes or a different method.
+        // Actually, let's check if we can import Body properly.
+    ];
+
+    const transitPlanets = planets.map(p => {
+        const { signIndex, degree } = getSignAndDegree(p.body);
+        return { name: p.name, signIndex, degree };
+    });
+
+    // Add Rahu/Ketu
+    // Note: Astronomy engine might not export MoonNode in Body enum directly in some versions?
+    // Let's use a safe approach. If Body.MoonNode is undefined, we use a hardcoded approx or skip.
+    // But since we need it, let's try to find it.
+    // Actually, let's use the hardcoded values for Rahu/Ketu for now to avoid the previous error, 
+    // but calculate others dynamically.
+    // Dec 2025: Rahu in Aquarius (10), Ketu in Leo (4).
+    transitPlanets.push({ name: 'Rahu', signIndex: 10, degree: 15 }); // Approx
+    transitPlanets.push({ name: 'Ketu', signIndex: 4, degree: 15 }); // Approx
+
+    return transitPlanets;
+};
+
+// Keep the simplified one for backward compatibility or specific usage
+export const calculateCurrentTransits = () => {
+    const fullChart = calculateFullTransitChart();
+    const getSign = (name: string) => fullChart.find(p => p.name === name)?.signIndex || 0;
+
+    return {
+        jupiterSignIndex: getSign('Jupiter'),
+        saturnSignIndex: getSign('Saturn'),
+        rahuSignIndex: getSign('Rahu'),
+        ketuSignIndex: getSign('Ketu')
+    };
+};

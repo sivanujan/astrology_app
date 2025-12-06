@@ -17,7 +17,7 @@ const getDegreeDifference = (deg1: number, deg2: number) => {
 
 // Check if Moon is Waxing (Valarpirai)
 // Simplified: If Moon is ahead of Sun by 0-180 degrees, it's waxing.
-const isWaxingMoon = (moonLon: number, sunLon: number) => {
+export const isWaxingMoon = (moonLon: number, sunLon: number) => {
     let diff = moonLon - sunLon;
     if (diff < 0) diff += 360;
     return diff > 0 && diff < 180;

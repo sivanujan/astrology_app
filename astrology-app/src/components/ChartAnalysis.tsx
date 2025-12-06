@@ -8,12 +8,17 @@ import {
     checkNeechaBhanga,
     checkParivartana,
     calculateAspects,
-    calculateStrength
+    calculateStrength,
+    calculateDashaPeriods,
+    getCurrentDasha,
+    calculateCurrentTransits
 } from '../utils/astrology';
 import { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } from '../utils/subathuvam';
-import { calculateAdityaGurujiSubathuvam, calculateDigbalaAndYogas, getFunctionalNature, generateSpecialPredictions } from '../utils/adityaGurujiSubathuvam';
+import { calculateAdityaGurujiSubathuvam, calculateDigbalaAndYogas, getFunctionalNature, generateSpecialPredictions, calculateRahuKetuStrength } from '../utils/adityaGurujiSubathuvam';
+// predictionRules imports removed as they are used in RuleBasedPredictions.tsx
 import { useLanguage } from '../contexts/LanguageContext';
 import { TAMIL_PLANET_NAMES, TAMIL_NAKSHATRAS } from '../utils/translations';
+import RuleBasedPredictions from './RuleBasedPredictions';
 
 interface ChartAnalysisProps {
     data: any;
@@ -241,6 +246,16 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                     )}
                 </div>
             </div>
+
+            {/* Rule Based Predictions (Guruji's Q&A) */}
+            <div className="mt-8">
+                <div className="flex items-center gap-2 mb-4 px-2">
+                    <Star className="w-6 h-6 text-purple-400" />
+                    <h3 className="text-xl font-bold text-white">{t.predictions?.title || "Guruji's Predictions"}</h3>
+                </div>
+                <RuleBasedPredictions data={data} language={language as 'en' | 'ta'} />
+            </div>
+
             {/* Subathuvam & Pavathuvam Analysis */}
             <div className="glass-panel p-6 mt-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -560,6 +575,61 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                         </div>
                     </div>
                 </div>
+
+                {/* Shadow Planet Analysis (Rahu-Ketu) */}
+                <div className="mt-8">
+                    <h4 className="text-md font-semibold text-slate-300 mb-4">Shadow Planet Analysis (Rahu-Ketu)</h4>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
+                                    <th className="p-4">Planet</th>
+                                    <th className="p-4 text-center">House Score</th>
+                                    <th className="p-4 text-center">Subathuvam</th>
+                                    <th className="p-4 text-center">Soodshuma</th>
+                                    <th className="p-4 text-center">Total</th>
+                                    <th className="p-4">Prediction</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                                {['Rahu', 'Ketu'].map((planetName) => {
+                                    const rkResults = calculateRahuKetuStrength(planets, data.ascendant.signIndex);
+                                    const result = rkResults[planetName];
+                                    if (!result) return null;
+
+                                    let totalColor = 'text-slate-300';
+                                    if (result.totalScore >= 70) totalColor = 'text-green-400';
+                                    else if (result.totalScore >= 40) totalColor = 'text-yellow-400';
+                                    else totalColor = 'text-red-400';
+
+                                    return (
+                                        <tr key={planetName} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="p-4 font-medium">
+                                                {language === 'ta' ? TAMIL_PLANET_NAMES[planetName] : planetName}
+                                                {result.details.length > 0 && (
+                                                    <div className="text-xs text-slate-500 mt-1">
+                                                        {result.details.join(', ')}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-center text-slate-300">{result.houseScore}</td>
+                                            <td className="p-4 text-center text-slate-300">{result.subathuvamScore}</td>
+                                            <td className="p-4 text-center text-slate-300">{result.soodshumaScore}</td>
+                                            <td className={`p-4 text-center font-bold ${totalColor}`}>
+                                                {result.totalScore}
+                                            </td>
+                                            <td className="p-4 text-sm text-slate-400">
+                                                {result.prediction}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Guruji's Predictions (FAQ) - Moved to separate page */}
             </div>
         </div>
     );

@@ -6,6 +6,8 @@ import SouthIndianChart from './components/SouthIndianChart';
 import ChartAnalysis from './components/ChartAnalysis';
 import AIPredictions from './components/AIPredictions';
 import DashaPeriods from './components/DashaPeriods';
+import GurujiPredictions from './components/GurujiPredictions';
+import DailySnapshot from './components/DailySnapshot';
 
 // Placeholder components until we implement them
 const Placeholder = ({ title }: { title: string }) => (
@@ -39,6 +41,14 @@ function App() {
           <Route
             path="/predictions"
             element={chartData ? <AIPredictions data={chartData} /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/predictions-faq"
+            element={chartData ? <GurujiPredictions data={chartData} /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/daily-snapshot"
+            element={chartData ? <DailySnapshot data={chartData} /> : <Navigate to="/" />}
           />
         </Routes>
       </Layout>

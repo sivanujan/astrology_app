@@ -390,3 +390,170 @@ export const generateSpecialPredictions = (
 
     return predictions;
 };
+
+// --- Rahu-Ketu Analysis (Aditya Guruji Rules) ---
+
+import { isWaxingMoon } from './subathuvam';
+import { EXALTATION_POINTS } from './constants';
+
+export interface ShadowPlanetResult {
+    planet: string;
+    houseScore: number;
+    subathuvamScore: number;
+    soodshumaScore: number;
+    totalScore: number;
+    prediction: string;
+    details: string[];
+}
+
+export const calculateRahuKetuStrength = (
+    planets: any[],
+    ascendantSignIndex: number
+): Record<string, ShadowPlanetResult> => {
+    const results: Record<string, ShadowPlanetResult> = {};
+    const sun = planets.find(p => p.name === 'Sun');
+    const moon = planets.find(p => p.name === 'Moon');
+    const jupiter = planets.find(p => p.name === 'Jupiter');
+    const venus = planets.find(p => p.name === 'Venus');
+    const mars = planets.find(p => p.name === 'Mars');
+
+    ['Rahu', 'Ketu'].forEach(planetName => {
+        const planet = planets.find(p => p.name === planetName);
+        if (!planet) return;
+
+        let houseScore = 0;
+        let subathuvamScore = 0;
+        let soodshumaScore = 0;
+        const details: string[] = [];
+
+        // Step A: House Placement (Sthana Balam)
+        const houseIndex = (planet.signIndex - ascendantSignIndex + 12) % 12;
+        const houseNumber = houseIndex + 1;
+
+        if ([3, 6, 10, 11].includes(houseNumber)) {
+            houseScore = 30;
+            details.push(`Upachaya House ${houseNumber} (+30)`);
+        } else if ([1, 5, 9].includes(houseNumber)) {
+            houseScore = 20;
+            details.push(`Trikona House ${houseNumber} (+20)`);
+        } else if ([2, 8, 12].includes(houseNumber)) {
+            houseScore = 5;
+            details.push(`Tricky House ${houseNumber} (+5)`);
+        } else {
+            // 4, 7 (Kendras not mentioned in prompt as best, assume neutral/moderate)
+            // Let's give 10 for Kendra
+            if ([4, 7].includes(houseNumber)) {
+                houseScore = 10;
+                details.push(`Kendra House ${houseNumber} (+10)`);
+            }
+        }
+
+        // Step B: Subathuvam Check
+        // Helper for Conjunction (Same Sign)
+        const isConjoined = (p1: any, p2: any) => p1.signIndex === p2.signIndex;
+
+        // Helper for Aspect (Sign Based)
+        // Jupiter: 5, 7, 9
+        // Mars: 4, 7, 8
+        // Venus: 7 (Standard)
+        const isAspectedBy = (target: any, source: any, aspects: number[]) => {
+            if (!source) return false;
+            const signDiff = (target.signIndex - source.signIndex + 12) % 12;
+            const dist = signDiff + 1;
+            return aspects.includes(dist);
+        };
+
+        if (planetName === 'Rahu') {
+            // Venus Conj/Aspect (+40)
+            if (venus && (isConjoined(planet, venus) || isAspectedBy(planet, venus, [7]))) {
+                subathuvamScore += 40;
+                details.push("Venus Connection (+40)");
+            }
+            // Jupiter Conj/Aspect (+30)
+            if (jupiter && (isConjoined(planet, jupiter) || isAspectedBy(planet, jupiter, [5, 7, 9]))) {
+                subathuvamScore += 30;
+                details.push("Jupiter Connection (+30)");
+            }
+            // Moon Conj (Waxing) (+20)
+            if (moon && isConjoined(planet, moon)) {
+                if (sun && isWaxingMoon(moon.longitude, sun.longitude)) {
+                    subathuvamScore += 20;
+                    details.push("Waxing Moon Conjunction (+20)");
+                }
+            }
+        } else { // Ketu
+            // Jupiter Conj/Aspect (+40)
+            if (jupiter && (isConjoined(planet, jupiter) || isAspectedBy(planet, jupiter, [5, 7, 9]))) {
+                subathuvamScore += 40;
+                details.push("Jupiter Connection (+40)");
+            }
+            // Mars Conj/Aspect (+30)
+            if (mars && (isConjoined(planet, mars) || isAspectedBy(planet, mars, [4, 7, 8]))) {
+                subathuvamScore += 30;
+                details.push("Mars Connection (+30)");
+            }
+        }
+
+        // Step C: Soodshuma Check
+        // Dispositor Strength
+        const dispositorName = SIGN_LORDS[planet.signIndex];
+        const dispositor = planets.find(p => p.name === dispositorName);
+
+        if (dispositor) {
+            // Check Ucha (Exaltation)
+            const exaltInfo = EXALTATION_POINTS[dispositorName as keyof typeof EXALTATION_POINTS];
+            const isExalted = exaltInfo && dispositor.signIndex === exaltInfo.sign;
+
+            // Check Aatchi (Own Sign)
+            const ownSigns = OWN_SIGNS[dispositorName as keyof typeof OWN_SIGNS];
+            const isOwnSign = ownSigns && ownSigns.includes(dispositor.signIndex);
+
+            if (isExalted || isOwnSign) {
+                soodshumaScore += 20;
+                details.push(`Dispositor ${dispositorName} Strong (+20)`);
+            }
+        }
+
+        // Star Lord
+        const nakshatra = getNakshatra(planet.longitude);
+        if (nakshatra.index >= 0 && nakshatra.index < NAKSHATRA_LORDS.length) {
+            const starLord = NAKSHATRA_LORDS[nakshatra.index];
+            if (['Jupiter', 'Venus', 'Mercury'].includes(starLord)) {
+                soodshumaScore += 10;
+                details.push(`Benefic Star Lord ${starLord} (+10)`);
+            }
+        }
+
+        // Final Verdict
+        const totalScore = houseScore + subathuvamScore + soodshumaScore;
+        let prediction = "";
+
+        if (totalScore >= 70) {
+            if (planetName === 'Rahu') {
+                prediction = "Excellent / Yoga Rahu: Immense wealth, luxury cars, big business, and foreign travel. (Bogan)";
+            } else {
+                prediction = "Excellent / Yoga Ketu: Supreme wisdom (Gnanam), spiritual rise, or medical/astrology success.";
+            }
+        } else if (totalScore >= 40) {
+            prediction = "Moderate / Mixed: Good results but with some struggle. Sudden gains possible.";
+        } else {
+            if (planetName === 'Rahu') {
+                prediction = "Pavathuvam / Malefic: Addiction, bad friendship, legal issues, or illusion.";
+            } else {
+                prediction = "Pavathuvam / Malefic: Confusion, detachment, marital trouble.";
+            }
+        }
+
+        results[planetName] = {
+            planet: planetName,
+            houseScore,
+            subathuvamScore,
+            soodshumaScore,
+            totalScore,
+            prediction,
+            details
+        };
+    });
+
+    return results;
+};

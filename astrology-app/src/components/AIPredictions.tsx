@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Send, Bot, User, Key, AlertCircle } from 'lucide-react';
-import { NAKSHATRAS, ZODIAC_SIGNS, TAMIL_RASI_NAMES } from '../utils/constants';
-import { getNakshatra, calculateDashaPeriods, getCurrentDasha } from '../utils/astrology';
+import { Sparkles, Send, Bot, User, AlertCircle, BrainCircuit } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 
 interface AIPredictionsProps {
     data: any;
@@ -11,13 +10,18 @@ interface AIPredictionsProps {
 
 const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const { t, language } = useLanguage();
-    const [apiKey, setApiKey] = useState('');
-    const [prediction, setPrediction] = useState('');
+    const [prediction, setPrediction] = useState<OrchestratorResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [chatHistory, setChatHistory] = useState<any[]>([]);
     const [question, setQuestion] = useState('');
+    const [responseLanguage, setResponseLanguage] = useState<'en' | 'ta'>('en');
     const chatEndRef = useRef<HTMLDivElement>(null);
+
+    // Sync initial response language with app language
+    useEffect(() => {
+        setResponseLanguage(language);
+    }, [language]);
 
     const scrollToBottom = () => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -29,137 +33,28 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
     if (!data) return null;
 
-    const generatePrompt = (context: string) => {
-        const { userDetails, planets, ascendant } = data;
-
-        const planetDetails = planets.map((p: any) =>
-            `${p.name} in ${TAMIL_RASI_NAMES[p.signIndex]} (${ZODIAC_SIGNS[p.signIndex]}) at ${Math.floor(p.degree)} degrees`
-        ).join(', ');
-
-        const ascendantDetail = `Ascendant in ${TAMIL_RASI_NAMES[ascendant.signIndex]} (${ZODIAC_SIGNS[ascendant.signIndex]})`;
-
-        // Calculate Dasha
-        const moon = planets.find((p: any) => p.name === 'Moon');
-        let dashaText = '';
-        if (moon) {
-            const periods = calculateDashaPeriods(userDetails.birthDate, moon.longitude);
-            const current = getCurrentDasha(periods);
-            if (current) {
-                dashaText = `Current Vimshottari Dasha Period: ${current.maha.planet} Maha Dasha, ${current.bhukti?.planet} Bhukti, ${current.antaram?.planet} Antaram.`;
-            }
-        }
-
-        return `
-      You are an expert Vedic Astrologer. Analyze this birth chart:
-      Name: ${userDetails.name}
-      Birth Date: ${userDetails.date}
-      Birth Time: ${userDetails.time}
-      Place: ${userDetails.city}
-      
-      Planetary Positions:
-      ${ascendantDetail}
-      ${planetDetails}
-      
-      ${dashaText}
-      
-      ${context}
-      
-      Provide predictions for career, relationships, health, and favorable periods. 
-      Consider planetary positions, house placements, and current dasha period (estimate).
-      Be positive but realistic. Use Vedic terminology where appropriate but explain it.
-      ${language === 'ta' ? 'Please provide the response in Tamil language.' : ''}
-    `;
-    };
-
-    const handleGeneratePrediction = async () => {
-        if (!apiKey) {
-            setError('Please enter your Anthropic API Key first.');
-            return;
-        }
-
-        setIsLoading(true);
-        setError('');
-        setPrediction('');
-
-        try {
-            const prompt = generatePrompt("Provide a comprehensive initial reading.");
-
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'content-type': 'application/json',
-                    'dangerously-allow-browser': 'true'
-                },
-                body: JSON.stringify({
-                    model: "claude-3-sonnet-20240229",
-                    max_tokens: 1024,
-                    messages: [{ role: "user", content: prompt }]
-                })
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error?.message || 'Failed to fetch prediction');
-            }
-
-            const data = await response.json();
-            const text = data.content[0].text;
-
-            let i = 0;
-            const interval = setInterval(() => {
-                setPrediction(prev => prev + text.charAt(i));
-                i++;
-                if (i >= text.length) clearInterval(interval);
-            }, 10);
-
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const handleAskQuestion = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!question.trim() || !apiKey) return;
+        if (!question.trim()) return;
 
         const newHistory = [...chatHistory, { role: 'user', content: question }];
         setChatHistory(newHistory);
         setQuestion('');
         setIsLoading(true);
+        setError('');
 
         try {
-            const prompt = generatePrompt(`User Question: ${question}\nAnswer based on the chart.`);
+            // Call the Orchestrator with selected response language
+            const response = await queryAstrologyOrchestrator(question, data, responseLanguage);
 
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'content-type': 'application/json',
-                    'dangerously-allow-browser': 'true'
-                },
-                body: JSON.stringify({
-                    model: "claude-3-sonnet-20240229",
-                    max_tokens: 1024,
-                    messages: [
-                        ...newHistory.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.content })),
-                        { role: "user", content: prompt }
-                    ]
-                })
-            });
+            setPrediction(response);
 
-            if (!response.ok) throw new Error('Failed to fetch response');
-
-            const data = await response.json();
-            const text = data.content[0].text;
-
-            setChatHistory(prev => [...prev, { role: 'ai', content: text }]);
+            // Add AI response to history
+            const aiContent = responseLanguage === 'ta' ? response.final_answer_tamil : response.final_answer_english;
+            setChatHistory(prev => [...prev, { role: 'ai', content: aiContent, details: response }]);
 
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || "Failed to get prediction");
         } finally {
             setIsLoading(false);
         }
@@ -172,73 +67,81 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center flex-shrink-0"
             >
-                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                    {t.predictions.title}
+                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400 flex items-center justify-center gap-3">
+                    <BrainCircuit className="w-8 h-8 text-purple-400" />
+                    {t.predictions.title} (AI Orchestrator)
                 </h2>
                 <p className="text-slate-400">{t.predictions.subtitle}</p>
             </motion.div>
 
-            {/* API Key Input */}
-            {!prediction && chatHistory.length === 0 && (
-                <div className="glass-panel p-6 max-w-md mx-auto w-full">
-                    <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                        <Key className="w-4 h-4" /> {t.predictions.apiKeyLabel}
-                    </label>
-                    <input
-                        type="password"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder={t.predictions.apiKeyPlaceholder}
-                        className="w-full bg-slate-900/50 border border-slate-700 rounded px-4 py-2 mb-4 focus:ring-2 focus:ring-purple-500 outline-none"
-                    />
-                    {error && (
-                        <div className="text-red-400 text-sm mb-4 flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4" /> {error}
+            {/* Chat Interface */}
+            <div className="flex-1 glass-panel flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {chatHistory.length === 0 && (
+                        <div className="text-center text-slate-500 mt-10">
+                            <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p>Ask a question to start the AI analysis.</p>
+                            <p className="text-sm mt-2">Examples: "When will I get married?", "Is government job possible?"</p>
                         </div>
                     )}
-                    <button
-                        onClick={handleGeneratePrediction}
-                        disabled={isLoading || !apiKey}
-                        className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {isLoading ? <Sparkles className="animate-spin" /> : <Sparkles />}
-                        {t.predictions.generateBtn}
-                    </button>
-                    <p className="text-xs text-slate-500 mt-4 text-center">
-                        {t.predictions.note}
-                    </p>
+
+                    {chatHistory.map((msg, idx) => (
+                        <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'}`}>
+                                {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
+                            </div>
+                            <div className={`rounded-lg p-4 max-w-[80%] ${msg.role === 'user' ? 'bg-blue-900/30 text-blue-100' : 'bg-slate-800/50 text-slate-200'}`}>
+                                {msg.content}
+                                {msg.details && (
+                                    <div className="mt-4 pt-4 border-t border-slate-700 text-sm text-slate-400">
+                                        <p><strong>Intent:</strong> {msg.details.intent}</p>
+                                        <p><strong>Key Planet:</strong> {msg.details.primary_analysis.key_planet} ({msg.details.primary_analysis.status})</p>
+                                        <p><strong>Reasoning:</strong> {msg.details.reasoning}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+
+                    {isLoading && (
+                        <div className="flex gap-4">
+                            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                                <Bot className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="bg-slate-800/50 rounded-lg p-4 text-slate-200">
+                                <Sparkles className="w-5 h-5 animate-spin" /> Thinking...
+                            </div>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="text-red-400 text-center p-4 bg-red-900/20 rounded-lg">
+                            <AlertCircle className="w-5 h-5 inline mr-2" /> {error}
+                        </div>
+                    )}
+
+                    <div ref={chatEndRef} />
                 </div>
-            )}
 
-            {/* Chat Interface */}
-            {(prediction || chatHistory.length > 0) && (
-                <div className="flex-1 glass-panel flex flex-col overflow-hidden">
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                        {prediction && (
-                            <div className="flex gap-4">
-                                <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
-                                    <Bot className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="bg-slate-800/50 rounded-lg p-4 text-slate-200 whitespace-pre-wrap leading-relaxed">
-                                    {prediction}
-                                </div>
-                            </div>
-                        )}
-
-                        {chatHistory.map((msg, idx) => (
-                            <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'}`}>
-                                    {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
-                                </div>
-                                <div className={`rounded-lg p-4 max-w-[80%] ${msg.role === 'user' ? 'bg-blue-900/30 text-blue-100' : 'bg-slate-800/50 text-slate-200'}`}>
-                                    {msg.content}
-                                </div>
-                            </div>
-                        ))}
-                        <div ref={chatEndRef} />
+                <div className="p-4 border-t border-slate-800 bg-slate-900/50 space-y-3">
+                    {/* Language Toggle */}
+                    <div className="flex justify-end gap-2 text-xs">
+                        <span className="text-slate-400 self-center">Answer in:</span>
+                        <button
+                            onClick={() => setResponseLanguage('en')}
+                            className={`px-3 py-1 rounded-full border transition-colors ${responseLanguage === 'en' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+                        >
+                            English
+                        </button>
+                        <button
+                            onClick={() => setResponseLanguage('ta')}
+                            className={`px-3 py-1 rounded-full border transition-colors ${responseLanguage === 'ta' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+                        >
+                            தமிழ்
+                        </button>
                     </div>
 
-                    <form onSubmit={handleAskQuestion} className="p-4 border-t border-slate-800 bg-slate-900/50 flex gap-2">
+                    <form onSubmit={handleAskQuestion} className="flex gap-2">
                         <input
                             type="text"
                             value={question}
@@ -255,7 +158,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                         </button>
                     </form>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
