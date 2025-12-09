@@ -4,15 +4,17 @@ import { Calendar, Clock, MapPin, Search, Loader2, ChevronRight } from 'lucide-r
 import { useNavigate } from 'react-router-dom';
 import { calculatePlanetaryPositions } from '../utils/astrology';
 
-interface InputFormProps {
-    setChartData: (data: any) => void;
-}
+import { useChartData } from '../contexts/ChartContext';
+import { saveGuestBirthData } from '../hooks/useSaveGuestData';
+import { useAuth } from '../contexts/AuthContext';
 
 import { useLanguage } from '../contexts/LanguageContext';
 
-const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
+const InputForm: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useLanguage();
+    const { setChartData } = useChartData();
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
         date: '',
@@ -80,12 +82,24 @@ const InputForm: React.FC<InputFormProps> = ({ setChartData }) => {
         const birthDate = new Date(`${formData.date}T${formData.time}`);
         const chartData = calculatePlanetaryPositions(birthDate, formData.lat, formData.lng);
 
-        setChartData({
+        const fullChartData = {
             ...chartData,
             userDetails: formData,
             birthDate
-        });
+        };
 
+        // Save guest data if not logged in
+        if (!user) {
+            saveGuestBirthData({
+                dob: birthDate,
+                time: formData.time,
+                place: formData.city,
+                latitude: formData.lat!,
+                longitude: formData.lng!
+            });
+        }
+
+        setChartData(fullChartData);
         setIsGenerating(false);
         navigate('/chart');
     };

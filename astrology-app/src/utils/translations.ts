@@ -5,7 +5,38 @@ export const translations = {
             birthDetails: "Birth Details",
             chart: "Vedic Chart",
             analysis: "Analysis",
-            predictions: "AI Insights"
+            predictions: "AI Insights",
+            dashboard: "Dashboard",
+            login: "Login",
+            signup: "Sign Up"
+        },
+        auth: {
+            loginTitle: "Welcome Back",
+            loginSubtitle: "Sign in to access your saved charts and predictions",
+            registerTitle: "Create Account",
+            registerSubtitle: "Join us to save your charts and get personalized insights",
+            email: "Email Address",
+            password: "Password",
+            name: "Full Name",
+            loginBtn: "Sign In",
+            registerBtn: "Create Account",
+            googleBtn: "Continue with Google",
+            noAccount: "Don't have an account?",
+            hasAccount: "Already have an account?",
+            verifyEmail: "Check Your Email!",
+            verifySubtitle: "We've sent a verification link to",
+            resend: "Resend Verification Email",
+            backToLogin: "Back to Login"
+        },
+        dashboard: {
+            title: "My Cosmic Dashboard",
+            createBtn: "Create New Birth Chart",
+            logout: "Logout",
+            noCharts: "No Charts Yet",
+            noChartsSub: "Create your first birth chart to begin your cosmic journey",
+            getStarted: "Get Started",
+            viewChart: "View Chart",
+            loading: "Loading your charts..."
         },
         input: {
             title: "Discover Your Cosmic Blueprint",
@@ -101,8 +132,39 @@ export const translations = {
         nav: {
             birthDetails: "பிறப்பு விவரங்கள்",
             chart: "ஜாதக கட்டம்",
-            analysis: "ஆராய்ச்சி",
-            predictions: "AI கணிப்புகள்"
+            analysis: "பலன்கள்",
+            predictions: "AI கணிப்புகள்",
+            dashboard: "முகப்பு",
+            login: "உள்நுழைய",
+            signup: "பதிவு செய்ய"
+        },
+        auth: {
+            loginTitle: "மீண்டும் வருக",
+            loginSubtitle: "உங்கள் சேமிக்கப்பட்ட ஜாதகங்களை அணுக உள்நுழையவும்",
+            registerTitle: "கணக்கை உருவாக்கவும்",
+            registerSubtitle: "உங்கள் ஜாதகங்களை சேமிக்க எங்களுடன் இணையுங்கள்",
+            email: "மின்னஞ்சல் முகவரி",
+            password: "கடவுச்சொல்",
+            name: "முழு பெயர்",
+            loginBtn: "உள்நுழைய",
+            registerBtn: "கணக்கை உருவாக்கவும்",
+            googleBtn: "Google மூலம் தொடரவும்",
+            noAccount: "கணக்கு இல்லையா?",
+            hasAccount: "ஏற்கனவே கணக்கு உள்ளதா?",
+            verifyEmail: "மின்னஞ்சலை சரிபார்க்கவும்!",
+            verifySubtitle: "நாங்கள் ஒரு சரிபார்ப்பு இணைப்பை அனுப்பியுள்ளோம்",
+            resend: "சரிபார்ப்பு மின்னஞ்சலை மீண்டும் அனுப்பு",
+            backToLogin: "உள்நுழைவுக்கு திரும்பவும்"
+        },
+        dashboard: {
+            title: "எனது ஜாதகங்கள்",
+            createBtn: "புதிய ஜாதகத்தை உருவாக்கவும்",
+            logout: "வெளியேறு",
+            noCharts: "ஜாதகங்கள் இல்லை",
+            noChartsSub: "உங்கள் ஜோதிட பயணத்தைத் தொடங்க முதல் ஜாதகத்தை உருவாக்கவும்",
+            getStarted: "தொடங்கவும்",
+            viewChart: "ஜாதகத்தை பார்க்க",
+            loading: "ஜாதகங்கள் ஏற்றப்படுகின்றன..."
         },
         input: {
             title: "உங்கள் ஜாதகத்தை கண்டறியவும்",

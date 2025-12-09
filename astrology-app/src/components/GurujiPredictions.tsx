@@ -1,20 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, MessageCircle, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
     getCurrentDasha,
-    calculateCurrentTransits,
-    calculateStrength
+    calculateCurrentTransits
 } from '../utils/astrology';
 import { calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
-import {
-    predictJobTiming,
-    predictDetailedMarriageTiming,
-    predictMarriageType,
-    predictCareerPath
-} from '../utils/predictionRules';
+import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 
 interface GurujiPredictionsProps {
     data: any;
@@ -23,6 +17,9 @@ interface GurujiPredictionsProps {
 const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const { t, language } = useLanguage();
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [aiResponse, setAiResponse] = useState<OrchestratorResponse | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
     if (!data) return null;
 
@@ -40,19 +37,39 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
     if (!currentDasha) return <div className="text-center p-8 text-slate-400">{isTamil ? "தசை காலங்களை கணக்கிட முடியவில்லை." : "Unable to calculate Dasa periods."}</div>;
 
-    const predictions = [
-        predictJobTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, language),
-        predictDetailedMarriageTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, birthDate, userDetails?.gender || 'male', dashaPeriods, language),
-        predictMarriageType(planets, ascendant.signIndex, agScores, currentDasha, language),
-        predictCareerPath(planets, ascendant.signIndex, agScores, { maha: currentDasha.maha, bhukti: currentDasha.bhukti }, language)
-    ];
+    // Prepare data for AI
+    const chartData = {
+        planets,
+        ascendant,
+        subathuvamScores: agScores,
+        currentDasa: currentDasha
+    };
+
+    // Auto-fetch comprehensive analysis on mount
+    useEffect(() => {
+        const fetchAnalysis = async () => {
+            setIsLoading(true);
+            setError('');
+            try {
+                const question = isTamil ? "முழுமையான பாவக பகுப்பாய்வு தாருங்கள்" : "Give me a comprehensive house-by-house analysis";
+                const response = await queryAstrologyOrchestrator(question, chartData, language);
+                setAiResponse(response);
+            } catch (err: any) {
+                setError(err.message || "Failed to generate predictions");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchAnalysis();
+    }, [language]); // Re-fetch when language changes
 
     const toggleExpand = (id: number) => {
         setExpandedId(expandedId === id ? null : id);
     };
 
     return (
-        <div className="max-w-3xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -60,84 +77,118 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             >
                 <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400 flex items-center justify-center gap-3">
                     <Sparkles className="w-8 h-8 text-purple-400" />
-                    {isTamil ? "அடிப்படை கேள்விகள் மற்றும் பதில்கள்" : "Basic Question and Answers"}
+                    {isTamil ? "எங்கள் கணிப்புகள்" : "Our Predictions"}
                 </h2>
                 <p className="text-slate-400 mt-2">
                     {isTamil
-                        ? "ஆதித்ய குருஜியின் தனித்துவமான விதிகளின் அடிப்படையில் உங்கள் வாழ்க்கையின் மிக முக்கியமான கேள்விகளுக்கு நேரடி பதில்கள்."
-                        : "Direct answers to your life's most important questions based on Aditya Guruji's unique rules."}
+                        ? "ஆதித்ய குருஜியின் பாவக பகுப்பாய்வு முறையின் அடிப்படையில் உங்கள் ஜாதக கணிப்புகள்."
+                        : "Your chart predictions based on Aditya Guruji's house-by-house analysis method."}
                 </p>
             </motion.div>
 
-            <div className="space-y-4">
-                {predictions.map((pred, idx) => (
-                    <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className={`glass-panel overflow-hidden border transition-colors duration-300 ${expandedId === idx
-                            ? 'border-purple-500/50 bg-slate-900/80'
-                            : 'border-slate-700/50 bg-slate-900/40 hover:bg-slate-800/50'
-                            }`}
-                    >
-                        <button
-                            onClick={() => toggleExpand(idx)}
-                            className="w-full px-6 py-5 flex items-center justify-between text-left"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className={`p-2 rounded-full ${expandedId === idx ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-800 text-slate-400'}`}>
-                                    <MessageCircle className="w-5 h-5" />
-                                </div>
-                                <h3 className={`text-lg font-semibold ${expandedId === idx ? 'text-white' : 'text-slate-300'}`}>
-                                    {pred.question}
-                                </h3>
-                            </div>
-                            {expandedId === idx ? (
-                                <ChevronUp className="w-5 h-5 text-purple-400" />
-                            ) : (
-                                <ChevronDown className="w-5 h-5 text-slate-500" />
-                            )}
-                        </button>
+            {isLoading && (
+                <div className="text-center p-12 glass-panel">
+                    <Loader className="w-12 h-12 mx-auto mb-4 animate-spin text-purple-400" />
+                    <p className="text-slate-300">{isTamil ? "பகுப்பாய்வு செய்யப்படுகிறது..." : "Analyzing your chart..."}</p>
+                </div>
+            )}
 
-                        <AnimatePresence>
-                            {expandedId === idx && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.3 }}
+            {error && (
+                <div className="text-center p-8 glass-panel border border-red-800/30 bg-red-900/10">
+                    <p className="text-red-400">{error}</p>
+                </div>
+            )}
+
+            {aiResponse?.bava_analysis_report && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                >
+                    {/* Lagna Summary */}
+                    <div className="glass-panel p-6 border border-purple-800/30 bg-purple-900/10">
+                        <h3 className="text-xl font-bold text-purple-300 mb-3">
+                            {isTamil ? "லக்னா சுருக்கம்" : "Lagna Summary"}
+                        </h3>
+                        <p className="text-slate-200 leading-relaxed">{aiResponse.bava_analysis_report.lagna_summary}</p>
+                    </div>
+
+                    {/* House Predictions */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {aiResponse.bava_analysis_report.house_predictions.map((house, idx) => (
+                            <motion.div
+                                key={house.house_number}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: idx * 0.05 }}
+                                className={`glass-panel overflow-hidden border transition-colors duration-300 ${expandedId === idx
+                                    ? 'border-purple-500/50 bg-slate-900/80'
+                                    : 'border-slate-700/50 bg-slate-900/40 hover:bg-slate-800/50'
+                                    }`}
+                            >
+                                <button
+                                    onClick={() => toggleExpand(idx)}
+                                    className="w-full px-4 py-4 flex items-center justify-between text-left"
                                 >
-                                    <div className="px-6 pb-6 pt-2 border-t border-slate-800/50">
-                                        <div className={`p-4 rounded-lg mb-4 ${pred.isFavorable
-                                            ? 'bg-green-900/20 border border-green-900/30'
-                                            : 'bg-yellow-900/20 border border-yellow-900/30'
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${house.status === 'Strong' || house.status === 'Excellent'
+                                            ? 'bg-green-600/30 text-green-300'
+                                            : house.status === 'Weak'
+                                                ? 'bg-red-600/30 text-red-300'
+                                                : 'bg-yellow-600/30 text-yellow-300'
                                             }`}>
-                                            <span className={`text-sm font-bold uppercase tracking-wider ${pred.isFavorable ? 'text-green-400' : 'text-yellow-400'
-                                                }`}>
-                                                {isTamil ? "பதில்:" : "Answer:"}
-                                            </span>
-                                            <p className={`text-xl font-medium mt-1 whitespace-pre-line ${pred.isFavorable ? 'text-green-100' : 'text-yellow-100'
-                                                }`}>
-                                                {pred.answer}
-                                            </p>
+                                            {house.house_number}
                                         </div>
-
                                         <div>
-                                            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">
-                                                {isTamil ? "ஜோதிட காரணம்:" : "Astrological Reason:"}
+                                            <h3 className="text-sm font-semibold text-white">{house.title}</h3>
+                                            <span className={`text-xs ${house.status === 'Strong' || house.status === 'Excellent'
+                                                ? 'text-green-400'
+                                                : house.status === 'Weak'
+                                                    ? 'text-red-400'
+                                                    : 'text-yellow-400'
+                                                }`}>
+                                                {house.status}
                                             </span>
-                                            <p className="text-slate-300 mt-1 italic leading-relaxed whitespace-pre-line">
-                                                "{pred.reason}"
-                                            </p>
                                         </div>
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </motion.div>
-                ))}
-            </div>
+                                    {expandedId === idx ? (
+                                        <ChevronUp className="w-5 h-5 text-purple-400" />
+                                    ) : (
+                                        <ChevronDown className="w-5 h-5 text-slate-500" />
+                                    )}
+                                </button>
+
+                                <AnimatePresence>
+                                    {expandedId === idx && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <div className="px-4 pb-4 pt-2 border-t border-slate-800/50">
+                                                <p className="text-slate-300 text-sm leading-relaxed mb-3">{house.analysis}</p>
+                                                <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/30">
+                                                    <span className="text-xs font-bold text-purple-400">{isTamil ? "குருஜி விதி:" : "Guruji Rule:"}</span>
+                                                    <p className="text-xs text-slate-400 mt-1 italic">{house.guruji_rule_applied}</p>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    {/* Final Verdict */}
+                    <div className="glass-panel p-6 border border-blue-800/30 bg-blue-900/10">
+                        <h3 className="text-xl font-bold text-blue-300 mb-3">
+                            {isTamil ? "இறுதி தீர்ப்பு" : "Final Verdict"}
+                        </h3>
+                        <p className="text-slate-200 leading-relaxed">{aiResponse.bava_analysis_report.final_verdict}</p>
+                    </div>
+                </motion.div>
+            )}
         </div>
     );
 };

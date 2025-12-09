@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 body {
-  @apply bg-slate-950 text-white overflow-x-hidden;
+  @apply text-white overflow-x-hidden;
   font-family: 'Inter', sans-serif;
+  background: linear-gradient(135deg, #1e1b4b 0%, #581c87 50%, #0f172a 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
 .glass-panel {

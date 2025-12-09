@@ -92,7 +92,49 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                             </div>
                             <div className={`rounded-lg p-4 max-w-[80%] ${msg.role === 'user' ? 'bg-blue-900/30 text-blue-100' : 'bg-slate-800/50 text-slate-200'}`}>
                                 {msg.content}
-                                {msg.details && (
+                                {msg.details?.bava_analysis_report && (
+                                    <div className="mt-6 space-y-4">
+                                        <div className="p-4 bg-purple-900/20 rounded-lg border border-purple-800/30">
+                                            <h3 className="text-lg font-bold text-purple-300 mb-2">📊 Comprehensive House Analysis</h3>
+                                            <p className="text-slate-300">{msg.details.bava_analysis_report.lagna_summary}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {msg.details.bava_analysis_report.house_predictions.map((house: any) => (
+                                                <div
+                                                    key={house.house_number}
+                                                    className={`p-3 rounded-lg border ${house.status === 'Strong' || house.status === 'Excellent'
+                                                            ? 'bg-green-900/20 border-green-800/30'
+                                                            : house.status === 'Weak'
+                                                                ? 'bg-red-900/20 border-red-800/30'
+                                                                : 'bg-yellow-900/20 border-yellow-800/30'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-xs font-bold text-slate-400">House {house.house_number}</span>
+                                                        <span className={`text-xs px-2 py-1 rounded-full ${house.status === 'Strong' || house.status === 'Excellent'
+                                                                ? 'bg-green-700/30 text-green-300'
+                                                                : house.status === 'Weak'
+                                                                    ? 'bg-red-700/30 text-red-300'
+                                                                    : 'bg-yellow-700/30 text-yellow-300'
+                                                            }`}>
+                                                            {house.status}
+                                                        </span>
+                                                    </div>
+                                                    <h4 className="text-sm font-semibold text-white mb-1">{house.title}</h4>
+                                                    <p className="text-xs text-slate-300 mb-2">{house.analysis}</p>
+                                                    <p className="text-xs text-slate-500 italic">Rule: {house.guruji_rule_applied}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                                            <h3 className="text-sm font-bold text-blue-300 mb-1">📝 Final Verdict</h3>
+                                            <p className="text-sm text-slate-300">{msg.details.bava_analysis_report.final_verdict}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {msg.details && !msg.details.bava_analysis_report && (
                                     <div className="mt-4 pt-4 border-t border-slate-700 text-sm text-slate-400">
                                         <p><strong>Intent:</strong> {msg.details.intent}</p>
                                         <p><strong>Key Planet:</strong> {msg.details.primary_analysis.key_planet} ({msg.details.primary_analysis.status})</p>

@@ -6,6 +6,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { getNavamsaChartData } from '../utils/astrology';
 
 import ChartGrid from './ChartGrid';
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { Save, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface SouthIndianChartProps {
     data: any;
@@ -13,6 +17,53 @@ interface SouthIndianChartProps {
 
 const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
     const { t } = useLanguage();
+    const { user } = useAuth();
+    const [saving, setSaving] = React.useState(false);
+    const [saveStatus, setSaveStatus] = React.useState<'idle' | 'success' | 'error' | 'exists'>('idle');
+
+    const handleSaveChart = async () => {
+        if (!user || !data) return;
+
+        setSaving(true);
+        setSaveStatus('idle');
+
+        try {
+            // Check for duplicates
+            const chartsRef = collection(db, 'charts');
+            const q = query(
+                chartsRef,
+                where('userId', '==', user.uid),
+                where('birth_details.dob', '==', data.birthDate),
+                where('birth_details.place', '==', data.userDetails.city)
+            );
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                setSaveStatus('exists');
+                setTimeout(() => setSaveStatus('idle'), 3000);
+                return;
+            }
+
+            await addDoc(collection(db, 'charts'), {
+                userId: user.uid,
+                name: data.userDetails.name,
+                birth_details: {
+                    dob: data.birthDate,
+                    place: data.userDetails.city,
+                    latitude: data.userDetails.lat,
+                    longitude: data.userDetails.lng
+                },
+                createdAt: serverTimestamp()
+            });
+            setSaveStatus('success');
+            setTimeout(() => setSaveStatus('idle'), 3000);
+        } catch (error) {
+            console.error('Error saving chart:', error);
+            setSaveStatus('error');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const navamsaData = useMemo(() => getNavamsaChartData(data), [data]);
 
@@ -32,6 +83,47 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                     {data.userDetails.name} • {new Date(data.userDetails.date).toLocaleDateString()}
                 </p>
             </motion.div>
+
+            {user && (
+                <div className="flex justify-end mb-4 px-4">
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleSaveChart}
+                        disabled={saving || saveStatus === 'success'}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition shadow-lg ${saveStatus === 'success'
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : saveStatus === 'error'
+                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                    : saveStatus === 'exists'
+                                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                        : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
+                            }`}
+                    >
+                        {saveStatus === 'success' ? (
+                            <>
+                                <CheckCircle className="w-4 h-4" />
+                                Saved!
+                            </>
+                        ) : saveStatus === 'error' ? (
+                            <>
+                                <AlertCircle className="w-4 h-4" />
+                                Failed to Save
+                            </>
+                        ) : saveStatus === 'exists' ? (
+                            <>
+                                <AlertCircle className="w-4 h-4" />
+                                Already Saved
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" />
+                                {saving ? 'Saving...' : 'Save Chart'}
+                            </>
+                        )}
+                    </motion.button>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start justify-items-center">
                 {/* Rasi Chart */}
@@ -71,7 +163,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                     {t.chart.note}
                 </p>
             </div>
-        </div>
+        </div >
     );
 };
 

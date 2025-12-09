@@ -1,0 +1,136 @@
+[
+    {
+        "rule_id": "job_timing_dasa_transit",
+        "category": "Job",
+        "trigger_conditions": {
+            "dasa_lord": [
+                "10th Lord",
+                "Saturn",
+                "Planet in 10th"
+            ],
+            "transit_jupiter": [
+                "Aspects 6th House",
+                "Aspects 10th House"
+            ],
+            "transit_saturn": [
+                "3rd from Moon",
+                "6th from Moon",
+                "11th from Moon"
+            ]
+        },
+        "logic_flow": "1. Check if current Dasa/Bhukti Lord is 10th Lord, Saturn, or a planet in 10th House. 2. If yes, check if Transit Jupiter aspects 6th or 10th House. 3. If both are true, predict 'Very Soon'. 4. If only Dasa is favorable, predict 'Slight Delay'. 5. If only Transit is favorable, predict 'Effort Needed'.",
+        "output_template": {
+            "ta": "மிக விரைவில் வேலை கிடைக்கும். (தசை மற்றும் கோச்சாரம் சாதகம்)",
+            "en": "You will get a job very soon. (Dasa and Transit are favorable)"
+        },
+        "priority": 1
+    },
+    {
+        "rule_id": "marriage_timing_guru_bala",
+        "category": "Marriage",
+        "trigger_conditions": {
+            "dasa_lord": [
+                "2nd Lord",
+                "7th Lord",
+                "11th Lord",
+                "Planet in 2/7/11",
+                "Star Lord is 7th Lord"
+            ],
+            "transit_jupiter": [
+                "Aspects 7th House",
+                "Aspects 7th Lord",
+                "Aspects Lagna"
+            ]
+        },
+        "logic_flow": "1. Check if Dasa/Bhukti Lord is connected to 2, 7, 11 houses or lords. 2. If yes, check if Transit Jupiter aspects 7th House, 7th Lord, or Lagna (Guru Bala). 3. If both are true, predict 'Strong Marriage Yoga'. 4. If only Dasa is favorable, predict 'Wait for Guru Bala'.",
+        "output_template": {
+            "ta": "திருமண யோகம் இப்போது மிக வலுவாக உள்ளது! (குரு பலம் உள்ளது)",
+            "en": "Marriage Yoga is very strong now! (Jupiter strength is present)"
+        },
+        "priority": 1
+    },
+    {
+        "rule_id": "marriage_type_rahu_override",
+        "category": "Marriage Type",
+        "trigger_conditions": {
+            "rahu_position": [
+                "7th House",
+                "Conjoined with 7th Lord"
+            ]
+        },
+        "logic_flow": "1. Check if Rahu is in the 7th House OR conjoined with the 7th Lord. 2. If true, OVERRIDE all other rules and predict 'Love/Inter-caste Marriage'.",
+        "output_template": {
+            "ta": "காதல் திருமணம் (விதிவிலக்கு/கலப்பு) - ராகு 7-ல்/7-ம் அதிபதியுடன்.",
+            "en": "Love Marriage (Inter-caste/Unconventional) - Rahu in 7th/with 7th Lord."
+        },
+        "priority": 1
+    },
+    {
+        "rule_id": "marriage_type_venus_override",
+        "category": "Marriage Type",
+        "trigger_conditions": {
+            "venus_position": [
+                "Own House (Taurus/Libra)",
+                "Exalted (Pisces)"
+            ],
+            "dasa_lord": [
+                "Venus",
+                "Rahu (connected to Venus)"
+            ]
+        },
+        "logic_flow": "1. If Rahu Override is false, check if Venus is in Own House or Exalted. 2. OR check if running Dasa is Venus or Rahu (connected to Venus). 3. If true, predict 'Love Marriage (High Probability)'.",
+        "output_template": {
+            "ta": "காதல் திருமணம் (அதிக வாய்ப்பு) - சுக்கிரன் பலம்.",
+            "en": "Love Marriage (High Probability) - Venus Strength."
+        },
+        "priority": 2
+    },
+    {
+        "rule_id": "career_path_10th_subathuvam",
+        "category": "Career",
+        "trigger_conditions": {
+            "dominant_planet": "Planet with highest Subathuvam score connected to 10th House (Lord, Occupant, or Karaka Saturn)"
+        },
+        "logic_flow": "1. Identify all planets connected to 10th House (Occupants, Lord, Saturn). 2. Calculate Subathuvam score for each. 3. Select the planet with the HIGHEST score. 4. Predict career based on that planet's nature.",
+        "output_template": {
+            "ta": "உங்கள் தொழில்: {planet_name} துறை (அதிக சுபத்துவம்).",
+            "en": "Your Career: {planet_name} field (Highest Subathuvam)."
+        },
+        "priority": 1
+    },
+    {
+        "rule_id": "career_path_dasa_override",
+        "category": "Career",
+        "trigger_conditions": {
+            "dasa_lord": [
+                "6th Lord",
+                "8th Lord"
+            ],
+            "dominant_planet": "Same as Dasa Lord"
+        },
+        "logic_flow": "1. If the calculated Dominant Planet is ALSO the current Dasa Lord. 2. AND that Dasa Lord is the 6th or 8th Lord. 3. THEN discard it and select the 2nd best planet.",
+        "output_template": {
+            "ta": "விதிவிலக்கு: தசை நாதன் 6/8 அதிபதி என்பதால் மாற்று தொழில் தேர்ந்தெடுக்கப்பட்டது.",
+            "en": "Override: Switched to alternative career as Dasa Lord is 6th/8th Lord."
+        },
+        "priority": 1
+    },
+    {
+        "rule_id": "govt_job_sun_jupiter",
+        "category": "Career",
+        "trigger_conditions": {
+            "sun_position": [
+                "10th House"
+            ],
+            "jupiter_aspect": [
+                "Aspects 10th House"
+            ]
+        },
+        "logic_flow": "1. Check if Sun is in 10th House. 2. Check if Jupiter aspects 10th House. 3. If both true, predict 'High Level Govt Job'.",
+        "output_template": {
+            "ta": "உயர் அரசு வேலை (சூரியன் 10-ல் + குரு பார்வை).",
+            "en": "High Level Govt Job (Sun in 10th + Jupiter Aspect)."
+        },
+        "priority": 2
+    }
+]

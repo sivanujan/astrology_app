@@ -1,48 +1,80 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { language, setLanguage, t } = useLanguage();
+    const { user } = useAuth();
 
     const steps = [
-        { path: '/', label: t.nav.birthDetails, icon: MapPin },
-        { path: '/chart', label: t.nav.chart, icon: Moon },
-        { path: '/analysis', label: t.nav.analysis, icon: Sun },
-        { path: '/dasha', label: t.dasha.title, icon: Clock },
-        { path: '/predictions', label: t.nav.predictions, icon: Sparkles },
-        { path: '/predictions-faq', label: "Basic Question and Answers", icon: MessageCircle },
-        { path: '/daily-snapshot', label: "Daily Snapshot", icon: Sun },
+        { path: '/', label: t.nav.birthDetails, icon: MapPin, protected: false },
+        { path: '/chart', label: t.nav.chart, icon: Moon, protected: false },
+        { path: '/analysis', label: t.nav.analysis, icon: Sun, protected: true },
+        { path: '/dasha', label: t.dasha.title, icon: Clock, protected: true },
+        { path: '/predictions', label: t.nav.predictions, icon: Sparkles, protected: true },
+        { path: '/predictions-faq', label: "Basic Question and Answers", icon: MessageCircle, protected: true },
+        { path: '/daily-snapshot', label: "Daily Snapshot", icon: Sun, protected: true },
     ];
 
     const currentStepIndex = steps.findIndex(s => s.path === location.pathname);
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white overflow-hidden relative selection:bg-purple-500/30">
-            {/* Background Elements */}
+        <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950 text-white selection:bg-purple-500/30">
+            {/* Animated Star Field */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black"></div>
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay"></div>
-
-                {/* Animated Stars */}
-                {[...Array(50)].map((_, i) => (
-                    <div
+                {[...Array(100)].map((_, i) => (
+                    <motion.div
                         key={i}
-                        className="absolute rounded-full bg-white animate-twinkle"
+                        className="absolute w-1 h-1 bg-white rounded-full"
                         style={{
-                            top: `${Math.random() * 100}%`,
                             left: `${Math.random() * 100}%`,
-                            width: `${Math.random() * 2 + 1}px`,
-                            height: `${Math.random() * 2 + 1}px`,
-                            animationDelay: `${Math.random() * 5}s`,
-                            opacity: Math.random() * 0.7 + 0.3,
+                            top: `${Math.random() * 100}%`,
+                        }}
+                        animate={{
+                            opacity: [0.2, 1, 0.2],
+                            scale: [1, 1.5, 1],
+                        }}
+                        transition={{
+                            duration: Math.random() * 3 + 2,
+                            repeat: Infinity,
+                            delay: Math.random() * 2,
                         }}
                     />
                 ))}
+            </div>
+
+            {/* Animated Planets */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+                <motion.div
+                    className="absolute top-20 right-20 w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 opacity-20 blur-xl"
+                    animate={{
+                        y: [0, -20, 0],
+                        rotate: [0, 360],
+                    }}
+                    transition={{
+                        duration: 20,
+                        repeat: Infinity,
+                        ease: "linear"
+                    }}
+                />
+
+                <motion.div
+                    className="absolute bottom-20 left-20 w-24 h-24 rounded-full bg-gradient-to-br from-pink-400 to-orange-500 opacity-20 blur-xl"
+                    animate={{
+                        y: [0, 20, 0],
+                        rotate: [360, 0],
+                    }}
+                    transition={{
+                        duration: 15,
+                        repeat: Infinity,
+                        ease: "linear"
+                    }}
+                />
             </div>
 
             {/* Navigation */}
@@ -63,15 +95,24 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                 const Icon = step.icon;
                                 const isActive = location.pathname === step.path;
                                 const isCompleted = idx < currentStepIndex;
+                                const isLocked = step.protected && !user;
 
                                 return (
                                     <div
                                         key={step.path}
-                                        className={`flex items-center gap-2 text-sm font-medium transition-colors duration-300 cursor-pointer ${isActive ? 'text-purple-400' : isCompleted ? 'text-blue-400' : 'text-slate-500'
+                                        className={`flex items-center gap-2 text-sm font-medium transition-colors duration-300 cursor-pointer ${isActive ? 'text-purple-400' :
+                                            isLocked ? 'text-slate-600 cursor-not-allowed' :
+                                                isCompleted ? 'text-blue-400' : 'text-slate-500'
                                             }`}
-                                        onClick={() => navigate(step.path)}
+                                        onClick={() => {
+                                            if (isLocked) {
+                                                navigate('/login');
+                                            } else {
+                                                navigate(step.path);
+                                            }
+                                        }}
                                     >
-                                        <Icon className={`w-4 h-4 ${isActive ? 'animate-pulse' : ''}`} />
+                                        {isLocked ? <Lock className="w-3 h-3" /> : <Icon className={`w-4 h-4 ${isActive ? 'animate-pulse' : ''}`} />}
                                         {step.label}
                                         {idx < steps.length - 1 && (
                                             <div className={`h-[1px] w-8 ml-4 ${isCompleted ? 'bg-blue-500/50' : 'bg-slate-800'}`} />
@@ -79,6 +120,34 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                     </div>
                                 );
                             })}
+                        </div>
+
+                        {/* Auth Buttons */}
+                        <div className="flex items-center gap-3 mr-4">
+                            {user ? (
+                                <button
+                                    onClick={() => navigate('/dashboard')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30"
+                                >
+                                    <LayoutDashboard className="w-4 h-4" />
+                                    {t.nav.dashboard}
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => navigate('/login')}
+                                        className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                                    >
+                                        {t.nav.login}
+                                    </button>
+                                    <button
+                                        onClick={() => navigate('/register')}
+                                        className="px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 rounded-lg hover:from-yellow-400 hover:to-orange-500 transition-colors shadow-lg shadow-yellow-500/20"
+                                    >
+                                        {t.nav.signup}
+                                    </button>
+                                </>
+                            )}
                         </div>
 
                         {/* Language Toggle */}
