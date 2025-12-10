@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2 } from 'lucide-react';
+import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChartData } from '../contexts/ChartContext';
 import { calculatePlanetaryPositions } from '../utils/astrology';
@@ -121,15 +121,27 @@ const Dashboard: React.FC = () => {
             {/* Main Content */}
             <div className="relative z-10 max-w-7xl mx-auto p-6">
                 {/* Add New Chart Button */}
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleNewChart}
-                    className="mb-6 flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 font-bold rounded-xl hover:from-yellow-400 hover:to-orange-500 transition shadow-lg shadow-yellow-500/20"
-                >
-                    <Plus className="w-6 h-6" />
-                    {t.dashboard.createBtn}
-                </motion.button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleNewChart}
+                        className="flex items-center justify-center gap-3 px-6 py-8 bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 font-bold rounded-xl hover:from-yellow-400 hover:to-orange-500 transition shadow-lg shadow-yellow-500/20"
+                    >
+                        <Plus className="w-6 h-6" />
+                        {t.dashboard.createBtn}
+                    </motion.button>
+
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => navigate('/predictions-faq')}
+                        className="flex items-center justify-center gap-3 px-6 py-8 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition shadow-lg backdrop-blur-sm"
+                    >
+                        <MessageCircle className="w-6 h-6 text-purple-400" />
+                        Basic Questions & Answers
+                    </motion.button>
+                </div>
 
                 {/* Charts Grid */}
                 {loading ? (
@@ -183,8 +195,8 @@ const Dashboard: React.FC = () => {
                                         birthDate: chart.dob
                                     });
 
-                                    // Navigate to analysis view
-                                    navigate('/analysis');
+                                    // Navigate to chart view
+                                    navigate('/chart');
                                 }}
                             >
                                 <div className="flex items-start justify-between mb-4">

@@ -17,7 +17,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         { path: '/analysis', label: t.nav.analysis, icon: Sun, protected: true },
         { path: '/dasha', label: t.dasha.title, icon: Clock, protected: true },
         { path: '/predictions', label: t.nav.predictions, icon: Sparkles, protected: true },
-        { path: '/predictions-faq', label: "Basic Question and Answers", icon: MessageCircle, protected: true },
+
         { path: '/daily-snapshot', label: "Daily Snapshot", icon: Sun, protected: true },
     ];
 
@@ -90,7 +90,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             </span>
                         </div>
 
-                        <div className="hidden md:flex items-center gap-8">
+                        <div className="hidden md:flex items-center gap-2 lg:gap-4">
                             {steps.map((step, idx) => {
                                 const Icon = step.icon;
                                 const isActive = location.pathname === step.path;
@@ -114,9 +114,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                     >
                                         {isLocked ? <Lock className="w-3 h-3" /> : <Icon className={`w-4 h-4 ${isActive ? 'animate-pulse' : ''}`} />}
                                         {step.label}
-                                        {idx < steps.length - 1 && (
-                                            <div className={`h-[1px] w-8 ml-4 ${isCompleted ? 'bg-blue-500/50' : 'bg-slate-800'}`} />
-                                        )}
                                     </div>
                                 );
                             })}
@@ -127,10 +124,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             {user ? (
                                 <button
                                     onClick={() => navigate('/dashboard')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30"
+                                    className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    {t.nav.dashboard}
+                                    <span className="hidden lg:inline">{t.nav.dashboard}</span>
                                 </button>
                             ) : (
                                 <>
@@ -142,7 +139,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                     </button>
                                     <button
                                         onClick={() => navigate('/register')}
-                                        className="px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 rounded-lg hover:from-yellow-400 hover:to-orange-500 transition-colors shadow-lg shadow-yellow-500/20"
+                                        className="whitespace-nowrap px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 rounded-lg hover:from-yellow-400 hover:to-orange-500 transition-colors shadow-lg shadow-yellow-500/20"
                                     >
                                         {t.nav.signup}
                                     </button>

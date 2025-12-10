@@ -128,7 +128,7 @@ export const translations = {
         }
     },
     ta: {
-        appTitle: "வேதிக் ஏஐ",
+        appTitle: "சிவா அஸ்ட்ரோ",
         nav: {
             birthDetails: "பிறப்பு விவரங்கள்",
             chart: "ஜாதக கட்டம்",
