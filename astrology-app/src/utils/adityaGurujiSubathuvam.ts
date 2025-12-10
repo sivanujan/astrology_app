@@ -501,12 +501,12 @@ export const calculateRahuKetuStrength = (
 
         if (dispositor) {
             // Check Ucha (Exaltation)
-            const exaltInfo = EXALTATION_POINTS[dispositorName as keyof typeof EXALTATION_POINTS];
-            const isExalted = exaltInfo && dispositor.signIndex === exaltInfo.sign;
+            const exaltInfo = EXALTATION_POINTS && EXALTATION_POINTS[dispositorName as keyof typeof EXALTATION_POINTS];
+            const isExalted = !!(exaltInfo && dispositor.signIndex === exaltInfo.sign);
 
             // Check Aatchi (Own Sign)
-            const ownSigns = OWN_SIGNS[dispositorName as keyof typeof OWN_SIGNS];
-            const isOwnSign = ownSigns && ownSigns.includes(dispositor.signIndex);
+            const ownSigns = OWN_SIGNS && OWN_SIGNS[dispositorName as keyof typeof OWN_SIGNS];
+            const isOwnSign = !!(ownSigns && ownSigns.includes(dispositor.signIndex));
 
             if (isExalted || isOwnSign) {
                 soodshumaScore += 20;

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle } from 'lucide-react';
+import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X } from 'lucide-react';
+import GurujiPredictions from '../components/GurujiPredictions';
 import { useAuth } from '../contexts/AuthContext';
 import { useChartData } from '../contexts/ChartContext';
 import { calculatePlanetaryPositions } from '../utils/astrology';
@@ -26,6 +27,8 @@ const Dashboard: React.FC = () => {
     const { t } = useLanguage();
     const [charts, setCharts] = useState<SavedChart[]>([]);
     const [loading, setLoading] = useState(true);
+    const [predictionData, setPredictionData] = useState<any | null>(null);
+    const [showPredictionModal, setShowPredictionModal] = useState(false);
 
     useEffect(() => {
         if (!user) {
@@ -85,6 +88,23 @@ const Dashboard: React.FC = () => {
 
     const handleNewChart = () => {
         navigate('/');
+    };
+
+    const handleShowPrediction = (chart: SavedChart) => {
+        const chartData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
+        setPredictionData({
+            ...chartData,
+            userDetails: {
+                name: chart.name,
+                date: chart.dob.toISOString().split('T')[0],
+                time: chart.dob.toTimeString().slice(0, 5),
+                city: chart.place,
+                lat: chart.latitude,
+                lng: chart.longitude
+            },
+            birthDate: chart.dob
+        });
+        setShowPredictionModal(true);
     };
 
     return (
@@ -176,28 +196,7 @@ const Dashboard: React.FC = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.1 }}
                                 whileHover={{ y: -5 }}
-                                className="backdrop-blur-xl bg-white/10 rounded-2xl p-6 border border-white/20 hover:border-yellow-500/50 transition cursor-pointer"
-                                onClick={() => {
-                                    // Calculate planetary positions
-                                    const chartData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
-
-                                    // Set global chart data
-                                    setChartData({
-                                        ...chartData,
-                                        userDetails: {
-                                            name: chart.name,
-                                            date: chart.dob.toISOString().split('T')[0],
-                                            time: chart.dob.toTimeString().slice(0, 5),
-                                            city: chart.place,
-                                            lat: chart.latitude,
-                                            lng: chart.longitude
-                                        },
-                                        birthDate: chart.dob
-                                    });
-
-                                    // Navigate to chart view
-                                    navigate('/chart');
-                                }}
+                                className="backdrop-blur-xl bg-white/10 rounded-2xl p-6 border border-white/20 hover:border-yellow-500/50 transition"
                             >
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
@@ -232,15 +231,12 @@ const Dashboard: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 pt-4 border-t border-white/10">
+                                <div className="mt-4 pt-4 border-t border-white/10 flex gap-2">
                                     <motion.button
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
                                         onClick={() => {
-                                            // Calculate planetary positions
                                             const chartData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
-
-                                            // Set global chart data
                                             setChartData({
                                                 ...chartData,
                                                 userDetails: {
@@ -253,13 +249,21 @@ const Dashboard: React.FC = () => {
                                                 },
                                                 birthDate: chart.dob
                                             });
-
-                                            // Navigate to analysis view
-                                            navigate('/analysis');
+                                            navigate('/chart');
                                         }}
-                                        className="w-full py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition text-sm font-semibold"
+                                        className="flex-1 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition text-sm font-semibold"
                                     >
                                         {t.dashboard.viewChart}
+                                    </motion.button>
+
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => handleShowPrediction(chart)}
+                                        className="flex-1 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition text-sm font-semibold flex items-center justify-center gap-1"
+                                    >
+                                        <Sparkles className="w-3 h-3" />
+                                        Predictions
                                     </motion.button>
                                 </div>
                             </motion.div>
@@ -267,7 +271,31 @@ const Dashboard: React.FC = () => {
                     </div>
                 )}
             </div>
-        </div>
+
+            {/* Prediction Modal */}
+            {
+                showPredictionModal && predictionData && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative"
+                        >
+                            <button
+                                onClick={() => setShowPredictionModal(false)}
+                                className="absolute top-4 right-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition z-10"
+                            >
+                                <X className="w-6 h-6 text-slate-400" />
+                            </button>
+                            <div className="p-6">
+                                <GurujiPredictions data={predictionData} />
+                            </div>
+                        </motion.div>
+                    </div>
+                )
+            }
+        </div >
+
     );
 };
 
