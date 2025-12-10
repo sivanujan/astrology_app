@@ -45,24 +45,29 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
         currentDasa: currentDasha
     };
 
+    const fetchAnalysis = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const question = isTamil ? "முழுமையான பாவக பகுப்பாய்வு தாருங்கள்" : "Give me a comprehensive house-by-house analysis";
+            const response = await queryAstrologyOrchestrator(question, chartData, language);
+            setAiResponse(response);
+
+        } catch (err: any) {
+            console.error("Prediction Error:", err);
+            const errorMessage = err.message || "Failed to generate predictions";
+            setError(errorMessage);
+
+
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Auto-fetch comprehensive analysis on mount
     useEffect(() => {
-        const fetchAnalysis = async () => {
-            setIsLoading(true);
-            setError('');
-            try {
-                const question = isTamil ? "முழுமையான பாவக பகுப்பாய்வு தாருங்கள்" : "Give me a comprehensive house-by-house analysis";
-                const response = await queryAstrologyOrchestrator(question, chartData, language);
-                setAiResponse(response);
-            } catch (err: any) {
-                setError(err.message || "Failed to generate predictions");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchAnalysis();
-    }, [language]); // Re-fetch when language changes
+    }, [language]); // Only re-fetch when language changes, NOT on every key press
 
     const toggleExpand = (id: number) => {
         setExpandedId(expandedId === id ? null : id);
@@ -96,6 +101,12 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             {error && (
                 <div className="text-center p-8 glass-panel border border-red-800/30 bg-red-900/10">
                     <p className="text-red-400">{error}</p>
+                    <button
+                        onClick={fetchAnalysis}
+                        className="mt-4 px-4 py-2 bg-purple-600 rounded-lg text-white font-medium hover:bg-purple-700 transition"
+                    >
+                        {isTamil ? "மீண்டும் முயற்சி" : "Retry"}
+                    </button>
                 </div>
             )}
 

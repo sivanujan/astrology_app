@@ -27,12 +27,11 @@ export interface OrchestratorResponse {
 
 const OPENROUTER_API_KEY = "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";
 
-// List of free models to try in order of preference
 const FREE_MODELS = [
-    "google/gemini-2.0-flash-exp:free", // High quality, fast
-    "google/gemini-flash-1.5:free", // Stable alternative
-    "mistralai/mistral-7b-instruct:free", // Reliable fallback
-    "microsoft/phi-3-mini-128k-instruct:free", // Very fast
+    "google/gemini-2.0-flash-exp:free", // Primary: Latest experimental
+    "google/gemini-exp-1206:free", // Secondary: Reliable experimental
+    "google/gemini-2.0-flash-thinking-exp:free", // Tertiary: Deep thinking
+    "mistralai/mistral-7b-instruct:free", // Fallback: Non-Google option
 ];
 
 const HOUSE_KARAKAS = {
@@ -80,17 +79,18 @@ const HOUSE_NAMES_EN = [
     "Loss & Liberation"
 ];
 
-export const queryAstrologyOrchestrator = async (
-    question: string,
+export async function queryAstrologyOrchestrator(
+    userQuery: string,
     chartData: any,
-    language: 'en' | 'ta'
-): Promise<OrchestratorResponse> => {
+    language: 'en' | 'ta' = 'en',
+    apiKey?: string // Optional user-provided key
+): Promise<OrchestratorResponse> {
 
     // 1. Intent Classification
     let intent = "General Prediction";
     let isComprehensiveAnalysis = false;
 
-    const qLower = question.toLowerCase();
+    const qLower = userQuery.toLowerCase();
     if (qLower.includes("marriage") || qLower.includes("wedding") || qLower.includes("spouse") || qLower.includes("love") || qLower.includes("திருமணம்")) {
         intent = "Marriage Timing";
     } else if (qLower.includes("job") || qLower.includes("career") || qLower.includes("work") || qLower.includes("business") || qLower.includes("வேலை")) {
@@ -190,7 +190,7 @@ Prediction Logic (The "Guruji" Rules):
 4. Transit (Gocharam): Use transit results (like Ashtama Shani or Guru Peyarchi) only as a secondary delivery mechanism. The Dasa determines if it happens; Transit determines when.
 
 Task:
-Generate a detailed "Life Prediction Report" for the user answering their specific question: "${question}"
+Generate a detailed "Life Prediction Report" for the user answering their specific question: "${userQuery}"
 
 Output Requirements:
 - Provide the answer in BOTH Tamil and English.
@@ -224,16 +224,17 @@ Output Format (JSON):
                 headers: {
                     "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:5173",
-                    "X-Title": "Astrology App"
+                    "HTTP-Referer": window.location.origin, // Required by OpenRouter
+                    "X-Title": "Vedic AI Astrologer"
                 },
                 body: JSON.stringify({
-                    model: model,
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: question }
+                    "model": model,
+                    "messages": [
+                        { "role": "system", "content": systemPrompt },
+                        { "role": "user", "content": userQuery }
                     ],
-                    response_format: { type: "json_object" }
+                    "temperature": 0.7,
+                    "max_tokens": 4000
                 })
             });
 
