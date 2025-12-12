@@ -16,6 +16,11 @@ export interface TransitPositions {
     saturnSignIndex: number;
     rahuSignIndex: number;
     ketuSignIndex: number;
+    sunSignIndex: number;
+    moonSignIndex: number;
+    marsSignIndex: number;
+    mercurySignIndex: number;
+    venusSignIndex: number;
 }
 
 // --- Helper Functions ---
@@ -357,7 +362,7 @@ export const predictDetailedMarriageTimingDeprecated = (
         isFavorable
     };
 };
-export const predictCareerPath = (
+const predictCareerPath_Old = (
     planets: any[],
     ascendantSign: number,
     subathuvamScores: Record<string, SubathuvamResult>,
@@ -721,18 +726,21 @@ export const predictDetailedMarriageTiming = (
 
     // --- Step A: Identify Key Planets ---
     const house2Sign = (ascendantSign + 1) % 12;
+    const house3Sign = (ascendantSign + 2) % 12; // Added 3rd House
     const house7Sign = (ascendantSign + 6) % 12;
     const house8Sign = (ascendantSign + 7) % 12;
     const house11Sign = (ascendantSign + 10) % 12;
 
     const lord2 = SIGN_LORDS[house2Sign];
+    const lord3 = SIGN_LORDS[house3Sign]; // Lord 3
     const lord7 = SIGN_LORDS[house7Sign];
     const lord11 = SIGN_LORDS[house11Sign];
     const venus = 'Venus';
 
     const rahu = getPlanetPosition(planets, 'Rahu');
     const ketu = getPlanetPosition(planets, 'Ketu');
-    const keyPlanets = [lord2, lord7, lord11, venus];
+    // Updated Key Planets for Marriage: 2, 7, 11 AND 3 (Attempts) + Venus
+    const keyPlanets = [lord2, lord7, lord11, lord3, venus];
 
     if (rahu && [house2Sign, house7Sign, house8Sign].includes(rahu.signIndex)) keyPlanets.push('Rahu');
     if (ketu && [house2Sign, house7Sign, house8Sign].includes(ketu.signIndex)) keyPlanets.push('Ketu');
@@ -745,9 +753,12 @@ export const predictDetailedMarriageTiming = (
     let isFavorable = false;
     let predictionDetails: string[] = [];
 
+    // Store years for summary
+    const favorableYears = new Set<number>();
+
     const now = new Date();
 
-    // 1. Scan Future Periods
+    // 1. Scan Future Periods (Step 1: Dasa/Bhukti Filter)
     if (allDashaPeriods.length > 0) {
         for (const maha of allDashaPeriods) {
             if (maha.endDate < now) continue;
@@ -761,13 +772,13 @@ export const predictDetailedMarriageTiming = (
                     const ageAtBhukti = bhuktiMidDate.getFullYear() - birthDate.getFullYear();
                     if (ageAtBhukti < 21) continue;
 
-                    // Step 1: Bukthi Filter
+                    // Step 1: Check if Bhukti Lord is connected to 3, 7, 11 (Key Planet)
                     if (isKeyPlanet(bhukti.planet)) {
 
-                        // Step 2: Guru Filter (Intersection)
-                        // Scan for favorable Jupiter periods within this Bukthi
+                        // Step 2: Jupiter Filter (Year Check)
+                        // Scan for favorable Jupiter periods within this Bhukti
                         const jupiterWindows = getJupiterFavorablePeriods(
-                            bhukti.startDate < now ? now : bhukti.startDate, // Start from now if Bukthi active
+                            bhukti.startDate < now ? now : bhukti.startDate, // Start from now if Bhukti active
                             bhukti.endDate,
                             ascendantSign,
                             moonSign,
@@ -776,7 +787,11 @@ export const predictDetailedMarriageTiming = (
 
                         if (jupiterWindows.length > 0) {
                             for (const jWindow of jupiterWindows) {
-                                // Step 3: Sun Filter (Pinpoint)
+                                // Add Year to Set
+                                favorableYears.add(jWindow.start.getFullYear());
+                                favorableYears.add(jWindow.end.getFullYear());
+
+                                // Step 3: Sun Filter (Month Check)
                                 const sunWindows = getSunFavorablePeriods(
                                     jWindow.start,
                                     jWindow.end,
@@ -787,44 +802,55 @@ export const predictDetailedMarriageTiming = (
                                 if (sunWindows.length > 0) {
                                     // Found precise dates!
                                     sunWindows.forEach(sw => {
+                                        // Format: "May 2026 - Jun 2026"
+                                        const startStr = sw.start.toLocaleDateString(language, { month: 'short', year: 'numeric' });
+                                        const endStr = sw.end.toLocaleDateString(language, { month: 'short', year: 'numeric' });
+
                                         const detail = isTamil
-                                            ? `${sw.start.toLocaleDateString()} - ${sw.end.toLocaleDateString()} (புத்தி: ${bhukti.planet}, குரு பலம்)`
-                                            : `${sw.start.toLocaleDateString()} - ${sw.end.toLocaleDateString()} (Bukthi: ${bhukti.planet}, Jupiter Favorable)`;
-                                        predictionDetails.push(detail);
+                                            ? `**${sw.start.getFullYear()}**: ${startStr} முதல் ${endStr} வரை (புத்தி: ${bhukti.planet})`
+                                            : `**${sw.start.getFullYear()}**: ${startStr} to ${endStr} (Bhukti: ${bhukti.planet})`;
+
+                                        // Avoid duplicates if possible, or just push
+                                        if (predictionDetails.length < 3) { // Limit to top 3
+                                            predictionDetails.push(detail);
+                                        }
                                     });
-                                } else {
-                                    // Fallback to Jupiter Window if Sun window misses (rare but possible if window is short)
-                                    const detail = isTamil
-                                        ? `${jWindow.start.toLocaleDateString()} - ${jWindow.end.toLocaleDateString()} (புத்தி: ${bhukti.planet}, குரு பலம்)`
-                                        : `${jWindow.start.toLocaleDateString()} - ${jWindow.end.toLocaleDateString()} (Bukthi: ${bhukti.planet}, Jupiter Favorable)`;
-                                    predictionDetails.push(detail);
                                 }
                             }
                         }
                     }
-                    if (predictionDetails.length >= 3) break; // Limit to top 3 predictions
                 }
             }
-            if (predictionDetails.length >= 3) break;
         }
     }
 
-    if (predictionDetails.length > 0) {
+    // --- Construct Answer ---
+    const sortedYears = Array.from(favorableYears).sort((a, b) => a - b).slice(0, 2); // Next 2 likely years
+
+    if (sortedYears.length > 0) {
+        if (isTamil) {
+            answer = `திருமணம் நடக்க அதிக வாய்ப்புள்ள ஆண்டுகள்: **${sortedYears.join(", ")}**\n\n`;
+            answer += `குறிப்பிட்ட காலங்கள்:\n` + predictionDetails.join("\n");
+        } else {
+            answer = `Most Likely Marriage Years: **${sortedYears.join(", ")}**\n\n`;
+            answer += `Specific Favorable Periods:\n` + predictionDetails.join("\n");
+        }
         isFavorable = true;
-        answer = isTamil ? "திருமண காலம் துல்லியமாக கணிக்கப்பட்டுள்ளது." : "Marriage timing has been precisely calculated.";
-        reason = isTamil
-            ? `**துல்லியமான திருமண தேதிகள் (Precision Dates):**\n\n` +
-            predictionDetails.map(d => `- ${d}`).join('\n') +
-            `\n\n(கணிக்கப்பட்ட முறை: தசை/புத்தி -> குரு பார்வை -> சூரியன் சஞ்சாரம்)`
-            : `**Precision Marriage Dates:**\n\n` +
-            predictionDetails.map(d => `- ${d}`).join('\n') +
-            `\n\n(Method: Dasa/Bukthi -> Jupiter Aspect -> Sun Transit)`;
     } else {
+        answer = isTamil
+            ? "அடுத்த சில ஆண்டுகளில் திருமணத்திற்கு மிகச் சிறந்த அமைப்பு இல்லை. (தசை அல்லது குரு பலம் குறைவு)."
+            : "No very strong marriage window found in the next few years (Dasa or Jupiter strength low).";
         isFavorable = false;
-        answer = isTamil ? "தற்போதைய காலம் திருமணத்திற்கு சாதகமாக இல்லை." : "Current period is not favorable for marriage.";
-        reason = isTamil
-            ? "அடுத்த சில ஆண்டுகளில் வலுவான திருமண அமைப்பு இல்லை. (தசை, குரு, சூரியன் மூன்றும் இணையும் காலம் இல்லை)."
-            : "No strong marriage indication in the next few years. (No intersection of favorable Dasa, Jupiter, and Sun found).";
+    }
+
+    if (isTamil) {
+        reason = `விதி: 3, 7, 11 அதிபதிகளின் தசை/புத்தியில், குரு மற்றும் சூரியன் பலம் பெறும் காலங்கள்.\n` +
+            `- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n` +
+            `- தற்போதைய தசை: ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
+    } else {
+        reason = `Rule: Marriage happens during Dasa/Bhukti of 3, 7, 11 Lords, combining with favorable Jupiter (Year) and Sun (Month) transits.\n` +
+            `- Key Planets Checked: ${keyPlanets.join(', ')}\n` +
+            `- Current Status: Running ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
     }
 
     return {
@@ -869,153 +895,129 @@ export const predictMarriageType = (
     const p7 = getP(lord7);
     const p11 = getP(lord11);
 
+    // --- Extra Definitions ---
+    const house9Sign = (ascendantSign + 8) % 12;
+    const lord9 = SIGN_LORDS[house9Sign]; // Also define lord9 just in case logic uses it
+
     let predictionType = "";
     let reasons: string[] = [];
     let isLove = false;
 
-    // --- Step A: The "Rahu Override" (Primary Check) ---
-    // Check: Is Rahu in the 7th House OR conjoined with the 7th Lord?
-    let rahuOverride = false;
-    if (rahu) {
-        if (rahu.signIndex === house7Sign) {
-            rahuOverride = true;
+    // --- Scoring System ---
+    let loveScore = 0;
+    let arrangedScore = 0;
+
+    // 1. Conjunctions (Classic Rule)
+    if (p5 && p7 && p5.signIndex === p7.signIndex) {
+        loveScore += 40;
+        reasons.push(isTamil ? "5-ம் மற்றும் 7-ம் அதிபதிகள் சேர்க்கை." : "5th and 7th Lords are conjoined.");
+    }
+    if (pLagna && p7 && pLagna.signIndex === p7.signIndex) {
+        loveScore += 30;
+        reasons.push(isTamil ? "லக்னாதிபதி மற்றும் 7-ம் அதிபதி சேர்க்கை." : "Lagna Lord and 7th Lord are conjoined.");
+    }
+
+    // 2. Rahu Effect (Unconventional)
+    if (rahu && (rahu.signIndex === house7Sign || (p7 && rahu.signIndex === p7.signIndex))) {
+        loveScore += 35;
+        reasons.push(isTamil ? "ராகு 7-ல் அல்லது 7-ம் அதிபதியுடன் (கலப்பு திருமணம்)." : "Rahu in 7th or with 7th Lord (Inter-caste/Love).");
+    }
+
+    // 3. Venus Analysis (The User's Request)
+    // "check Venus realted if Venus releate past he have love check how Venus in that chart it good or bad"
+    const venusScore = subathuvamScores['Venus']?.totalScore || 0;
+    const isVenusSubathuva = venusScore >= 50;
+
+    // Check Libra (Thulam - House of Venus/Balance)
+    // If Lagna is Libra (6) -> Venus is Lagna Lord -> Nature is Love/Art
+    // If 7th is Libra (6) -> Aries Lagna -> Venus is 7th Lord.
+    const isLagnaLibra = ascendantSign === 6;
+    const is7thLibra = house7Sign === 6;
+
+    if (isLagnaLibra || is7thLibra) {
+        loveScore += 15;
+        reasons.push(isTamil
+            ? "துலாம் ராசி தொடர்பு (லக்னம் அல்லது 7-ம் இடம்) - இயற்கையான காதல் ஈர்ப்பு."
+            : "Libra connection (Lagna or 7th) - Natural romantic inclination.");
+    }
+
+    if (isVenusSubathuva) {
+        loveScore += 20;
+        reasons.push(isTamil
+            ? "சுக்கிரன் சுபத்துவமாக உள்ளார் (உண்மையான அன்பு)."
+            : "Venus is Subathuva (Strong/Pure Love).");
+    } else {
+        // Weak Venus often means love failure or unconventional desire usually leading to arranged
+        arrangedScore += 10;
+        reasons.push(isTamil
+            ? "சுக்கிரன் பலவீனமாக உள்ளார் (காதல் தோல்வி அல்லது பெற்றோர் தேர்வு)."
+            : "Venus is Weak (Love obstacles/Arranged likely).");
+    }
+
+    // 4. Dasa/Bhukti Check (Timing Rule)
+    // "check dasa buthi and check Venus realted"
+    if (currentDasa) {
+        const dasaLord = currentDasa.maha.planet;
+        const bhuktiLord = currentDasa.bhukti?.planet;
+
+        // Is Dasa Lord Venus or 5th/7th/Rahu?
+        const lovePlanets = ['Venus', 'Rahu', lord5, lord7];
+
+        if (lovePlanets.includes(dasaLord)) {
+            loveScore += 25;
             reasons.push(isTamil
-                ? "ராகு 7-ம் இடத்தில் உள்ளார் (விதிவிலக்கு: காதல்/கலப்பு திருமணம் உறுதி)."
-                : "Rahu is in the 7th House (Override: Strong Love/Inter-caste Marriage).");
-        }
-        if (p7 && rahu.signIndex === p7.signIndex) {
-            rahuOverride = true;
+                ? `தற்போதைய தசை (${dasaLord}) காதலுக்கு சாதகமானது.`
+                : `Current Dasa (${dasaLord}) favors Love.`);
+        } else if (bhuktiLord && lovePlanets.includes(bhuktiLord)) {
+            loveScore += 15;
             reasons.push(isTamil
-                ? "ராகு 7-ம் அதிபதியுடன் சேர்க்கை (விதிவிலக்கு: காதல் திருமணம்)."
-                : "Rahu is conjoined with 7th Lord (Override: Love Marriage).");
+                ? `தற்போதைய புத்தி (${bhuktiLord}) காதலுக்கு சாதகமானது.`
+                : `Current Bhukti (${bhuktiLord}) favoring Love.`);
+        } else {
+            // Unrelated Dasa often leads to Arranged
+            arrangedScore += 20;
         }
     }
 
-    if (rahuOverride) {
-        predictionType = isTamil ? "காதல் திருமணம் (விதிவிலக்கு/கலப்பு)" : "Love Marriage (Inter-caste/Unconventional)";
+    // 5. 9th House (Parental Approval)
+    // If 9th Lord is strong and connected to 7th, Parents arrange it.
+    if (p7 && p5 && p7.signIndex === house9Sign) {
+        arrangedScore += 25;
+        reasons.push(isTamil ? "7-ம் அதிபதி 9-ல் (பெற்றோர் நிச்சயித்த திருமணம்)." : "7th Lord in 9th (Arranged by parents).");
+    }
+
+    // --- Final Verdict ---
+    let verdict = "";
+
+    // Normalize Scores
+    arrangedScore += 20; // Default weight for social norm
+
+    if (loveScore > arrangedScore) {
+        const diff = loveScore - arrangedScore;
+        if (diff > 30) {
+            verdict = isTamil ? "காதல் திருமணம் நடக்கவே அதிக வாய்ப்பு." : "Strong indication of Love Marriage.";
+        } else {
+            verdict = isTamil ? "காதல் கலந்த பெற்றோர் சம்மதத்துடன் திருமணம்." : "Love Marriage with parental approval likely.";
+        }
         isLove = true;
-    }
-
-    // --- Step B: The "Venus Override" (Secondary Check) ---
-    // Check: Is Venus in Own House (Taurus/Libra) or Exalted (Pisces)?
-    // Check: Is the user running Venus Dasa or Rahu Dasa (connected to Venus)?
-    else {
-        let venusOverride = false;
-        if (venus) {
-            // Own House (Taurus=1, Libra=6) or Exalted (Pisces=11)
-            if ([1, 6, 11].includes(venus.signIndex)) {
-                venusOverride = true;
-                reasons.push(isTamil
-                    ? "சுக்கிரன் ஆட்சி/உச்சம் (இயற்கையான காதல் ஈர்ப்பு)."
-                    : "Venus is in Own House/Exalted (Natural Romantic Nature).");
-            }
+    } else {
+        verdict = isTamil ? "பெற்றோர் பார்க்கும் (Arranged) திருமணம் நடக்கவே வாய்ப்பு." : "Arranged Marriage is most likely.";
+        // Check for Love Failure context
+        if (!isVenusSubathuva && loveScore > 20) {
+            verdict += isTamil ? " (கடந்த கால காதல் தடைகள் இருக்கலாம்)." : " (Possible past love obstacles).";
         }
-
-        if (currentDasa) {
-            const dasaLord = currentDasa.maha.planet;
-            if (dasaLord === 'Venus') {
-                venusOverride = true;
-                reasons.push(isTamil
-                    ? "சுக்கிரன் தசை நடக்கிறது (காதல் காலம்)."
-                    : "Running Venus Dasa (Romantic Period).");
-            }
-            if (dasaLord === 'Rahu') {
-                // Check if Rahu connects to Venus
-                if (rahu && venus && (rahu.signIndex === venus.signIndex || isAspecting(rahu.signIndex, venus.signIndex, [5, 9]))) { // Rahu trine/conjunction
-                    venusOverride = true;
-                    reasons.push(isTamil
-                        ? "ராகு தசை (சுக்கிரன் தொடர்பு) - காதல் விருப்பம்."
-                        : "Running Rahu Dasa connected to Venus (Desire for Love).");
-                }
-            }
-        }
-
-        if (venusOverride) {
-            predictionType = isTamil ? "காதல் திருமணம் (அதிக வாய்ப்பு)" : "Love Marriage (High Probability)";
-            isLove = true;
-        }
-
-        // --- Step C: The "Standard 5+7 Rule" (Tertiary Check) ---
-        // Check: Is the 5th Lord connected to the 7th Lord or 7th House?
-        else {
-            let standardLove = false;
-            if (p5) {
-                if (p5.signIndex === house7Sign) {
-                    standardLove = true;
-                    reasons.push(isTamil ? "5-ம் அதிபதி 7-ல் உள்ளார்." : "5th Lord is in the 7th House.");
-                }
-                if (p7 && p5.signIndex === p7.signIndex) {
-                    standardLove = true;
-                    reasons.push(isTamil ? "5-ம் மற்றும் 7-ம் அதிபதிகள் சேர்க்கை." : "5th and 7th Lords are conjoined.");
-                }
-                // Mutual Aspect (7th)
-                if (p7 && Math.abs(p5.signIndex - p7.signIndex) === 6) {
-                    standardLove = true;
-                    reasons.push(isTamil ? "5-ம் மற்றும் 7-ம் அதிபதிகள் சமசப்தம பார்வை." : "5th and 7th Lords aspect each other.");
-                }
-            }
-            // Lagna Lord to 7th (Personal Choice)
-            if (pLagna) {
-                if (pLagna.signIndex === house7Sign) {
-                    standardLove = true;
-                    reasons.push(isTamil ? "லக்னாதிபதி 7-ல் உள்ளார்." : "Lagna Lord is in 7th House.");
-                }
-                if (p7 && pLagna.signIndex === p7.signIndex) {
-                    standardLove = true;
-                    reasons.push(isTamil ? "லக்னாதிபதி மற்றும் 7-ம் அதிபதி சேர்க்கை." : "Lagna Lord and 7th Lord are conjoined.");
-                }
-            }
-
-            if (standardLove) {
-                predictionType = isTamil ? "காதல் திருமணம் (ஆன்ம ரீதியானது)" : "Love Marriage (Soul Connection)";
-                isLove = true;
-            }
-
-            // --- Step D: The "Kama Trikona" Check (Desire Love) ---
-            // Check: Are the 3rd Lord, 7th Lord, and 11th Lord connected?
-            else {
-                let kamaTrikona = false;
-                // Check connections between 3, 7, 11
-                // 3-7
-                if (p3 && p7 && (p3.signIndex === p7.signIndex || Math.abs(p3.signIndex - p7.signIndex) === 6)) {
-                    kamaTrikona = true;
-                    reasons.push(isTamil ? "3-ம் மற்றும் 7-ம் அதிபதிகள் தொடர்பு." : "3rd and 7th Lords connected.");
-                }
-                // 7-11
-                if (p7 && p11 && (p7.signIndex === p11.signIndex || Math.abs(p7.signIndex - p11.signIndex) === 6)) {
-                    kamaTrikona = true;
-                    reasons.push(isTamil ? "7-ம் மற்றும் 11-ம் அதிபதிகள் தொடர்பு." : "7th and 11th Lords connected.");
-                }
-                // 3-11 (Less strong for marriage but supports desire)
-                if (p3 && p11 && (p3.signIndex === p11.signIndex)) {
-                    // Optional: usually need 7th involvement for marriage
-                }
-
-                if (kamaTrikona) {
-                    predictionType = isTamil ? "காதல் திருமணம் (விருப்பம் சார்ந்தது)" : "Love Marriage (Desire Driven)";
-                    isLove = true;
-                } else {
-                    // All Checks Failed -> Arranged Marriage
-                    predictionType = isTamil ? "பெற்றோர் பார்க்கும் திருமணம்" : "Arranged Marriage";
-                    isLove = false;
-                    reasons.push(isTamil
-                        ? "காதல் திருமணத்திற்கான கிரக அமைப்புகள் இல்லை (5-7 தொடர்பு, ராகு/சுக்கிரன் ஆதிக்கம் இல்லை)."
-                        : "No strong planetary combinations for Love Marriage (No 5-7 connection, Rahu/Venus override).");
-                }
-            }
-        }
+        isLove = false;
     }
 
     // Additional Context: Inter-caste Warning
-    if (isLove && !predictionType.includes("Inter-caste") && !predictionType.includes("கலப்பு")) {
-        // Check Ketu too
+    if (isLove && !verdict.includes("Inter-caste") && !verdict.includes("கலப்பு")) {
         if (ketu && ketu.signIndex === house7Sign) {
             reasons.push(isTamil ? "கேது 7-ல் உள்ளார் (கலப்பு சாத்தியம்)." : "Ketu in 7th House (Inter-caste likely).");
-            predictionType += isTamil ? " (கலப்பு சாத்தியம்)" : " (Inter-caste likely)";
+            verdict += isTamil ? " (கலப்பு சாத்தியம்)" : " (Inter-caste likely)";
         }
     }
 
-    const answer = predictionType;
+    const answer = verdict;
     const reason = reasons.join('\n- ');
 
     return {
@@ -1024,5 +1026,103 @@ export const predictMarriageType = (
         reason: isTamil ? `**காரணங்கள்:**\n- ${reason}` : `**Reasons:**\n- ${reason}`,
         isFavorable: isLove // Favorable = Love in this context? Or just neutral. Let's say True if Love, False if Arranged for now, or just True.
         // Actually, let's keep it consistent with "Favorable" meaning "Love" as that's usually the query "Will I have love marriage?"
+    };
+};
+
+// 4. Suitable Career Path (Job vs Business) - Guruji Method
+export const predictCareerPath = (
+    planets: any[],
+    ascendantSign: number,
+    subathuvamScores: Record<string, SubathuvamResult>,
+    currentDasa?: { maha: DashaPeriod, bhukti?: DashaPeriod },
+    language: 'en' | 'ta' = 'en'
+): PredictionResult => {
+    const isTamil = language === 'ta';
+    const question = isTamil ? "எந்த வேலை எனக்கு ஏற்றது? (தொழில்/வேலை)" : "Which Career is suitable? (Job vs Business)";
+
+    const getP = (name: string) => getPlanetPosition(planets, name);
+    // Safe access to scores
+    const saturnScore = subathuvamScores['Saturn']?.totalScore || 0;
+    const mercuryScore = subathuvamScores['Mercury']?.totalScore || 0;
+    const sunScore = subathuvamScores['Sun']?.totalScore || 0;
+    const marsScore = subathuvamScores['Mars']?.totalScore || 0;
+    const jupiterScore = subathuvamScores['Jupiter']?.totalScore || 0;
+    const venusScore = subathuvamScores['Venus']?.totalScore || 0;
+
+    let careerType = "";
+    let reasons: string[] = [];
+
+    // 1. Job vs Business (Saturn vs Mercury)
+    const isBusiness = mercuryScore > saturnScore && mercuryScore > 15;
+
+    if (isBusiness) {
+        careerType = isTamil ? "சொந்த தொழில் (Business)" : "Business / Self-Employment";
+        reasons.push(isTamil
+            ? `புதன் (${mercuryScore.toFixed(1)}) சனியை விட வலுவாக உள்ளார் (வியாபார சிந்தனை).`
+            : `Mercury (${mercuryScore.toFixed(1)}) is stronger than Saturn (Business aptitude).`);
+    } else {
+        const diff = saturnScore - mercuryScore;
+        if (diff > 10) {
+            careerType = isTamil ? "அரசு/தனியார் வேலை (Job/Service)" : "Job / Service (Employment)";
+            reasons.push(isTamil
+                ? `சனி (${saturnScore.toFixed(1)}) புதனை விட வலுவாக உள்ளார் (உழைப்பு/சேவை).`
+                : `Saturn (${saturnScore.toFixed(1)}) is stronger than Mercury (Service oriented).`);
+        } else {
+            careerType = isTamil ? "வேலை அல்லது தொழில் (இரண்டும் சாத்தியம்)" : "Job or Business (Mixed Potential)";
+            reasons.push(isTamil
+                ? "சனியும் புதனும் சம பலத்தில் உள்ளனர்."
+                : "Saturn and Mercury have comparable strength.");
+        }
+    }
+
+    // 2. Career Domain (Strongest Planet)
+    // Exclude Rahu/Ketu for domain usually, focus on 5 Tara Grahas + Sun/Moon
+    const scores = [
+        { name: isTamil ? 'சூரியன் (நிர்வாகம்/அரசு)' : 'Sun (Govt/Admin)', val: sunScore, planet: 'Sun' },
+        { name: isTamil ? 'செவ்வாய் (பொறியியல்/சீருடை)' : 'Mars (Engineering/Uniform)', val: marsScore, planet: 'Mars' },
+        { name: isTamil ? 'குரு (நிதி/ஆசிரியர்)' : 'Jupiter (Finance/Teaching)', val: jupiterScore, planet: 'Jupiter' },
+        { name: isTamil ? 'சுக்கிரன் (கலை/மென்பொருள்)' : 'Venus (Arts/IT/Luxury)', val: venusScore, planet: 'Venus' },
+        { name: isTamil ? 'புதன் (கணக்கு/தொடர்பு)' : 'Mercury (Accounts/Comm)', val: mercuryScore, planet: 'Mercury' },
+        { name: isTamil ? 'சனி (தொழிற்சாலை/உழைப்பு)' : 'Saturn (Industry/Service)', val: saturnScore, planet: 'Saturn' }
+    ];
+
+    // Filter out weak planets (<10)
+    const strongDomains = scores.filter(s => s.val > 10).sort((a, b) => b.val - a.val);
+
+    let domainText = "";
+    if (strongDomains.length > 0) {
+        const top = strongDomains[0];
+        domainText = isTamil
+            ? `சிறந்த துறை: ${top.name}`
+            : `Best Domain: ${top.name}`;
+        reasons.push(isTamil
+            ? `${top.planet} மிக அதிக சுபத்துவ பலம் (${top.val.toFixed(1)}) பெற்றுள்ளார்.`
+            : `${top.planet} has the highest Subathuvam strength (${top.val.toFixed(1)}).`);
+
+        // 2nd Best
+        if (strongDomains.length > 1) {
+            const second = strongDomains[1];
+            domainText += isTamil ? `, ${second.name}` : `, ${second.name}`;
+        }
+    } else {
+        domainText = isTamil ? "பொதுவான துறை" : "General Stream";
+    }
+
+    // 3. Dasa Influence
+    if (currentDasa) {
+        const dasaLord = currentDasa.maha.planet;
+        reasons.push(isTamil
+            ? `தற்போதைய தசை: ${dasaLord} (இப்போதைய கவனம்).`
+            : `Current Dasa: ${dasaLord} (Current focus).`);
+    }
+
+    const answer = `**${careerType}**\n${domainText}`;
+    const reasonText = reasons.join('\n- ');
+
+    return {
+        question,
+        answer,
+        reason: isTamil ? `**காரணங்கள்:**\n- ${reasonText}` : `**Reasons:**\n- ${reasonText}`,
+        isFavorable: true
     };
 };

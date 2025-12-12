@@ -1,5 +1,5 @@
 import { SIGN_LORDS, NAKSHATRAS, ZODIAC_SIGNS, EXALTATION_POINTS, DEBILITATION_POINTS, PLANETS } from './constants';
-import { calculateAdityaGurujiSubathuvam } from './adityaGurujiSubathuvam';
+import { calculateAdityaGurujiSubathuvam, generateSpecialPredictions, getFunctionalNature } from './adityaGurujiSubathuvam';
 
 export interface OrchestratorResponse {
     intent: string;
@@ -679,32 +679,36 @@ export async function queryAstrologyOrchestrator(
     let systemPrompt = "";
 
     if (isComprehensiveAnalysis) {
-        // Bava-by-Bava Analysis Prompt
         systemPrompt = `
-You are an expert Vedic Astrologer following Aditya Guruji's System. 
-Task: Perform a "Bava-by-Bava" (House-by-House) Analysis of the user's chart. Do not skip any house. Analyze strictly in the order of 1 to 12.
+You are an expert Vedic Astrologer following **Aditya Guruji's Subathuvam System**.
+Task: Perform a deep "Bava-by-Bava" (House-by-House) Analysis.
 
-Input Data (User's Chart):
+**Core Philosophy:**
+- **Subathuvam (Goodness)**: A planet becomes good if it is touched by Jupiter, Venus, or Mercury (Solo).
+- **Pavathuvam (Badness)**: A planet becomes bad if connected to Saturn, Mars, or Rahu/Ketu.
+- **Rule**: If a House Lord has HIGH Subathuvam (use the 'subathuvam_calculations' in input), that house PROSPERS even if the planet is debilitated.
+- **Rule**: If a House Lord has HIGH Pavathuvam, that house SUFFERS even if the planet is exalted.
+
+**Input Data (User's Chart):**
 ${JSON.stringify(context, null, 2)}
 
-The Analysis Protocol (Execute Step-by-Step):
+**The Analysis Protocol (Execute Step-by-Step for Houses 1-12):**
 
-For EVERY HOUSE (1 to 12), you must apply this Guruji Audit Logic:
+For each house:
+1.  **Check House**: Is it occupied? By whom? (Benefic/Malefic).
+2.  **Check Lord**: Where is the Lord? **Look at its 'subathuvam_score' in the input**.
+    - If Score > 50%: Result is Positive.
+    - If Score < 20% and Pavathuvam is high: Result is Negative.
+3.  **Check Karaka**: Is the significator strong?
+4.  **Verdict**: Synthesize.
 
-Step A: The House (Bava): Is the house occupied by a Benefic (Jupiter, Venus, Mercury, Waxing Moon) or Malefic?
-Rule: Benefics increase the house's life. Malefics (Saturn/Mars/Rahu) destroy it unless they have Subathuvam.
+**Example**:
+- House: 7th (Marriage).
+- Lord: Venus is in 6th (Hidden - usually bad).
+- But: Venus has 80% Subathuvam (Aspect from Jupiter).
+- Prediction: "Though 7th Lord is hidden, the high Subathuvam guarantees a good marriage, but with some initial delay."
 
-Step B: The Lord (Adhipathi): Where is the Lord placed? Is he strong (Kendra/Trikona) or weak (6/8/12)?
-Rule: If the Lord is hidden in 6/8/12, that relationship/result suffers.
-
-Step C: The Karaka (Significator): Is the natural Karaka for that house strong? (e.g., Sun for 9th, Moon for 4th).
-
-Step D: The Verdict: Combine A + B + C.
-- Strong: "Excellent results."
-- Mixed: "Average results."
-- Weak (Pavathuvam): "Struggle/Denial of result."
-
-Execution Loop (Internal Thought Process):
+**Execution Loop (Internal Thought Process):**
 1. Analyze Lagna (1st): Check Lagna Lord strength & Aspects on Lagna. (Key: Health, Status).
 2. Analyze 2nd House: Check 2nd Lord & Occupants. (Key: Family, Speech, Wealth).
 3. Analyze 3rd House: Check 3rd Lord & Mars. (Key: Courage, Siblings).
@@ -718,31 +722,31 @@ Execution Loop (Internal Thought Process):
 11. Analyze 11th House: Check 11th Lord. (Key: Profit, Elder Siblings).
 12. Analyze 12th House: Check 12th Lord. (Key: Loss, Sleep, Foreign Travel).
 
-Required Output Format (JSON):
+**Output Format (JSON):**
 {
     "intent": "Comprehensive House Analysis",
     "primary_analysis": {
         "key_planet": "Lagna Lord name",
-        "status": "Strength of Lagna Lord",
-        "dasa_verdict": "Current Dasa verdict"
+        "status": "Strength of Lagna Lord (High/Low Subathuvam)",
+        "dasa_verdict": "Current Dasa verdict based on Subathuvam"
     },
-    "model_consensus": "Brief overall summary",
+    "model_consensus": "Expert Summary",
     "final_answer_tamil": "முழுமையான பாவக பகுப்பாய்வு கீழே உள்ளது.",
     "final_answer_english": "Complete house-by-house analysis is provided below.",
-    "reasoning": "Overall chart strength assessment",
+    "reasoning": "Overall chart strength assessment based on Lagna Lord Subathuvam.",
     "bava_analysis_report": {
-        "lagna_summary": "Your Lagna is [Lagna]. Lagna Lord [Planet] is in [House] with [Strength].",
+        "lagna_summary": "Your Lagna is [Lagna]. Lagna Lord [Planet] is in [House] with [X]% Subathuvam.",
         "house_predictions": [
             {
                 "house_number": 1,
                 "title": "${language === 'ta' ? HOUSE_NAMES_TA[0] : HOUSE_NAMES_EN[0]}",
-                "status": "Strong/Weak/Moderate",
-                "analysis": "Detailed analysis in ${language === 'ta' ? 'Tamil' : 'English'}",
-                "guruji_rule_applied": "Specific Guruji rule used"
+                "status": "Excellent/Good/Average/Challenging",
+                "analysis": "Detailed analysis using Subathuvam/Pavathuvam logic.",
+                "guruji_rule_applied": "e.g., 'Subathuvam wins over weak placement'"
             }
             // ... Repeat for all 12 houses
         ],
-        "final_verdict": "Overall chart assessment"
+        "final_verdict": "Overall life prediction based on Dasa + Lagna strength."
     }
 }
 `;
@@ -778,6 +782,9 @@ Required Output Format (JSON):
             }
         }
 
+        // Safe name access
+        const userName = (chartData.userDetails && chartData.userDetails.name) || "User";
+
         systemPrompt = `
 Role & Persona:
 You are an expert Vedic Astrologer modeled after the teachings of Aditya Guruji. You do not give generic answers. You analyze the specific Subathuvam (Beneficence), Pavathuvam (Maleficence), and Sookshma (Intricacy) strengths of the planets provided in the input to generate a precise prediction.
@@ -791,8 +798,14 @@ Prediction Logic (The "Guruji" Rules):
    - COMPARE 'subathuvam_score' vs 'pavathuvam_score' for each planet.
    - Subathuvam (Beneficence) comes from Jupiter/Venus/Merc aspect or connection.
    - Pavathuvam (Maleficence) comes from Saturn/Mars/Rahu aspect or 6/8/12 placement.
-   - Rule: "Subathuvam wins over Pavathuvam" -> Good result. "Pavathuvam dominates" -> Bad result.
-3. Dasa Judgment: Analyze CurrentDasa. Is the Lord a Functional Benefic? Does it have high Subathuvam? If Dasa Lord is Pavathuva (Malefic), predict stress.
+   - **GOLDEN RULE**: Check 'subathuvam_score' in the 'KeyPlanets' list.
+     - IF SCORE >= 50: The planet is **PURE GOOD**. Ignore any "Pavathuvam" warning. It will give GOOD results.
+     - IF SCORE < 50: The planet might be malefic. Check Pavathuvam.
+     - **Saturn with >50 Score is NOT Malefic**. It is a Functional Benefic. Do not predict "delays" or "obstacles" for a Subathuva Saturn.
+3. Dasa Judgment (CRITICAL):
+   - **READ 'DasaSchedule' from input**.
+   - **EXCEPTION / OVERRIDE**: If the user's question explicitly says "I am in [Planet] Dasa" or "Current is [Planet] Dasa", **IGNORE** the calculated schedule and use the USER'S stated Dasa. The User is always right about their timeline.
+   - Verify: Is the current Dasa Lord a Functional Benefic? Does it have high Subathuvam?
 4. Transit (Gocharam): Use transit results (like Ashtama Shani) as secondary.
 5. Marriage/Career: Use the calculated aspects directly directly (e.g., "7th aspect of Saturn") to judge outcomes.
 
@@ -808,6 +821,10 @@ CONFIRM THIS IN YOUR RESPONSE.`
 
 
 ${intentPrompt}
+
+MANDATORY GREETING RULE:
+You MUST start your response by addressing the user by their name: "${userName}".
+Example: "Hello ${userName}," or "Vanakkam ${userName}," (if in Tamil).
 
 Task:
 Generate a detailed "Life Prediction Report" for the user answering their specific question: "${userQuery}"
@@ -916,11 +933,11 @@ Output Format (JSON):
 
     // 5. DIRECT GOOGLE GEMINI EXECUTION (PRIMARY FOR TEST)
     const GOOGLE_MODELS = [
-        "gemini-1.5-pro",
-        "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-1.5-flash-001",
-        "gemini-pro"
+        "gemini-1.5-flash-8b",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash-exp",
+        "gemini-1.0-pro"
     ];
 
     for (const gModel of GOOGLE_MODELS) {
@@ -974,21 +991,7 @@ const getNakshatra = (longitude: number): string => {
     return NAKSHATRAS[index % 27];
 };
 
-const getFunctionalNature = (planetName: string, lagnaSignIndex: number): string => {
-    // Find which houses this planet owns
-    const ownedHouses: number[] = [];
-    SIGN_LORDS.forEach((lord, index) => {
-        if (lord === planetName) {
-            // Calculate house number relative to Lagna
-            const houseNum = (index - lagnaSignIndex + 12) % 12 + 1;
-            ownedHouses.push(houseNum);
-        }
-    });
 
-    if (ownedHouses.some(h => [1, 5, 9].includes(h))) return "Functional Benefic (Trine Lord)";
-    if (ownedHouses.some(h => [3, 6, 11].includes(h))) return "Functional Malefic (3/6/11 Lord)";
-    return "Neutral/Mixed";
-};
 
 // Calculate Aspects for Context
 const getAspects = (planets: any[], ascSignIndex: number) => {
@@ -1032,6 +1035,49 @@ const getAspects = (planets: any[], ascSignIndex: number) => {
 
     // Remove duplicates (A conjunct B vs B conjunct A)
     return [...new Set(aspects)];
+};
+
+// Helper: Determine Dasha Schedule for Context
+const getReadableDashaSchedule = (periods: any[]) => {
+    if (!periods || periods.length === 0) return "Dasa Schedule Not Available";
+
+    const now = new Date();
+    // Flatten the hierarchy to find current sequence
+    let schedule: string[] = [];
+    let foundCurrent = false;
+
+    // We simply walk through the Mahadashas and their Bhuktis
+    for (const maha of periods) {
+        if (new Date(maha.endDate) < now) continue; // Past Mahadasha
+
+        // If we haven't found current yet, this might be it
+        const isCurrentMaha = new Date(maha.startDate) <= now && new Date(maha.endDate) > now;
+
+        if (isCurrentMaha || foundCurrent || schedule.length < 5) {
+            schedule.push(`*** MAHA DASA: ${maha.planet} (${new Date(maha.startDate).toLocaleDateString()} to ${new Date(maha.endDate).toLocaleDateString()}) ***`);
+
+            if (maha.subPeriods) {
+                for (const bhukti of maha.subPeriods) {
+                    if (new Date(bhukti.endDate) < now) continue; // Past Bhukti
+
+                    schedule.push(`  - Bhukti: ${bhukti.planet} (${new Date(bhukti.startDate).toLocaleDateString()} to ${new Date(bhukti.endDate).toLocaleDateString()})`);
+
+                    // Include Antaram if it's the current running one
+                    const isCurrentBhukti = new Date(bhukti.startDate) <= now && new Date(bhukti.endDate) > now;
+                    if (isCurrentBhukti && bhukti.subPeriods) {
+                        const currentAntara = bhukti.subPeriods.find((a: any) => new Date(a.startDate) <= now && new Date(a.endDate) > now);
+                        if (currentAntara) {
+                            schedule.push(`    > Current Antaram: ${currentAntara.planet} (Ends: ${new Date(currentAntara.endDate).toLocaleDateString()})`);
+                        }
+                    }
+                }
+            }
+            foundCurrent = true;
+        }
+        if (schedule.length > 8) break; // Limit context size
+    }
+
+    return schedule.join("\n");
 };
 
 // Calculate Planetary Status (Uchcha, Neecha, Aatchi)
@@ -1170,10 +1216,25 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
 
     const calculatedAspects = getAspects(planets, ascSignIndex);
 
+    // Generate Advanced Rules Analysis
+    // Generate Advanced Rules Analysis
+    const advancedRules = generateSpecialPredictions(planets, ascSignIndex, subathuvamScores, currentDasa);
+
     const comprehensivePlanets = planets.map((p: any) => {
         const houseNum = (p.signIndex - ascendant.signIndex + 12) % 12 + 1;
         const status = getPlanetStatus(p.name, p.signIndex);
         const pavathuvam = getPavathuvamDetails(p.name, houseNum, calculatedAspects);
+
+        const subScore = subathuvamScores[p.name]?.totalScore || 0;
+        let pavaScore = pavathuvam.score;
+        let pavaReasons = pavathuvam.reasons;
+
+        // CRITICAL FIX: Enforce "Subathuvam Wins" Rule at Data Level
+        // If Subathuvam is > 50 (Verified Good), Pavathuvam MUST be ignored.
+        if (subScore >= 50) {
+            pavaScore = 0;
+            pavaReasons = ["(Nullified by High Subathuvam)"];
+        }
 
         return {
             name: p.name,
@@ -1181,9 +1242,9 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
             house: houseNum,
             star: getNakshatra(p.longitude),
             status_dignity: status, // Uchcha/Neecha/Aatchi
-            subathuvam_score: subathuvamScores[p.name]?.totalScore || 0,
-            pavathuvam_score: pavathuvam.score,
-            pavathuvam_reasons: pavathuvam.reasons,
+            subathuvam_score: subScore,
+            pavathuvam_score: pavaScore,
+            pavathuvam_reasons: pavaReasons,
             is_7th_lord: p.name === houseLords.Lord_7,
             is_10th_lord: p.name === houseLords.Lord_10
         };
@@ -1204,13 +1265,17 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
         Star: moon ? getNakshatra(moon.longitude) : "Unknown",
         CurrentDasa: currentDasa ? {
             lord: currentDasa.maha.planet,
-            functional_nature: getFunctionalNature(currentDasa.maha.planet, ascSignIndex),
+            functional_nature: getFunctionalNature(ascSignIndex)[currentDasa.maha.planet]?.nature || "Neutral",
             bhukti: currentDasa.bhukti?.planet,
             antaram: currentDasa.antaram?.planet,
             start_date: currentDasa.maha.startDate ? new Date(currentDasa.maha.startDate).toLocaleDateString() : "Unknown",
             end_date: currentDasa.maha.endDate ? new Date(currentDasa.maha.endDate).toLocaleDateString() : "Unknown",
-            bhukti_end_date: currentDasa.bhukti?.endDate ? new Date(currentDasa.bhukti.endDate).toLocaleDateString() : "Unknown"
+            bhukti_end_date: currentDasa.bhukti?.endDate ? new Date(currentDasa.bhukti.endDate).toLocaleDateString() : "Unknown",
+            timeline_summary: "See 'dasa_schedule' below for full timeline."
         } : "Unknown",
+        DasaSchedule: getReadableDashaSchedule(data.dashaPeriods), // Helper function to be added
+        FunctionalMalefics: getFunctionalNature(ascSignIndex),
+        SpecialRulesAnalysis: advancedRules,
         HouseLords: houseLords,
         CalculatedAspects: calculatedAspects,
         KeyPlanets: comprehensivePlanets

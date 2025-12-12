@@ -99,6 +99,11 @@ const ChartGrid: React.FC<ChartGridProps> = ({ title, planets, ascendant, onCent
                                             title={`${language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}: ${Math.floor(planet.degree)}°`}
                                         >
                                             {language === 'ta' ? TAMIL_PLANET_ABBREVIATIONS[planet.name] : PLANET_SYMBOLS[planet.name as keyof typeof PLANET_SYMBOLS]}
+                                            {planet.isRetro && (
+                                                <sup className="text-[8px] text-red-300 ml-0.5 font-bold">
+                                                    {language === 'ta' ? 'வ' : 'R'}
+                                                </sup>
+                                            )}
                                         </motion.div>
                                     ))}
                                 </div>

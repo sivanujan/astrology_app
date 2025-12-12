@@ -250,11 +250,25 @@ export const calculatePlanetaryPositions = (date: Date, lat: number, lng: number
         Body.Jupiter, Body.Venus, Body.Saturn
     ];
 
-    const positions: { name: string; longitude: number; signIndex: number; degree: number }[] = bodies.map(body => {
+    const positions: { name: string; longitude: number; signIndex: number; degree: number; isRetro: boolean }[] = bodies.map(body => {
         // Use GeoVector to get geocentric position vector
         const vector = Astronomy.GeoVector(body, date, true);
         // Convert to Ecliptic coordinates
         const ecliptic = Astronomy.Ecliptic(vector);
+
+        // Calculate Retrograde Status
+        // Check longitude 1 hour earlier
+        const datePrev = new Date(date.getTime() - 60 * 60 * 1000);
+        const vectorPrev = Astronomy.GeoVector(body, datePrev, true);
+        const eclipticPrev = Astronomy.Ecliptic(vectorPrev);
+
+        // If current lon < prev lon, it's retrograde
+        // Handle 360 boundary: (Prev: 359, Curr: 0) -> diff is +1 (Direct)
+        // (Prev: 0, Curr: 359) -> diff is +359 (Retrograde)
+        // Proper way: (Curr - Prev + 540) % 360 - 180 should be negative
+
+        const diff = (ecliptic.elon - eclipticPrev.elon + 540) % 360 - 180;
+        const isRetro = diff < 0;
 
         // Convert to Sidereal
         let lon = ecliptic.elon - ayanamsa;
@@ -264,7 +278,8 @@ export const calculatePlanetaryPositions = (date: Date, lat: number, lng: number
             name: body,
             longitude: lon,
             signIndex: Math.floor(lon / 30),
-            degree: lon % 30
+            degree: lon % 30,
+            isRetro: isRetro
         };
     });
 
@@ -324,14 +339,16 @@ export const calculatePlanetaryPositions = (date: Date, lat: number, lng: number
         name: "Rahu",
         longitude: rahuSidereal,
         signIndex: Math.floor(rahuSidereal / 30),
-        degree: rahuSidereal % 30
+        degree: rahuSidereal % 30,
+        isRetro: true // Rahu is always Retrograde (Mean Node)
     });
 
     positions.push({
         name: "Ketu",
         longitude: ketuSidereal,
         signIndex: Math.floor(ketuSidereal / 30),
-        degree: ketuSidereal % 30
+        degree: ketuSidereal % 30,
+        isRetro: true // Ketu is always Retrograde (Mean Node)
     });
 
     return {
@@ -651,7 +668,7 @@ export const calculateFullTransitChart = () => {
     return transitPlanets;
 };
 
-// Keep the simplified one for backward compatibility or specific usage
+// 3b. Calculate Current Transits (Simple Interface)
 export const calculateCurrentTransits = () => {
     const fullChart = calculateFullTransitChart();
     const getSign = (name: string) => fullChart.find(p => p.name === name)?.signIndex || 0;
@@ -660,6 +677,82 @@ export const calculateCurrentTransits = () => {
         jupiterSignIndex: getSign('Jupiter'),
         saturnSignIndex: getSign('Saturn'),
         rahuSignIndex: getSign('Rahu'),
-        ketuSignIndex: getSign('Ketu')
+        ketuSignIndex: getSign('Ketu'),
+        sunSignIndex: getSign('Sun'),
+        moonSignIndex: getSign('Moon'),
+        marsSignIndex: getSign('Mars'),
+        mercurySignIndex: getSign('Mercury'),
+        venusSignIndex: getSign('Venus')
     };
+};
+
+// 4. Calculate Yogas & Doshas (Shared Logic)
+export const calculateYogas = (planets: any[], ascendant: any) => {
+    const yogas: { name: string, description: string }[] = [];
+    const doshas: { name: string, description: string }[] = [];
+
+    // Simple Gajakesari Yoga (Jupiter in Kendra from Moon)
+    const moon = planets.find((p: any) => p.name === 'Moon');
+    const jupiter = planets.find((p: any) => p.name === 'Jupiter');
+
+    if (moon && jupiter) {
+        // Calculate house difference
+        const diff = (jupiter.signIndex - moon.signIndex + 12) % 12; // 0=1st, 3=4th, 6=7th, 9=10th
+        // Kendra houses are 1, 4, 7, 10 (Indices 0, 3, 6, 9)
+        if ([0, 3, 6, 9].includes(diff)) {
+            yogas.push({ name: 'Gajakesari Yoga', description: 'Moon and Jupiter in Kendra. Indicates wisdom, wealth, and fame.' });
+        }
+    }
+
+    // Manglik Dosha (Mars in 1, 2, 4, 7, 8, 12 from Ascendant)
+    const mars = planets.find((p: any) => p.name === 'Mars');
+    if (mars && ascendant) {
+        const house = (mars.signIndex - ascendant.signIndex + 12) % 12 + 1;
+        if ([1, 2, 4, 7, 8, 12].includes(house)) {
+            doshas.push({ name: 'Manglik Dosha', description: 'Mars is in a sensitive position (1/2/4/7/8/12). May cause delay or difficulty in marriage.' });
+        }
+    }
+
+    // Advanced Yogas
+    // Parivartana (Exchange of Signs)
+    // Assuming checkParivartana is imported or available in scope. 
+    // It is exported from this file, so accessible.
+    const exchanges = checkParivartana(planets);
+    exchanges.forEach(ex => {
+        yogas.push({
+            name: 'Parivartana Yoga',
+            description: `${ex.p1} & ${ex.p2} exchange signs. Strengthening both planets.`
+        });
+    });
+
+    // Neecha Bhanga (Cancellation of Debilitation)
+    planets.forEach((p: any) => {
+        if (checkNeechaBhanga(p, planets, ascendant)) {
+            yogas.push({
+                name: 'Neecha Bhanga Raja Yoga',
+                description: `${p.name} gets cancellation of debilitation, converting weakness into strength.`
+            });
+        }
+    });
+
+    // Guru-Mangala Yoga (Jupiter & Mars Conjunction/Aspect)
+    if (jupiter && mars) {
+        // Conjunction
+        if (jupiter.signIndex === mars.signIndex) {
+            yogas.push({ name: 'Guru-Mangala Yoga', description: 'Jupiter and Mars conjunction. Good for wealth and property.' });
+        }
+        // Opposition (Aspect)
+        else if (Math.abs(jupiter.signIndex - mars.signIndex) === 6) {
+            yogas.push({ name: 'Guru-Mangala Yoga', description: 'Jupiter and Mars mutual aspect. Good for energy and enterprise.' });
+        }
+    }
+
+    // Budha-Aditya Yoga (Sun & Mercury Conjunction)
+    const sun = planets.find((p: any) => p.name === 'Sun');
+    const mercury = planets.find((p: any) => p.name === 'Mercury');
+    if (sun && mercury && sun.signIndex === mercury.signIndex) {
+        yogas.push({ name: 'Budha-Aditya Yoga', description: 'Sun and Mercury conjunction. Good for intelligence and communication.' });
+    }
+
+    return { yogas, doshas };
 };

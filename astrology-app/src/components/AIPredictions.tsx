@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Send, Bot, User, AlertCircle, BrainCircuit } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { db } from '../lib/firebase';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 
 interface AIPredictionsProps {
@@ -17,19 +20,70 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const [question, setQuestion] = useState('');
     const [responseLanguage, setResponseLanguage] = useState<'en' | 'ta'>('en');
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const { user } = useAuth(); // Auth context
+
+    // Firestore Integration
+    useEffect(() => {
+        if (!user || !data) return;
+
+        // Generate a simplified chart ID or use Name+DOB key
+        const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_');
+        const messagesRef = collection(db, `users/${user.uid}/charts/${chartId}/messages`);
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const msgs = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setChatHistory(msgs);
+            // Scroll to bottom on load
+            setTimeout(scrollToBottom, 100);
+        });
+
+        return () => unsubscribe();
+    }, [user, data]);
+
+    // Internal save function
+    const saveMessageToFirestore = async (msg: any) => {
+        if (!user || !data) return;
+        try {
+            const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_');
+            await addDoc(collection(db, `users/${user.uid}/charts/${chartId}/messages`), {
+                ...msg,
+                timestamp: serverTimestamp()
+            });
+        } catch (e) {
+            console.error("Error saving message:", e);
+        }
+    };
 
     // Sync initial response language with app language
     useEffect(() => {
         setResponseLanguage(language);
     }, [language]);
 
+    // Calculate Dasa locally for display (Consistency Check)
+    const [systemDasa, setSystemDasa] = useState<any>(null);
+
+    useEffect(() => {
+        const loadDasa = async () => {
+            if (data.birthDate && data.planets) {
+                const moon = data.planets.find((p: any) => p.name === 'Moon');
+                if (moon) {
+                    const { calculateDashaPeriods, getCurrentDasha } = await import('../utils/astrology');
+                    const periods = calculateDashaPeriods(new Date(data.birthDate), moon.longitude);
+                    const current = getCurrentDasha(periods);
+                    setSystemDasa(current);
+                }
+            }
+        };
+        loadDasa();
+    }, [data]);
+
     const scrollToBottom = () => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [chatHistory, prediction]);
 
     if (!data) return null;
 
@@ -37,21 +91,88 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         e.preventDefault();
         if (!question.trim()) return;
 
-        const newHistory = [...chatHistory, { role: 'user', content: question }];
-        setChatHistory(newHistory);
+        // Optimistic Update (will apply only if not logged in, otherwise Firestore syncs)
+        const userMsg = { role: 'user', content: question, timestamp: new Date() };
+        if (!user) {
+            setChatHistory(prev => [...prev, userMsg]);
+        } else {
+            saveMessageToFirestore(userMsg);
+        }
+
         setQuestion('');
         setIsLoading(true);
         setError('');
 
         try {
+            // Calculate Dasa if missing (similar to GurujiPredictions)
+            let enrichedData = { ...data };
+            // FORCE RE-CALCULATION of Dasa (Consistency with DashaPeriods component)
+            if (data.birthDate && data.planets) {
+                const moon = data.planets.find((p: any) => p.name === 'Moon');
+                if (moon) {
+                    const { calculateDashaPeriods, getCurrentDasha } = await import('../utils/astrology');
+                    const dashaPeriods = calculateDashaPeriods(new Date(data.birthDate), moon.longitude);
+                    const currentDasha = getCurrentDasha(dashaPeriods);
+
+                    // Overwrite with fresh calculation
+                    enrichedData = {
+                        ...enrichedData,
+                        currentDasa: currentDasha,
+                        dashaPeriods: dashaPeriods
+                    };
+                }
+            }
+
+            // --- PROACTIVE ENRICHMENT: Calculate Yogas & Subathuvam if missing ---
+            // The AI needs these pre-calculated values to follow rules accurately.
+
+            // 1. Calculate Subathuvam/Pavathuvam
+            const { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } = await import('../utils/subathuvam');
+            const subathuvamScores = calculateSubathuvamPavathuvam(data.planets);
+            // Assuming ascendant Sign Index is available. If not, derive from data.ascendant.
+            // data.ascendant usually has 'signIndex' or we can find it.
+            // Fallback: If no ascendant index, skip House Subathuvam.
+            let houseScores = {};
+            if (data.ascendant && typeof data.ascendant.signIndex === 'number') {
+                houseScores = calculateHouseSubathuvamPavathuvam(data.ascendant.signIndex, data.planets);
+            }
+
+            enrichedData = {
+                ...enrichedData,
+                subathuvam_calculations: {
+                    planetary_scores: subathuvamScores,
+                    house_scores: houseScores
+                }
+            };
+
+            // 2. Calculate Yogas
+            // Check if yoga calculation function exists or if we need to call it.
+            // Usually 'calculateYogas' in 'astrology.ts' or 'yogas.ts'.
+            // Let's assume basic yogas are in 'data.yogas' if calculated previously. 
+            // If not present, we should calculate.
+            if (!enrichedData.yogas) {
+                const { calculateYogas } = await import('../utils/astrology'); // Assuming this export exists
+                const yogas = calculateYogas(data.planets, data.ascendant?.signIndex || 0);
+                enrichedData = { ...enrichedData, yogas };
+            }
+
+            // Call the Orchestrator with enriched data
+            // Call the Orchestrator with enriched data
+
             // Call the Orchestrator with selected response language
-            const response = await queryAstrologyOrchestrator(question, data, responseLanguage);
+            const response = await queryAstrologyOrchestrator(question, enrichedData, responseLanguage);
 
             setPrediction(response);
 
             // Add AI response to history
             const aiContent = responseLanguage === 'ta' ? response.final_answer_tamil : response.final_answer_english;
-            setChatHistory(prev => [...prev, { role: 'ai', content: aiContent, details: response }]);
+            const aiMsg = { role: 'ai', content: aiContent, details: response, timestamp: new Date() };
+
+            if (!user) {
+                setChatHistory(prev => [...prev, aiMsg]);
+            } else {
+                saveMessageToFirestore(aiMsg);
+            }
 
         } catch (err: any) {
             setError(err.message || "Failed to get prediction");
@@ -104,19 +225,19 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                                 <div
                                                     key={house.house_number}
                                                     className={`p-3 rounded-lg border ${house.status === 'Strong' || house.status === 'Excellent'
-                                                            ? 'bg-green-900/20 border-green-800/30'
-                                                            : house.status === 'Weak'
-                                                                ? 'bg-red-900/20 border-red-800/30'
-                                                                : 'bg-yellow-900/20 border-yellow-800/30'
+                                                        ? 'bg-green-900/20 border-green-800/30'
+                                                        : house.status === 'Weak'
+                                                            ? 'bg-red-900/20 border-red-800/30'
+                                                            : 'bg-yellow-900/20 border-yellow-800/30'
                                                         }`}
                                                 >
                                                     <div className="flex items-center justify-between mb-2">
                                                         <span className="text-xs font-bold text-slate-400">House {house.house_number}</span>
                                                         <span className={`text-xs px-2 py-1 rounded-full ${house.status === 'Strong' || house.status === 'Excellent'
-                                                                ? 'bg-green-700/30 text-green-300'
-                                                                : house.status === 'Weak'
-                                                                    ? 'bg-red-700/30 text-red-300'
-                                                                    : 'bg-yellow-700/30 text-yellow-300'
+                                                            ? 'bg-green-700/30 text-green-300'
+                                                            : house.status === 'Weak'
+                                                                ? 'bg-red-700/30 text-red-300'
+                                                                : 'bg-yellow-700/30 text-yellow-300'
                                                             }`}>
                                                             {house.status}
                                                         </span>
@@ -164,6 +285,21 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
                     <div ref={chatEndRef} />
                 </div>
+
+                {/* System Context Info (Debug/Transparency) */}
+                {data.currentDasa && (
+                    <div className="px-4 py-2 bg-slate-900 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center">
+                        <span>
+                            System Calculation:
+                            <span className="text-purple-400 font-semibold ml-1">
+                                {data.currentDasa.maha?.planet || '?'} Dasa - {data.currentDasa.bhukti?.planet || '?'} Bhukti
+                            </span>
+                        </span>
+                        <span className="opacity-50 text-[10px]">
+                            (If wrong, tell the AI: "I am in [Planet] Dasa")
+                        </span>
+                    </div>
+                )}
 
                 <div className="p-4 border-t border-slate-800 bg-slate-900/50 space-y-3">
                     {/* Language Toggle */}

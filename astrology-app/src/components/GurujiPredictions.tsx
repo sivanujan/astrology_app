@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Sparkles, Loader } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
@@ -8,6 +9,12 @@ import {
     calculateCurrentTransits
 } from '../utils/astrology';
 import { calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
+import {
+    predictJobTiming,
+    predictDetailedMarriageTiming,
+    predictMarriageType,
+    predictCareerPath
+} from '../utils/predictionRules';
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 
 interface GurujiPredictionsProps {
@@ -16,6 +23,7 @@ interface GurujiPredictionsProps {
 
 const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const { t, language } = useLanguage();
+    const navigate = useNavigate();
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [aiResponse, setAiResponse] = useState<OrchestratorResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -23,19 +31,25 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
     if (!data) return null;
 
-    const { planets, ascendant, birthDate, userDetails } = data;
+    const { planets, ascendant, birthDate } = data;
     const isTamil = language === 'ta';
 
     // Calculations
     const moon = planets.find((p: any) => p.name === 'Moon');
     if (!moon) return <div className="text-center p-8 text-slate-400">{isTamil ? "சந்திரன் நிலை காணப்படவில்லை." : "Moon position not found."}</div>;
 
-    const dashaPeriods = calculateDashaPeriods(moon.longitude, birthDate);
+    const dashaPeriods = calculateDashaPeriods(new Date(birthDate), moon.longitude);
     const currentDasha = getCurrentDasha(dashaPeriods);
     const transits = calculateCurrentTransits();
     const agScores = calculateAdityaGurujiSubathuvam(planets);
 
     if (!currentDasha) return <div className="text-center p-8 text-slate-400">{isTamil ? "தசை காலங்களை கணக்கிட முடியவில்லை." : "Unable to calculate Dasa periods."}</div>;
+
+    // --- Rule Based Answers ---
+    const jobPrediction = predictJobTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, language);
+    const marriageTiming = predictDetailedMarriageTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, new Date(birthDate), 'male', dashaPeriods, language);
+    const marriageType = predictMarriageType(planets, ascendant.signIndex, agScores, currentDasha, language);
+    const careerPath = predictCareerPath(planets, ascendant.signIndex, agScores, currentDasha, language);
 
     // Prepare data for AI
     const chartData = {
@@ -66,15 +80,18 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
     // Auto-fetch comprehensive analysis on mount
     useEffect(() => {
+        // fetchAnalysis(); // OPTIONAL: Disable auto-fetch if we only want static Q&A primarily, but user asked for "Our Predictions" which implies the House Analysis is still kept.
+        // The user said "in the Our Predictions remove the final Final Verdict and add basice quesion... and add button below for more question it will move to AI Insights"
+        // So I will KEEP the House Analysis fetching.
         fetchAnalysis();
-    }, [language]); // Only re-fetch when language changes, NOT on every key press
+    }, [language]);
 
     const toggleExpand = (id: number) => {
         setExpandedId(expandedId === id ? null : id);
     };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-8 pb-20">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -86,20 +103,127 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </h2>
                 <p className="text-slate-400 mt-2">
                     {isTamil
-                        ? "ஆதித்ய குருஜியின் பாவக பகுப்பாய்வு முறையின் அடிப்படையில் உங்கள் ஜாதக கணிப்புகள்."
-                        : "Your chart predictions based on Aditya Guruji's house-by-house analysis method."}
+                        ? "விதிமுறை அடிப்படையிலான கேள்விகள் மற்றும் பாவக பகுப்பாய்வு."
+                        : "Rule-based answers and comprehensive house analysis."}
                 </p>
             </motion.div>
 
+            {/* --- Lagna Summary (Moved Top) --- */}
+            {aiResponse?.bava_analysis_report && (
+                <div className="glass-panel p-6 border border-purple-800/30 bg-purple-900/10 mb-8">
+                    <h3 className="text-xl font-bold text-purple-300 mb-3 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-yellow-400" />
+                        {isTamil ? "லக்னா சுருக்கம்" : "Lagna Summary"}
+                    </h3>
+                    <p className="text-slate-200 leading-relaxed font-medium">
+                        {aiResponse.bava_analysis_report.lagna_summary}
+                    </p>
+                </div>
+            )}
+
+            {/* --- Key Life Answers (Grid) --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+
+                {/* 1. Job Timing */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="glass-panel p-6 border-l-4 border-blue-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                >
+                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                        <Briefcase className="w-24 h-24 text-blue-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
+                        <Briefcase className="w-5 h-5" />
+                        {jobPrediction.question}
+                    </h3>
+                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                        {jobPrediction.answer}
+                    </p>
+                    <div className="text-xs text-blue-400 italic border-t border-blue-900/30 pt-2">
+                        {isTamil ? "காரணம்:" : "Reasoning:"} {jobPrediction.reason}
+                    </div>
+                </motion.div>
+
+                {/* 2. Career Path (Suitable Job) - NEW */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.15 }}
+                    className="glass-panel p-6 border-l-4 border-cyan-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                >
+                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                        <Briefcase className="w-24 h-24 text-cyan-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-cyan-200 mb-2 flex items-center gap-2">
+                        <Briefcase className="w-5 h-5" />
+                        {careerPath.question}
+                    </h3>
+                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                        {careerPath.answer}
+                    </p>
+                    <div className="text-xs text-cyan-400 italic border-t border-cyan-900/30 pt-2">
+                        {isTamil ? "காரணம்:" : "Reasoning:"} {careerPath.reason}
+                    </div>
+                </motion.div>
+
+                {/* 3. Marriage Timing */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="glass-panel p-6 border-l-4 border-pink-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                >
+                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                        <Heart className="w-24 h-24 text-pink-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-pink-200 mb-2 flex items-center gap-2">
+                        <Heart className="w-5 h-5" />
+                        {marriageTiming.question}
+                    </h3>
+                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                        {marriageTiming.answer}
+                    </p>
+                    <div className="text-xs text-pink-400 italic border-t border-pink-900/30 pt-2">
+                        {isTamil ? "காரணம்:" : "Reasoning:"} {marriageTiming.reason}
+                    </div>
+                </motion.div>
+
+                {/* 4. Marriage Type */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="glass-panel p-6 border-l-4 border-purple-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                >
+                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                        <Sparkles className="w-24 h-24 text-purple-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-purple-200 mb-2 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5" />
+                        {marriageType.question}
+                    </h3>
+                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                        {marriageType.answer}
+                    </p>
+                    <div className="text-xs text-purple-400 italic border-t border-purple-900/30 pt-2">
+                        {isTamil ? "காரணம்:" : "Reasoning:"} {marriageType.reason}
+                    </div>
+                </motion.div>
+            </div>
+
+
+            {/* Existing House Analysis (Kept as per implicit request, assuming user meant only remove verdict) */}
             {isLoading && (
-                <div className="text-center p-12 glass-panel">
+                <div className="text-center p-12 glass-panel mt-8">
                     <Loader className="w-12 h-12 mx-auto mb-4 animate-spin text-purple-400" />
                     <p className="text-slate-300">{isTamil ? "பகுப்பாய்வு செய்யப்படுகிறது..." : "Analyzing your chart..."}</p>
                 </div>
             )}
 
             {error && (
-                <div className="text-center p-8 glass-panel border border-red-800/30 bg-red-900/10">
+                <div className="text-center p-8 glass-panel border border-red-800/30 bg-red-900/10 mt-8">
                     <p className="text-red-400">{error}</p>
                     <button
                         onClick={fetchAnalysis}
@@ -111,18 +235,8 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             )}
 
             {aiResponse?.bava_analysis_report && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="space-y-6"
-                >
-                    {/* Lagna Summary */}
-                    <div className="glass-panel p-6 border border-purple-800/30 bg-purple-900/10">
-                        <h3 className="text-xl font-bold text-purple-300 mb-3">
-                            {isTamil ? "லக்னா சுருக்கம்" : "Lagna Summary"}
-                        </h3>
-                        <p className="text-slate-200 leading-relaxed">{aiResponse.bava_analysis_report.lagna_summary}</p>
-                    </div>
+                <div className="space-y-6 mt-8">
+                    {/* Lagna Summary - MOVED TO TOP */}
 
                     {/* House Predictions */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -190,16 +304,34 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                             </motion.div>
                         ))}
                     </div>
-
-                    {/* Final Verdict */}
-                    <div className="glass-panel p-6 border border-blue-800/30 bg-blue-900/10">
-                        <h3 className="text-xl font-bold text-blue-300 mb-3">
-                            {isTamil ? "இறுதி தீர்ப்பு" : "Final Verdict"}
-                        </h3>
-                        <p className="text-slate-200 leading-relaxed">{aiResponse.bava_analysis_report.final_verdict}</p>
-                    </div>
-                </motion.div>
+                </div>
             )}
+
+            {/* Ask AI Button */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="mt-12 text-center"
+            >
+                <div className="inline-block p-[2px] rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500">
+                    <button
+                        onClick={() => navigate('/predictions')}
+                        className="px-8 py-4 bg-slate-950 rounded-full flex items-center gap-3 text-lg font-bold text-white hover:bg-slate-900 transition-all group"
+                    >
+                        <MessageCircle className="w-6 h-6 text-purple-400 group-hover:text-pink-400 transition-colors" />
+                        {isTamil ? "AI ஜோதிடரிடம் மேலும் கேட்கவும்" : "Ask More Questions via AI"}
+                        <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded ml-2 border border-purple-500/30">
+                            {isTamil ? "புதியது" : "NEW"}
+                        </span>
+                    </button>
+                </div>
+                <p className="text-slate-500 text-sm mt-3">
+                    {isTamil
+                        ? "உங்கள் ஜாதகம் பற்றிய தனிப்பட்ட கேள்விகளுக்கு AI உடன் பேசுங்கள்."
+                        : "Chat with our AI Astrologer for personalized insights and remedies."}
+                </p>
+            </motion.div>
         </div>
     );
 };

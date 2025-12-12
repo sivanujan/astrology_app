@@ -11,7 +11,8 @@ import {
     calculateStrength,
     calculateDashaPeriods,
     getCurrentDasha,
-    calculateCurrentTransits
+    calculateCurrentTransits,
+    calculateYogas
 } from '../utils/astrology';
 import { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } from '../utils/subathuvam';
 import { calculateAdityaGurujiSubathuvam, calculateDigbalaAndYogas, getFunctionalNature, generateSpecialPredictions, calculateRahuKetuStrength } from '../utils/adityaGurujiSubathuvam';
@@ -31,58 +32,24 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
     const { planets, ascendant } = data;
     const [expandedSection, setExpandedSection] = useState<string | null>('planets');
 
-    // Helper to calculate basic Yogas/Doshas
-    const calculateYogas = () => {
-        const yogas = [];
-        const doshas = [];
+    // Use shared logic for Yogas
+    // 'calculateYogas' is imported at top level.
 
-        // Simple Gajakesari Yoga (Jupiter in Kendra from Moon)
-        const moon = planets.find((p: any) => p.name === 'Moon');
-        const jupiter = planets.find((p: any) => p.name === 'Jupiter');
+    const { yogas: rawYogas, doshas: rawDoshas } = calculateYogas(planets, ascendant);
 
-        if (moon && jupiter) {
-            const diff = Math.abs(moon.signIndex - jupiter.signIndex);
-            if ([0, 3, 6, 9].includes(diff)) {
-                yogas.push({ name: 'Gajakesari Yoga', description: 'Indicates wisdom, wealth, and fame.' });
-            }
-        }
 
-        // Manglik Dosha (Mars in 1, 2, 4, 7, 8, 12 from Ascendant)
-        const mars = planets.find((p: any) => p.name === 'Mars');
-        if (mars) {
-            let house = (mars.signIndex - ascendant.signIndex + 12) % 12 + 1;
-            if ([1, 2, 4, 7, 8, 12].includes(house)) {
-                doshas.push({ name: 'Manglik Dosha', description: 'Mars is in a position that may cause delay or difficulty in marriage.' });
-            }
-        }
+    // Filter/Map for Localization if needed
+    // The shared function returns English strings. We can display them as is or map specific names if we have translation keys.
+    // For now, let's just use the raw results as they are decently descriptive.
+    // Or we can map strict names like "Parivartana Yoga" to `t.advancedYogas.parivartana`
 
-        // Advanced Yogas
-        // Parivartana
-        const exchanges = checkParivartana(planets);
-        exchanges.forEach(ex => {
-            const p1Name = language === 'ta' ? TAMIL_PLANET_NAMES[ex.p1] : ex.p1;
-            const p2Name = language === 'ta' ? TAMIL_PLANET_NAMES[ex.p2] : ex.p2;
-            yogas.push({
-                name: t.advancedYogas.parivartana,
-                description: `${p1Name} & ${p2Name} exchange signs.`
-            });
-        });
+    const yogas = rawYogas.map(y => {
+        if (y.name === 'Parivartana Yoga') return { ...y, name: t.advancedYogas.parivartana || y.name };
+        if (y.name === 'Neecha Bhanga Raja Yoga') return { ...y, name: t.advancedYogas.neechaBhangaRajaYoga || y.name };
+        return y;
+    });
 
-        // Neecha Bhanga
-        planets.forEach((p: any) => {
-            if (checkNeechaBhanga(p, planets, ascendant)) {
-                const pName = language === 'ta' ? TAMIL_PLANET_NAMES[p.name] : p.name;
-                yogas.push({
-                    name: t.advancedYogas.neechaBhangaRajaYoga,
-                    description: `${pName} gets cancellation of debilitation.`
-                });
-            }
-        });
-
-        return { yogas, doshas };
-    };
-
-    const { yogas, doshas } = calculateYogas();
+    const doshas = rawDoshas;
 
     const toggleSection = (section: string) => {
         setExpandedSection(expandedSection === section ? null : section);
@@ -165,7 +132,14 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
 
                                             return (
                                                 <tr key={planet.name} className="hover:bg-slate-800/30 transition-colors">
-                                                    <td className="p-4 font-medium">{language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}</td>
+                                                    <td className="p-4 font-medium">
+                                                        {language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}
+                                                        {planet.isRetro && (
+                                                            <span className="ml-1 text-xs text-red-400 font-bold" title="Vakram (Retrograde)">
+                                                                {language === 'ta' ? '(வ)' : '(Rx)'}
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                     <td className="p-4">{TAMIL_RASI_NAMES[planet.signIndex]} ({ZODIAC_SIGNS[planet.signIndex]})</td>
                                                     <td className="p-4">{Math.floor(planet.degree)}° {Math.round((planet.degree % 1) * 60)}'</td>
                                                     <td className="p-4">{language === 'ta' ? TAMIL_NAKSHATRAS[nak.index] : NAKSHATRAS[nak.index]}</td>

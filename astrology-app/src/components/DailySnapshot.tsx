@@ -102,7 +102,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
 
                 {/* Background Glow */}
                 <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none ${snapshot.verdict.type === 'success' ? 'bg-green-500' :
-                        snapshot.verdict.type === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+                    snapshot.verdict.type === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
                     }`} />
             </motion.div>
 
@@ -120,71 +120,80 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Jupiter Transit */}
-                <motion.div
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="glass-panel p-6 border-t-4 border-t-yellow-500"
-                >
-                    <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-xl font-bold text-yellow-100 flex items-center gap-2">
-                            Guru Gocharam
-                        </h4>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${snapshot.jupiter.isFavorable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                            }`}>
-                            {snapshot.jupiter.status}
-                        </span>
-                    </div>
-                    <p className="text-slate-300 mb-4 min-h-[3rem]">
-                        {snapshot.jupiter.description}
-                    </p>
-                    {snapshot.jupiter.aspects && snapshot.jupiter.aspects.length > 0 && (
-                        <div className="flex items-start gap-2 text-sm text-yellow-300 bg-yellow-900/20 p-3 rounded-lg">
-                            <Shield className="w-4 h-4 mt-0.5 shrink-0" />
-                            <div>
-                                <span className="font-bold block mb-1">Special Protection:</span>
-                                {snapshot.jupiter.aspects.join(', ')}
-                            </div>
-                        </div>
-                    )}
-                </motion.div>
+            {/* Major Transits Grid */}
+            <h3 className="text-xl font-bold text-slate-300 mt-8 mb-4 border-l-4 border-purple-500 pl-3">
+                {t.chart.planetaryPositions} (Gocharam)
+            </h3>
 
-                {/* Saturn Transit */}
-                <motion.div
-                    initial={{ x: 20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="glass-panel p-6 border-t-4 border-t-blue-500"
-                >
-                    <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-xl font-bold text-blue-100 flex items-center gap-2">
-                            Sani Gocharam
-                        </h4>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${snapshot.saturn.isFavorable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                            }`}>
-                            {snapshot.saturn.status}
-                        </span>
-                    </div>
-                    <p className="text-slate-300 mb-4">
-                        {snapshot.saturn.description}
-                    </p>
-                    <div className="text-sm text-slate-400 bg-slate-800/50 p-3 rounded-lg flex gap-2">
-                        <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                        <span>
-                            Saturn's effects are slow and teach discipline.
-                            {snapshot.saturn.status === 'Sade Sati' && " Chant Hanuman Chalisa."}
-                        </span>
-                    </div>
-                </motion.div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                {/* Jupiter & Saturn - Highlights */}
+                {[snapshot.jupiter, snapshot.saturn].map((p, idx) => (
+                    <motion.div
+                        key={p.planet}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 + (idx * 0.1) }}
+                        className={`glass-panel p-6 border-t-4 ${p.planet === 'Jupiter' ? 'border-t-yellow-500' : 'border-t-blue-500'}`}
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <h4 className={`text-xl font-bold flex items-center gap-2 ${p.planet === 'Jupiter' ? 'text-yellow-100' : 'text-blue-100'}`}>
+                                {t.planets[p.planet] || p.planet} {language === 'ta' ? 'கோச்சாரம்' : 'Gocharam'}
+                            </h4>
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${p.isFavorable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {p.status}
+                            </span>
+                        </div>
+                        <p className="text-slate-300 mb-4 min-h-[3rem]">
+                            {p.description}
+                        </p>
+                        {p.aspects && p.aspects.length > 0 && (
+                            <div className="flex items-start gap-2 text-sm text-yellow-300 bg-yellow-900/20 p-3 rounded-lg">
+                                <Shield className="w-4 h-4 mt-0.5 shrink-0" />
+                                <div>
+                                    <span className="font-bold block mb-1">Special Protection:</span>
+                                    {p.aspects.join(', ')}
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                ))}
+            </div>
+
+            {/* Other Planets Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+                {[snapshot.sun, snapshot.mars, snapshot.mercury, snapshot.venus, snapshot.rahu, snapshot.ketu].map((p, idx) => (
+                    <motion.div
+                        key={p.planet}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.4 + (idx * 0.05) }}
+                        className="glass-panel p-4 border border-slate-700/50 hover:border-slate-500/50 transition-colors"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <h5 className="font-bold text-slate-200">
+                                {t.planets[p.planet] || p.planet}
+                            </h5>
+                            {p.isFavorable ? (
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                            ) : (
+                                <AlertTriangle className="w-4 h-4 text-orange-400" />
+                            )}
+                        </div>
+                        <div className="text-xs font-bold uppercase mb-2 opacity-80" style={{ color: p.isFavorable ? '#4ade80' : '#f87171' }}>
+                            {p.status}
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            {p.description}
+                        </p>
+                    </motion.div>
+                ))}
             </div>
 
             {/* Dasa Context */}
-            <div className="glass-panel p-4 flex items-center justify-between text-sm text-slate-400">
+            <div className="glass-panel p-4 flex items-center justify-between text-sm text-slate-400 mt-8">
                 <span>Current Dasa Context:</span>
                 <span className={`font-bold ${dasaStatus === 'Good' ? 'text-green-400' :
-                        dasaStatus === 'Bad' ? 'text-red-400' : 'text-yellow-400'
+                    dasaStatus === 'Bad' ? 'text-red-400' : 'text-yellow-400'
                     }`}>
                     {dasaDescription}
                 </span>

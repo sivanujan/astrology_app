@@ -307,9 +307,26 @@ export const getFunctionalNature = (ascendantSignIndex: number): Record<string, 
 export const generateSpecialPredictions = (
     planets: any[],
     ascendantSignIndex: number,
-    subathuvamResults: Record<string, SubathuvamResult>
+    subathuvamResults: Record<string, SubathuvamResult>,
+    currentDasa?: any
 ): { planet: string; prediction: string; type: string }[] => {
     const predictions: { planet: string; prediction: string; type: string }[] = [];
+    const lagnadipathiName = SIGN_LORDS[ascendantSignIndex];
+    const lagnadipathi = planets.find(p => p.name === lagnadipathiName);
+    const jupiter = planets.find(p => p.name === 'Jupiter');
+    const moon = planets.find(p => p.name === 'Moon');
+    const saturn = planets.find(p => p.name === 'Saturn');
+    const mars = planets.find(p => p.name === 'Mars');
+    const sun = planets.find(p => p.name === 'Sun');
+    const rahu = planets.find(p => p.name === 'Rahu');
+    const venus = planets.find(p => p.name === 'Venus');
+
+    // Helper: partial aspect check (simplified)
+    const hasAspect = (target: any, source: any, aspects: number[]) => {
+        if (!target || !source) return false;
+        const dist = (target.signIndex - source.signIndex + 12) % 12 + 1;
+        return aspects.includes(dist);
+    };
 
     planets.forEach(planet => {
         if (['Rahu', 'Ketu'].includes(planet.name)) return;
@@ -318,73 +335,299 @@ export const generateSpecialPredictions = (
         const houseNumber = houseIndex + 1;
         const isSubathuva = subathuvamResults[planet.name]?.isSubathuva || false;
 
-        // 1. Mars in 10th (Digbala)
+        // --- 1. Dusthana Rules (6, 8, 12) ---
+        if ([6, 8, 12].includes(houseNumber)) {
+            // A. Lagna Lord Exception
+            if (planet.name === lagnadipathiName) {
+                if (isSubathuva) {
+                    predictions.push({
+                        planet: planet.name,
+                        type: 'Lagna Lord in Dusthana',
+                        prediction: "Rise to high status after initial struggle (Subathuva protects Lagna Lord)."
+                    });
+                } else {
+                    predictions.push({
+                        planet: planet.name,
+                        type: 'Lagna Lord in Dusthana',
+                        prediction: "Risk of struggles in life structure due to weak Lagna Lord."
+                    });
+                }
+            }
+
+            // B. 8th House (Ayul Sthana)
+            if (houseNumber === 8) {
+                if (isSubathuva) {
+                    predictions.push({
+                        planet: planet.name,
+                        type: '8th House Subathuva',
+                        prediction: "Long life, potential for Unearned Wealth (Insurance/Legacy), Success in Research/Occult."
+                    });
+                } else if (['Saturn', 'Mars', 'Sun', 'Rahu', 'Ketu'].includes(planet.name)) {
+                    predictions.push({
+                        planet: planet.name,
+                        type: '8th House Affliction',
+                        prediction: "Risk of sudden events, accidents, or financial loss (Malefic in 8th without relief)."
+                    });
+                }
+            }
+
+            // C. 12th House (Viriya Sthana) - Foreign Settlement
+            if (houseNumber === 12) {
+                // Special Check for Foreign Settlement Case Study
+                const hasBeneficAspect = (jupiter && hasAspect(planet, jupiter, [5, 7, 9])) || (venus && hasAspect(planet, venus, [7]));
+
+                if (isSubathuva || hasBeneficAspect) {
+                    predictions.push({
+                        planet: planet.name,
+                        type: 'Foreign Settlement',
+                        prediction: "Permanent Foreign Citizenship & Settlement possible (Pure Benefic influence on 12th)."
+                    });
+                } else if (['Saturn', 'Rahu', 'Ketu'].includes(planet.name)) {
+                    predictions.push({
+                        planet: planet.name,
+                        type: 'Foreign Settlement',
+                        prediction: "Struggle abroad or settlement in different state only (Malefic influence on 12th)."
+                    });
+                }
+            }
+
+            // D. 6th House
+            if (houseNumber === 6 && isSubathuva) {
+                predictions.push({
+                    planet: planet.name,
+                    type: '6th House Subathuva',
+                    prediction: "Success in Service/Job, Victory over enemies, Good immunity."
+                });
+            }
+        }
+
+        // --- 2. Digbala Rules (Existing) ---
         if (planet.name === 'Mars' && houseNumber === 10) {
-            if (isSubathuva) {
+            predictions.push({
+                planet: 'Mars',
+                type: 'Digbala (10th)',
+                prediction: isSubathuva
+                    ? "High Authority, Commander, Real Estate Success (Controlled Power)."
+                    : "Aggressive leadership, conflicts (Uncontrolled Power)."
+            });
+            // Profession Case Study: Mars + Saturn
+            if (saturn && (hasAspect(planet, saturn, [3, 7, 10]) || planet.signIndex === saturn.signIndex)) {
                 predictions.push({
                     planet: 'Mars',
-                    type: 'Special Placement (10th House)',
-                    prediction: "High Authority, IAS/IPS, Commander, Successful Real Estate Entrepreneur. (Controlled Power)"
-                });
-            } else {
-                predictions.push({
-                    planet: 'Mars',
-                    type: 'Special Placement (10th House)',
-                    prediction: "Cruel Police, Sadistic Boss, Criminal tendencies, Accidents. (Uncontrolled Power)"
+                    type: 'Profession (Medical/Tech)',
+                    prediction: "Medical profession, Surgery, Dentistry, or Engineering (Cutting tools/Machinery)."
                 });
             }
         }
 
-        // 2. Saturn in 7th (Digbala)
         if (planet.name === 'Saturn' && houseNumber === 7) {
-            if (isSubathuva) {
-                predictions.push({
-                    planet: 'Saturn',
-                    type: 'Special Placement (7th House)',
-                    prediction: "Mass Leader, Justice, Public Service, Loyal Partner. (Benefic Saturn)"
-                });
-            } else {
-                predictions.push({
-                    planet: 'Saturn',
-                    type: 'Special Placement (7th House)',
-                    prediction: "Lazy, Delay in Marriage, Harsh Speech, Unpopular. (Malefic Saturn)"
-                });
-            }
+            predictions.push({
+                planet: 'Saturn',
+                type: 'Digbala (7th)',
+                prediction: isSubathuva
+                    ? "Mass Leader, Public Service, Loyal Partner."
+                    : "Delay in marriage, harsh speech, unpopularity."
+            });
         }
-
-        // 3. Sun in 10th (Digbala)
         if (planet.name === 'Sun' && houseNumber === 10) {
-            if (isSubathuva) {
-                predictions.push({
-                    planet: 'Sun',
-                    type: 'Special Placement (10th House)',
-                    prediction: "Government High Office, Politics, CEO, Father's Support. (Royal Status)"
-                });
-            } else {
-                predictions.push({
-                    planet: 'Sun',
-                    type: 'Special Placement (10th House)',
-                    prediction: "Egoistic Leader, Conflicts with Authority, Trouble to Father."
-                });
-            }
+            predictions.push({
+                planet: 'Sun',
+                type: 'Digbala (10th)',
+                prediction: isSubathuva
+                    ? "Government High Office, Politics, CEO."
+                    : "Egoistic leadership, father conflicts."
+            });
         }
-
-        // 4. Guru in 1st (Digbala)
         if (planet.name === 'Jupiter' && houseNumber === 1) {
             predictions.push({
                 planet: 'Jupiter',
-                type: 'Special Placement (Lagna)',
-                prediction: "Divine Protection, Wisdom, Respect, General Happiness. (Digbala Jupiter is always good)"
+                type: 'Digbala (Lagna)',
+                prediction: "Divine Protection, Wisdom, Respect. (Always Good)."
             });
         }
-
-        // 5. Venus in 4th (Digbala)
         if (planet.name === 'Venus' && houseNumber === 4) {
             predictions.push({
                 planet: 'Venus',
-                type: 'Special Placement (4th House)',
-                prediction: "Luxury Vehicles, Mansion, Happiness from Mother, Artistic Success."
+                type: 'Digbala (4th)',
+                prediction: "Luxury Vehicles, Mansion, Happiness from Mother."
             });
+        }
+    });
+
+    // --- 3. Afflicted Full Moon Rule ---
+    if (moon && sun) {
+        const isWaxing = isWaxingMoon(moon.longitude, sun.longitude);
+        // Simple check for Full Moon (approx opposite Sun)
+        const elongation = Math.abs(moon.longitude - sun.longitude);
+        const isFullMoon = elongation > 160 && elongation < 200; // Approx range
+
+        if (isFullMoon) {
+            const hasSaturnAspect = saturn && hasAspect(moon, saturn, [3, 7, 10]);
+            const hasRahuKetu = rahu && (moon.signIndex === rahu.signIndex || (rahu.signIndex + 6) % 12 === moon.signIndex); // Conj with Rahu or Ketu
+            const hasJupiterRelief = jupiter && hasAspect(moon, jupiter, [5, 7, 9]);
+
+            if ((hasSaturnAspect || hasRahuKetu) && !hasJupiterRelief) {
+                predictions.push({
+                    planet: 'Moon',
+                    type: 'Afflicted Full Moon',
+                    prediction: "Risk of mental stress, emotional instability, or water-related issues (Pavathuvam on Full Moon)."
+                });
+            }
+        }
+    }
+
+    // --- 4. Inter-Faith Love Rule (Case Study) ---
+    if (rahu) {
+        const rahuHouseIndex = (rahu.signIndex - ascendantSignIndex + 12) % 12 + 1;
+        if ([1, 7].includes(rahuHouseIndex)) {
+            predictions.push({
+                planet: 'Rahu',
+                type: 'Inter-Faith Connections',
+                prediction: "Strong tendency for unconventional, inter-religious, or inter-caste relationships (Rahu in 1/7)."
+            });
+        }
+    }
+
+    // --- 5. Progeny Analysis (Case Study) ---
+    // 5th House Lord
+    const house5SignIndex = (ascendantSignIndex + 4) % 12;
+    const lord5Name = SIGN_LORDS[house5SignIndex];
+    const lord5 = planets.find(p => p.name === lord5Name);
+
+    if (lord5 && jupiter) {
+        const lord5House = (lord5.signIndex - ascendantSignIndex + 12) % 12 + 1;
+        const jupiterHouse = (jupiter.signIndex - ascendantSignIndex + 12) % 12 + 1;
+
+        const lord5Afflicted = [6, 8, 12].includes(lord5House) || (rahu && lord5.signIndex === rahu.signIndex);
+        const jupiterAfflicted = [6, 8, 12].includes(jupiterHouse) || (rahu && jupiter.signIndex === rahu.signIndex);
+
+        if (lord5Afflicted && jupiterAfflicted) {
+            predictions.push({
+                planet: 'Jupiter',
+                type: 'Progeny (Child Birth)',
+                prediction: "Critical Puthira Dosha: Both 5th Lord and Karaka are afflicted. Child birth may require remedies/delay."
+            });
+        } else if (lord5Afflicted) {
+            predictions.push({
+                planet: lord5Name,
+                type: 'Progeny (Child Birth)',
+                prediction: "Delay or challenges in progeny due to 5th Lord affliction."
+            });
+        } else {
+            predictions.push({
+                planet: lord5Name,
+                type: 'Progeny (Child Birth)',
+                prediction: "Favorable conditions for progeny (5th Lord well-placed)."
+            });
+        }
+    }
+
+
+    // --- 6. Love Breakup & Dasha Rules (New Request) ---
+    if (currentDasa) {
+        const dasaLordName = currentDasa.maha?.planet || currentDasa.lord;
+
+        // A. Rahu Dasha Love Context
+        if (dasaLordName === 'Rahu') {
+            const hasLovePlanetConnection = (venus && (rahu?.signIndex === venus.signIndex || hasAspect(rahu, venus, [7]))) ||
+                (mars && (rahu?.signIndex === mars.signIndex || hasAspect(rahu, mars, [7])));
+
+            if (hasLovePlanetConnection) {
+                predictions.push({
+                    planet: 'Rahu',
+                    type: 'Love & Relationship (Rahu Dasha)',
+                    prediction: "Current Rahu Dasha indicates intense, possibly unconventional romantic involvement. Warning: Relationship may be temporary or fraught with illusion."
+                });
+            }
+        }
+
+        // B. Jupiter Dasha Breakup Context
+        if (dasaLordName === 'Jupiter') {
+            predictions.push({
+                planet: 'Jupiter',
+                type: 'Love & Breakup (Jupiter Dasha)',
+                prediction: "Jupiter Dasha typically brings a return to traditional values/wisdom. Unconventional relationships started previously (e.g., in Rahu period) often end or face reality check now."
+            });
+        }
+    }
+
+    // C. Saturn + Mars Breakup Indicator (General)
+    const house7Sign = (ascendantSignIndex + 6) % 12;
+    const house5Sign = (ascendantSignIndex + 4) % 12;
+
+    // Check if Saturn AND Mars influence 7th or 5th
+    const influencesHouse = (hSign: number) => {
+        if (!saturn || !mars) return false;
+
+        // Saturn Aspect (3, 7, 10 from Saturn)
+        const saturnDist = (hSign - saturn.signIndex + 12) % 12 + 1;
+        const saturnAspects = [1, 3, 7, 10].includes(saturnDist); // 1 is conjunction
+
+        // Mars Aspect (4, 7, 8 from Mars)
+        const marsDist = (hSign - mars.signIndex + 12) % 12 + 1;
+        const marsAspects = [1, 4, 7, 8].includes(marsDist);
+
+        return saturnAspects && marsAspects;
+    };
+
+    if (influencesHouse(house7Sign) || influencesHouse(house5Sign)) {
+        predictions.push({
+            planet: 'Saturn', // Attribution to Saturn/Mars
+            type: 'Breakup/Conflict Indicator',
+            prediction: "Saturn + Mars combined influence on 5th/7th House indicates potential for deep but problematic attachments, conflicts, or breakups."
+        });
+    }
+
+    // --- 7. Vakram (Retrograde) Rules (New Request) ---
+    planets.forEach(planet => {
+        if (['Rahu', 'Ketu', 'Sun', 'Moon'].includes(planet.name)) return; // Sun/Moon never Retro, Nodes always
+
+        if (planet.isRetro) {
+            const isNaturalMalefic = ['Saturn', 'Mars'].includes(planet.name);
+            const isNaturalBenefic = ['Jupiter', 'Venus', 'Mercury'].includes(planet.name);
+
+            // Check Exaltation/Debilitation
+            const exalt = EXALTATION_POINTS[planet.name as keyof typeof EXALTATION_POINTS];
+            const debilitation = DEBILITATION_POINTS[planet.name as keyof typeof DEBILITATION_POINTS];
+
+            const isExalted = exalt && exalt.sign === planet.signIndex;
+            const isDebilitated = debilitation && debilitation.sign === planet.signIndex;
+
+            // Rule 1: Malefic in Vakram -> Benefic
+            if (isNaturalMalefic) {
+                predictions.push({
+                    planet: planet.name,
+                    type: 'Retrograde Malefic (Vakram)',
+                    prediction: `${planet.name} is Retrograde (Vakram). Rule: A retrograde malefic loses its ability to harm and acts like a benefic. Unexpected success possible.`
+                });
+            }
+
+            // Rule 2: Benefic in Vakram -> Extremely Strong
+            if (isNaturalBenefic) {
+                predictions.push({
+                    planet: planet.name,
+                    type: 'Retrograde Benefic (Vakram)',
+                    prediction: `${planet.name} is Retrograde (Vakram). Rule: It gains immense strength (Chesta Bala). If functioning as a malefic for this Lagna, it may cause issues due to excess strength.`
+                });
+            }
+
+            // Rule 3: Exalted + Retro -> Weak (Debilitated)
+            if (isExalted) {
+                predictions.push({
+                    planet: planet.name,
+                    type: 'Exalted Retrograde (Uchcha Vakram)',
+                    prediction: `${planet.name} is Exalted but Retrograde. Rule: It acts as if it is Debilitated (Neecha). The strength is nullified.`
+                });
+            }
+
+            // Rule 4: Debilitated + Retro -> Strong (Exalted / Neecha Banga)
+            if (isDebilitated) {
+                predictions.push({
+                    planet: planet.name,
+                    type: 'Debilitated Retrograde (Neecha Vakram)',
+                    prediction: `${planet.name} is Debilitated but Retrograde. Rule: It acts as if it is Exalted (Uchcha). Immense power is hidden.`
+                });
+            }
         }
     });
 
@@ -394,7 +637,7 @@ export const generateSpecialPredictions = (
 // --- Rahu-Ketu Analysis (Aditya Guruji Rules) ---
 
 import { isWaxingMoon } from './subathuvam';
-import { EXALTATION_POINTS } from './constants';
+import { EXALTATION_POINTS, DEBILITATION_POINTS } from './constants'; // Added DEBILITATION_POINTS
 
 export interface ShadowPlanetResult {
     planet: string;

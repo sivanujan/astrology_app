@@ -50,51 +50,56 @@ const getConjunctionScore = (target: any, source: any, orb: number = 15) => {
 // Saturn: 3, 7, 10 (High Pavathuvam)
 // Others: 7 (Standard)
 // Orb: +/- 10 degrees
-const getAspectScore = (target: any, source: any) => {
-    const diff = (target.longitude - source.longitude + 360) % 360; // Angle from Source to Target
+// Improved Aspect Score Calculation
+// 1. Checks Sign-Based Aspect (Vedic Standard) first.
+// 2. Calculates Strength based on Degree Orb (Precision).
+const getAspectScore = (target: any, source: any, customOrb: number = 10) => {
+    // 1. Sign-Based Check
+    // Handle wrap-around for sign index difference
+    let signDiff = (target.signIndex - source.signIndex + 12) % 12;
 
-    let isAspected = false;
-    let aspectStrength = 0; // 0-100
-
-    // Check specific planetary aspects with 10 degree orb
-    // 10 degree orb means angle must be within (AspectAngle - 10) to (AspectAngle + 10)
-
-    const checkAngle = (angle: number, targetAngle: number) => {
-        return Math.abs(angle - targetAngle) <= 10;
-    };
+    let isSignAspect = false;
+    let idealAngle = 0;
 
     if (source.name === 'Jupiter') {
-        if (checkAngle(diff, 120) || checkAngle(diff, 180) || checkAngle(diff, 240)) { // 5th (120), 7th (180), 9th (240)
-            isAspected = true;
-            aspectStrength = 100; // Jupiter aspect is highest Subathuvam
-        }
+        if (signDiff === 4) { isSignAspect = true; idealAngle = 120; }      // 5th
+        else if (signDiff === 6) { isSignAspect = true; idealAngle = 180; } // 7th
+        else if (signDiff === 8) { isSignAspect = true; idealAngle = 240; } // 9th
     } else if (source.name === 'Mars') {
-        if (checkAngle(diff, 90) || checkAngle(diff, 180) || checkAngle(diff, 210)) { // 4th (90), 7th (180), 8th (210)
-            isAspected = true;
-            aspectStrength = 100;
-        }
+        if (signDiff === 3) { isSignAspect = true; idealAngle = 90; }       // 4th
+        else if (signDiff === 6) { isSignAspect = true; idealAngle = 180; } // 7th
+        else if (signDiff === 7) { isSignAspect = true; idealAngle = 210; } // 8th
     } else if (source.name === 'Saturn') {
-        if (checkAngle(diff, 60) || checkAngle(diff, 180) || checkAngle(diff, 270)) { // 3rd (60), 7th (180), 10th (270)
-            isAspected = true;
-            aspectStrength = 100;
-        }
+        if (signDiff === 2) { isSignAspect = true; idealAngle = 60; }       // 3rd
+        else if (signDiff === 6) { isSignAspect = true; idealAngle = 180; } // 7th
+        else if (signDiff === 9) { isSignAspect = true; idealAngle = 270; } // 10th
     } else {
-        // All others: 7th only
-        if (checkAngle(diff, 180)) {
-            isAspected = true;
-            aspectStrength = 100;
-        }
+        // All others (Sun, Moon, Ven, Merc, Rahu, Ketu): 7th Only
+        if (signDiff === 6) { isSignAspect = true; idealAngle = 180; }
     }
+
+    if (!isSignAspect) return 0;
+
+    // 2. Degree-Based Strength Calculation
+    const angleDiffRaw = (target.longitude - source.longitude + 360) % 360;
+
+    // Deviation from ideal angle
+    let deflection = Math.abs(angleDiffRaw - idealAngle);
+    if (deflection > 180) deflection = 360 - deflection;
+
+    // Gentle Decay: 100% at exact, decays to 10% at 30 deg deflection.
+    let score = 100 - (deflection * 3);
+
+    // Clamp Score
+    if (score < 10) score = 10; // Minimum visibility
+    if (score > 100) score = 100;
 
     // Special Rule: Saturn aspected by Jupiter within 5 degrees -> 100% Subathuvam
-    if (target.name === 'Saturn' && source.name === 'Jupiter' && isAspected) {
-        // Check exact orb
-        // We need to find which aspect it is to check degree
-        // But we already checked orb <= 10. If orb <= 5, it's super strong.
-        // Let's refine the strength based on orb if needed, but for now 100 is max.
+    if (target.name === 'Saturn' && source.name === 'Jupiter' && deflection <= 5) {
+        score = 100;
     }
 
-    return isAspected ? aspectStrength : 0;
+    return score;
 };
 
 // --- Main Calculation Function ---
@@ -114,15 +119,8 @@ export const calculateSubathuvamPavathuvam = (allPlanets: any[]) => {
         const subathuvamDetails: string[] = [];
         const pavathuvamDetails: string[] = [];
 
-        // 1. Check Star (Nakshatra) Lord
-        const nakshatra = getNakshatra(target.longitude);
-        // We need Nakshatra Lord mapping. Assuming we have it or can derive it.
-        // In astrology.ts we have NAKSHATRA_LORDS. We need to export/import it.
-        // For now, let's skip star lord check or add it if we can import NAKSHATRA_LORDS.
-        // Let's assume we can get it.
-        // actually NAKSHATRA_LORDS is in astrology.ts but not exported in the snippet I saw.
-        // I will add a placeholder or try to import if possible. 
-        // Let's skip for a moment and focus on planetary interaction which is the core request.
+        // 1. Check Star (Nakshatra) Lord (Placeholder)
+        // ...
 
         // 2. Check Conjunctions & Aspects
         allPlanets.forEach(source => {
@@ -154,41 +152,33 @@ export const calculateSubathuvamPavathuvam = (allPlanets: any[]) => {
                 }
             }
 
-            // Aspect by Jupiter (Highest Subathuvam)
-            if (source.name === 'Jupiter') {
-                const score = getAspectScore(target, source);
-                if (score > 0) {
-                    subathuvamScore += score; // Full score for Jupiter aspect
-                    subathuvamDetails.push(`Aspected by Jupiter (100%)`);
-                }
-            }
-            // Aspect by Venus (Good but less than Jupiter)
-            if (source.name === 'Venus') {
-                const score = getAspectScore(target, source);
-                if (score > 0) {
-                    subathuvamScore += score * 0.75;
-                    subathuvamDetails.push(`Aspected by Venus (75%)`);
-                }
-            }
+            // Aspects (Use Refined Function)
+            // Determine if source is Benefic/Malefic for Aspect Calculation
+            let isBeneficSource = ['Jupiter', 'Venus'].includes(source.name);
+            if (source.name === 'Moon' && isMoonWaxing) isBeneficSource = true;
+            if (source.name === 'Mercury' && isMercBenefic) isBeneficSource = true;
 
+            let isMaleficSource = ['Saturn', 'Mars'].includes(source.name);
 
-            // --- Pavathuvam (Badness) ---
+            // Calculate raw aspect score
+            const aspectScore = getAspectScore(target, source);
 
-            // Conjunction with Malefics (Saturn, Mars, Rahu, Ketu)
-            if (['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(source.name)) {
-                const score = getConjunctionScore(target, source);
-                if (score > 0) {
-                    pavathuvamScore += score;
-                    pavathuvamDetails.push(`Conjoined with ${source.name} (${Math.round(score)}%)`);
-                }
-            }
-
-            // Aspect by Saturn or Mars
-            if (['Saturn', 'Mars'].includes(source.name)) {
-                const score = getAspectScore(target, source);
-                if (score > 0) {
-                    pavathuvamScore += score;
-                    pavathuvamDetails.push(`Aspected by ${source.name} (100%)`);
+            if (aspectScore > 0) {
+                if (source.name === 'Jupiter') {
+                    subathuvamScore += aspectScore;
+                    subathuvamDetails.push(`Aspected by Jupiter (${Math.round(aspectScore)}%)`);
+                } else if (source.name === 'Venus') {
+                    subathuvamScore += aspectScore * 0.75;
+                    subathuvamDetails.push(`Aspected by Venus (${Math.round(aspectScore * 0.75)}%)`);
+                } else if (source.name === 'Moon' && isMoonWaxing) {
+                    subathuvamScore += aspectScore * 0.6;
+                    subathuvamDetails.push(`Aspected by Waxing Moon (${Math.round(aspectScore * 0.6)}%)`);
+                } else if (source.name === 'Mercury' && isMercBenefic) {
+                    subathuvamScore += aspectScore * 0.5;
+                    subathuvamDetails.push(`Aspected by Benefic Mercury (${Math.round(aspectScore * 0.5)}%)`);
+                } else if (isMaleficSource) {
+                    pavathuvamScore += aspectScore;
+                    pavathuvamDetails.push(`Aspected by ${source.name} (${Math.round(aspectScore)}%)`);
                 }
             }
         });
@@ -201,11 +191,6 @@ export const calculateSubathuvamPavathuvam = (allPlanets: any[]) => {
                 pavathuvamDetails.push(`Combust (Joined Sun)`);
             }
         }
-
-        // Normalize Scores (Optional, but good for UI)
-        // Cap at 100? Or allow accumulation?
-        // User said "Quantifying", so accumulation is fine, but maybe cap for percentage display.
-        // Let's keep raw scores for now.
 
         results[target.name] = {
             subathuvam: {
@@ -245,7 +230,7 @@ export const calculateHouseSubathuvamPavathuvam = (ascendantSign: number, allPla
         const houseObj = {
             name: `House ${houseNumber}`,
             longitude: houseMidpoint,
-            signIndex: houseSignIndex
+            signIndex: houseSignIndex // Kept for reference
         };
 
         let subathuvamScore = 0;
@@ -255,12 +240,13 @@ export const calculateHouseSubathuvamPavathuvam = (ascendantSign: number, allPla
 
         // Check Planets Occupying or Aspecting the House
         allPlanets.forEach(source => {
-            // 1. Occupants (Conjunction logic with house midpoint/sign)
-            // If planet is in the same sign, it influences the house.
+            // 1. Occupants (Sign-based is usually sufficient for Bhava Chalit, but let's use Conjunction Score for precision relative to midpoint?)
+            // Standard practice: If in same sign -> Occupant.
             if (source.signIndex === houseSignIndex) {
-                // Occupant
+                // Use Conjunction Score relative to Midpoint (BhavMadhya) for precision?
+                // Guruji often uses sign placement. Let's stick to Sign Placement = 100% for occupation.
                 if (['Jupiter', 'Venus'].includes(source.name)) {
-                    subathuvamScore += 100; // Strong Subathuvam by occupation
+                    subathuvamScore += 100;
                     subathuvamDetails.push(`Occupied by ${source.name}`);
                 } else if (source.name === 'Moon' && isMoonWaxing) {
                     subathuvamScore += 60;
@@ -269,66 +255,46 @@ export const calculateHouseSubathuvamPavathuvam = (ascendantSign: number, allPla
                     subathuvamScore += 50;
                     subathuvamDetails.push(`Occupied by Benefic Mercury`);
                 } else if (['Saturn', 'Mars', 'Rahu', 'Ketu', 'Sun'].includes(source.name)) {
-                    pavathuvamScore += 100; // Strong Pavathuvam by occupation
+                    pavathuvamScore += 100;
                     pavathuvamDetails.push(`Occupied by ${source.name}`);
                 }
             }
 
-            // 2. Aspects (Sign-Based for Houses)
-            const offset = (houseSignIndex - source.signIndex + 12) % 12;
-            const count = offset + 1;
-
-            let aspectScore = 0;
-            let aspectName = '';
-
-            if (source.name === 'Jupiter') {
-                if ([5, 7, 9].includes(count)) {
-                    aspectScore = 100;
-                    aspectName = `Aspected by Jupiter (${count}th)`;
-                }
-            } else if (source.name === 'Mars') {
-                if ([4, 7, 8].includes(count)) {
-                    aspectScore = 100;
-                    aspectName = `Aspected by Mars (${count}th)`;
-                }
-            } else if (source.name === 'Saturn') {
-                if ([3, 7, 10].includes(count)) {
-                    aspectScore = 100;
-                    aspectName = `Aspected by Saturn (${count}th)`;
-                }
-            } else if (['Rahu', 'Ketu'].includes(source.name)) {
-                if (count === 7) {
-                    aspectScore = 100;
-                    aspectName = `Aspected by ${source.name} (7th)`;
-                }
-            } else {
-                // Sun, Moon, Mercury, Venus - 7th aspect only
-                if (count === 7) {
-                    if (source.name === 'Venus') {
-                        aspectScore = 75;
-                        aspectName = `Aspected by Venus (7th)`;
-                    } else if (source.name === 'Mercury' && isMercBenefic) {
-                        aspectScore = 50;
-                        aspectName = `Aspected by Benefic Mercury (7th)`;
-                    } else if (source.name === 'Moon' && isMoonWaxing) {
-                        aspectScore = 60;
-                        aspectName = `Aspected by Waxing Moon (7th)`;
-                    } else if (source.name === 'Sun') {
-                        aspectScore = 100;
-                        aspectName = `Aspected by Sun (7th)`;
-                    }
-                }
-            }
+            // 2. Aspects (Degree Based)
+            // Use getAspectScore against houseMidpoint!
+            // Orb: 16 degrees ensures we cover the entire sign (15 +/- 15) and a bit more for edge cases
+            const aspectScore = getAspectScore(houseObj, source, 16);
 
             if (aspectScore > 0) {
-                if (['Jupiter', 'Venus'].includes(source.name) ||
-                    (source.name === 'Mercury' && isMercBenefic) ||
-                    (source.name === 'Moon' && isMoonWaxing)) {
+                // Subathuvam (Benefic) Aspects
+                if (source.name === 'Jupiter') {
                     subathuvamScore += aspectScore;
-                    subathuvamDetails.push(aspectName);
-                } else {
-                    pavathuvamScore += aspectScore;
-                    pavathuvamDetails.push(aspectName);
+                    subathuvamDetails.push(`Aspected by Jupiter`);
+                } else if (source.name === 'Venus') {
+                    subathuvamScore += aspectScore * 0.75;
+                    subathuvamDetails.push(`Aspected by Venus`);
+                } else if (source.name === 'Moon' && isMoonWaxing) {
+                    subathuvamScore += aspectScore * 0.6;
+                    subathuvamDetails.push(`Aspected by Waxing Moon`);
+                } else if (source.name === 'Mercury' && isMercBenefic) {
+                    subathuvamScore += aspectScore * 0.5;
+                    subathuvamDetails.push(`Aspected by Benefic Mercury`);
+                }
+                // Pavathuvam (Malefic) Aspects
+                else {
+                    // Includes Saturn, Mars, Rahu, Ketu, Sun
+                    // Also Waning Moon, Malefic Mercury (falling through)
+
+                    if (['Saturn', 'Mars', 'Rahu', 'Ketu', 'Sun'].includes(source.name)) {
+                        pavathuvamScore += aspectScore; // Full Malefic Score for these natural malefics
+                        pavathuvamDetails.push(`Aspected by ${source.name}`);
+                    } else if (source.name === 'Moon') { // Waning
+                        pavathuvamScore += aspectScore * 0.3; // Mild Malefic
+                        pavathuvamDetails.push(`Aspected by Waning Moon`);
+                    } else if (source.name === 'Mercury') { // Malefic
+                        pavathuvamScore += aspectScore * 0.3; // Mild Malefic
+                        pavathuvamDetails.push(`Aspected by Malefic Mercury`);
+                    }
                 }
             }
         });

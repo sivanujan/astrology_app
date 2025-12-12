@@ -125,6 +125,18 @@ export const translations = {
             subathuvam: "Subathuvam (Goodness)",
             pavathuvam: "Pavathuvam (Badness)",
             house: "House"
+        },
+        planets: {
+            Sun: "Sun",
+            Moon: "Moon",
+            Mars: "Mars",
+            Mercury: "Mercury",
+            Jupiter: "Jupiter",
+            Venus: "Venus",
+            Saturn: "Saturn",
+            Rahu: "Rahu",
+            Ketu: "Ketu",
+            Ascendant: "Ascendant"
         }
     },
     ta: {
@@ -253,6 +265,18 @@ export const translations = {
             subathuvam: "சுபத்துவம் (நன்மை)",
             pavathuvam: "பாத்துவம் (தீமை)",
             house: "பாவம்"
+        },
+        planets: {
+            Sun: "சூரியன்",
+            Moon: "சந்திரன்",
+            Mars: "செவ்வாய்",
+            Mercury: "புதன்",
+            Jupiter: "குரு",
+            Venus: "சுக்கிரன்",
+            Saturn: "சனி",
+            Rahu: "ராகு",
+            Ketu: "கேது",
+            Ascendant: "லக்னம்"
         }
     }
 };

@@ -11,6 +11,12 @@ export interface GocharamResult {
 export interface DailySnapshotResult {
     jupiter: GocharamResult;
     saturn: GocharamResult;
+    sun: GocharamResult;
+    mars: GocharamResult;
+    mercury: GocharamResult;
+    venus: GocharamResult;
+    rahu: GocharamResult;
+    ketu: GocharamResult;
     verdict: {
         title: string;
         message: string;
@@ -23,122 +29,87 @@ const getHouse = (fromSign: number, toSign: number): number => {
     return (toSign - fromSign + 12) % 12 + 1;
 };
 
-// Step A: Jupiter Transit (Guru Gocharam)
-export const calculateJupiterTransit = (
+// Generic Transit Calculation
+const calculatePlanetTransit = (
+    planetName: string,
     rasiSign: number,
-    lagnaSign: number,
-    currentJupiterSign: number
+    currentSignIndex: number,
+    goodHouses: number[],
+    badHouses: number[],
+    moderateHouses: number[]
 ): GocharamResult => {
-    const houseFromRasi = getHouse(rasiSign, currentJupiterSign);
-
-    // Check Aspects (Jupiter aspects 5, 7, 9 from itself)
-    // We need to check if Jupiter aspects User's Rasi or Lagna
-    const aspects: string[] = [];
-
-    // Check aspect on Rasi
-    // If Rasi is 5, 7, 9 houses from Jupiter
-    const rasiFromJupiter = getHouse(currentJupiterSign, rasiSign);
-    if ([5, 7, 9].includes(rasiFromJupiter)) {
-        aspects.push("Aspects Rasi (Moon Sign)");
-    }
-    // Conjunction (1st house) is also often considered a connection/aspect in general speech, 
-    // but specifically "Parvai" usually means 5, 7, 9. 
-    // However, Janma Guru (1st) is usually bad, but aspect is good? 
-    // Let's stick to standard aspect rules: 5, 7, 9.
-
-    // Check aspect on Lagna
-    const lagnaFromJupiter = getHouse(currentJupiterSign, lagnaSign);
-    if ([5, 7, 9].includes(lagnaFromJupiter)) {
-        aspects.push("Aspects Lagna");
-    }
+    const houseFromRasi = getHouse(rasiSign, currentSignIndex);
 
     let status: GocharamResult['status'] = 'Moderate';
     let description = '';
     let isFavorable = false;
 
-    // Excellent: 2, 5, 7, 9, 11
-    if ([2, 5, 7, 9, 11].includes(houseFromRasi)) {
-        status = 'Excellent';
-        description = 'Jupiter is in a highly favorable position, bringing growth and luck.';
+    if (goodHouses.includes(houseFromRasi)) {
+        status = 'Good'; // Or Excellent if distinctions needed
+        description = `${planetName} is in a favorable position (House ${houseFromRasi}). Expect positive results.`;
         isFavorable = true;
-    }
-    // Moderate: 1, 3, 4, 10
-    else if ([1, 3, 4, 10].includes(houseFromRasi)) {
-        status = 'Moderate';
-        description = 'Jupiter gives mixed results. Effort is required.';
-        isFavorable = true; // Moderate is considered okay/manageable
-    }
-    // Difficult: 6, 8, 12
-    else {
+    } else if (badHouses.includes(houseFromRasi)) {
         status = 'Difficult';
-        description = 'Jupiter is in a challenging position (6/8/12). Caution advised.';
+        description = `${planetName} is in a challenging position (House ${houseFromRasi}). Caution advised.`;
         isFavorable = false;
-    }
-
-    // "Guru Parvai Kodi Nanmai" Override
-    if (aspects.length > 0) {
-        description += ` However, Jupiter's aspect on ${aspects.join(' & ')} provides strong protection.`;
-        // If it was Difficult, aspect might mitigate it to Moderate or even Good protection.
-        // Let's keep the base status but append the positive note.
-    }
-
-    return {
-        planet: 'Jupiter',
-        status,
-        description,
-        isFavorable,
-        aspects
-    };
-};
-
-// Step B: Saturn Transit (Sani Gocharam)
-export const calculateSaturnTransit = (
-    rasiSign: number,
-    currentSaturnSign: number
-): GocharamResult => {
-    const houseFromRasi = getHouse(rasiSign, currentSaturnSign);
-
-    let status: GocharamResult['status'] = 'Moderate';
-    let description = '';
-    let isFavorable = false;
-
-    // Sade Sati: 12, 1, 2
-    if ([12, 1, 2].includes(houseFromRasi)) {
-        status = 'Sade Sati';
-        description = 'You are under the influence of Sade Sati (Ezharai Sani). Patience and discipline are key.';
-        isFavorable = false;
-    }
-    // Ashtama Sani: 8
-    else if (houseFromRasi === 8) {
-        status = 'Ashtama';
-        description = 'Ashtama Sani (8th House). Expect unexpected changes and pressure.';
-        isFavorable = false;
-    }
-    // Ardhastama Sani: 4
-    else if (houseFromRasi === 4) {
-        status = 'Ardhastama';
-        description = 'Ardhastama Sani (4th House). Watch out for domestic issues or travel troubles.';
-        isFavorable = false;
-    }
-    // Good: 3, 6, 11
-    else if ([3, 6, 11].includes(houseFromRasi)) {
-        status = 'Good';
-        description = 'Saturn is in a favorable position (Upachaya). Success through hard work.';
-        isFavorable = true;
-    }
-    else {
-        // 5, 7, 9, 10 - Generally neutral/mixed or specific effects not in the main "Bad" list
+    } else {
         status = 'Moderate';
-        description = 'Saturn transit is neutral. Routine work continues.';
+        description = `${planetName} gives mixed or neutral results (House ${houseFromRasi}).`;
         isFavorable = true;
     }
 
     return {
-        planet: 'Saturn',
+        planet: planetName,
         status,
         description,
         isFavorable
     };
+};
+
+export const calculateJupiterTransit = (rasiSign: number, lagnaSign: number, currentSign: number): GocharamResult => {
+    // Specific implementation for Jupiter (Guru) as it has special aspect rules (Guru Parvai)
+    const result = calculatePlanetTransit('Jupiter', rasiSign, currentSign, [2, 5, 7, 9, 11], [6, 8, 12], [1, 3, 4, 10]);
+
+    // Guru Parvai Check (Aspects 5, 7, 9)
+    const aspects: string[] = [];
+    const rasiFromJupiter = getHouse(currentSign, rasiSign);
+    if ([5, 7, 9].includes(rasiFromJupiter)) aspects.push("Aspects Rasi");
+
+    const lagnaFromJupiter = getHouse(currentSign, lagnaSign);
+    if ([5, 7, 9].includes(lagnaFromJupiter)) aspects.push("Aspects Lagna");
+
+    if (aspects.length > 0) {
+        result.description += ` However, Jupiter's aspect on ${aspects.join(' & ')} provides strong protection.`;
+        result.aspects = aspects;
+        // Boost status if aspect is present
+        if (result.status === 'Difficult') result.status = 'Moderate';
+        if (result.status === 'Moderate') result.status = 'Good';
+        result.isFavorable = true;
+    }
+    return result;
+};
+
+export const calculateSaturnTransit = (rasiSign: number, currentSign: number): GocharamResult => {
+    // Specific implementation for Saturn (Sade Sati, Ashtama)
+    // Good: 3, 6, 11. Bad: Most others.
+    const result = calculatePlanetTransit('Saturn', rasiSign, currentSign, [3, 6, 11], [1, 2, 4, 5, 7, 8, 9, 10, 12], []);
+
+    const houseFromRasi = getHouse(rasiSign, currentSign);
+    if ([12, 1, 2].includes(houseFromRasi)) {
+        result.status = 'Sade Sati';
+        result.description = 'You are under the influence of Sade Sati. Patience is key.';
+        result.isFavorable = false;
+    } else if (houseFromRasi === 8) {
+        result.status = 'Ashtama';
+        result.description = 'Ashtama Sani (8th House). Expect pressure.';
+        result.isFavorable = false;
+    } else if (houseFromRasi === 4) {
+        result.status = 'Ardhastama';
+        result.description = 'Ardhastama Sani (4th House). Domestic concerns.';
+        result.isFavorable = false;
+    }
+
+    return result;
 };
 
 // Step C: Daily Snapshot (Guruji Override)
@@ -151,41 +122,48 @@ export const getDailySnapshot = (
     const jupiter = calculateJupiterTransit(rasiSign, lagnaSign, transits.jupiterSignIndex);
     const saturn = calculateSaturnTransit(rasiSign, transits.saturnSignIndex);
 
+    // Other Planets
+    const sun = calculatePlanetTransit('Sun', rasiSign, transits.sunSignIndex, [3, 6, 10, 11], [1, 2, 4, 5, 7, 8, 9, 12], []);
+    const mars = calculatePlanetTransit('Mars', rasiSign, transits.marsSignIndex, [3, 6, 11], [1, 2, 4, 5, 7, 8, 9, 10, 12], []);
+    const mercury = calculatePlanetTransit('Mercury', rasiSign, transits.mercurySignIndex, [2, 4, 6, 8, 10, 11], [1, 3, 5, 7, 9, 12], []);
+    const venus = calculatePlanetTransit('Venus', rasiSign, transits.venusSignIndex, [1, 2, 3, 4, 5, 8, 9, 11, 12], [6, 7, 10], []);
+    const rahu = calculatePlanetTransit('Rahu', rasiSign, transits.rahuSignIndex, [3, 6, 11], [1, 2, 4, 5, 7, 8, 9, 10, 12], []);
+    const ketu = calculatePlanetTransit('Ketu', rasiSign, transits.ketuSignIndex, [3, 6, 11], [1, 2, 4, 5, 7, 8, 9, 10, 12], []);
+
     let verdictTitle = "";
     let verdictMessage = "";
     let verdictType: DailySnapshotResult['verdict']['type'] = 'warning';
 
     const isGocharamBad = !jupiter.isFavorable || !saturn.isFavorable;
-    const isGocharamVeryBad = !jupiter.isFavorable && !saturn.isFavorable;
 
     if (currentDasaStatus === 'Good') {
         if (isGocharamBad) {
             verdictTitle = "Don't Worry!";
-            verdictMessage = "Your current Dasa is strong. The adverse transit effects (Gocharam) will only cause minor stress, not major trouble. Focus on your goals.";
-            verdictType = 'success';
+            verdictMessage = "Your current Dasa is strong. The adverse transit effects (Gocharam) will only cause minor stress.";
+            verdictType = 'success'; // Green because Dasa protects
         } else {
             verdictTitle = "Excellent Time!";
-            verdictMessage = "Both Dasa and Transits are favorable. This is a golden period for progress.";
+            verdictMessage = "Both Dasa and Transits are favorable. Golden period.";
             verdictType = 'success';
         }
     } else if (currentDasaStatus === 'Bad') {
         if (isGocharamBad) {
             verdictTitle = "High Alert!";
-            verdictMessage = "Both Dasa and Transits are challenging. Be extremely careful in decisions, health, and relationships. Avoid risks.";
+            verdictMessage = "Both Dasa and Transits are challenging. Be extremely careful.";
             verdictType = 'danger';
         } else {
             verdictTitle = "Caution Advised";
-            verdictMessage = "Dasa is challenging, but Transits offer some relief. Proceed with care.";
+            verdictMessage = "Dasa is challenging, but Transits offer some relief.";
             verdictType = 'warning';
         }
-    } else { // Neutral Dasa
+    } else {
         if (isGocharamBad) {
             verdictTitle = "Be Careful";
-            verdictMessage = "Transits are challenging. Maintain routine and avoid unnecessary risks.";
+            verdictMessage = "Transits are challenging. Maintain routine.";
             verdictType = 'warning';
         } else {
             verdictTitle = "Good Period";
-            verdictMessage = "Transits are supportive. You can make steady progress.";
+            verdictMessage = "Transits are supportive. Steady progress.";
             verdictType = 'success';
         }
     }
@@ -193,6 +171,7 @@ export const getDailySnapshot = (
     return {
         jupiter,
         saturn,
+        sun, mars, mercury, venus, rahu, ketu, // Return all
         verdict: {
             title: verdictTitle,
             message: verdictMessage,
