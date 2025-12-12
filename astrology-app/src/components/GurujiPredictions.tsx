@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
@@ -13,7 +13,8 @@ import {
     predictJobTiming,
     predictDetailedMarriageTiming,
     predictMarriageType,
-    predictCareerPath
+    predictCareerPath,
+    predictForeignTravel
 } from '../utils/predictionRules';
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 
@@ -47,6 +48,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
     // --- Rule Based Answers ---
     const jobPrediction = predictJobTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, language);
+    const foreignTravel = predictForeignTravel(planets, ascendant.signIndex, moon.signIndex, agScores, currentDasha, language);
     const marriageTiming = predictDetailedMarriageTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, new Date(birthDate), 'male', dashaPeriods, language);
     const marriageType = predictMarriageType(planets, ascendant.signIndex, agScores, currentDasha, language);
     const careerPath = predictCareerPath(planets, ascendant.signIndex, agScores, currentDasha, language);
@@ -146,7 +148,29 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                     </div>
                 </motion.div>
 
-                {/* 2. Career Path (Suitable Job) - NEW */}
+                {/* 2. Foreign Settlement (New - Top Right) */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.12 }}
+                    className="glass-panel p-6 border-l-4 border-indigo-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                >
+                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                        <Globe className="w-24 h-24 text-indigo-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-indigo-200 mb-2 flex items-center gap-2">
+                        <Globe className="w-5 h-5" />
+                        {foreignTravel.question}
+                    </h3>
+                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                        {foreignTravel.answer}
+                    </p>
+                    <div className="text-xs text-indigo-400 italic border-t border-indigo-900/30 pt-2">
+                        {isTamil ? "காரணம்:" : "Reasoning:"} {foreignTravel.reason}
+                    </div>
+                </motion.div>
+
+                {/* 3. Career Path */}
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -168,7 +192,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                     </div>
                 </motion.div>
 
-                {/* 3. Marriage Timing */}
+                {/* 4. Marriage Timing */}
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -190,7 +214,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                     </div>
                 </motion.div>
 
-                {/* 4. Marriage Type */}
+                {/* 5. Marriage Type */}
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}

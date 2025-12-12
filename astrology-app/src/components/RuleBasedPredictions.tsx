@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Briefcase, Heart, HelpCircle, Star } from 'lucide-react';
+import { Briefcase, Heart, HelpCircle, Star, Globe } from 'lucide-react';
 import { calculatePlanetaryPositions, getCurrentDasha, calculateDashaPeriods } from '../utils/astrology';
 import { calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
 import {
@@ -8,6 +8,7 @@ import {
     predictDetailedMarriageTiming,
     predictMarriageType,
     predictCareerPath,
+    predictForeignTravel,
     PredictionResult,
     TransitPositions
 } from '../utils/predictionRules';
@@ -41,6 +42,11 @@ const RuleBasedPredictions: React.FC<RuleBasedPredictionsProps> = ({ data, langu
                 saturnSignIndex: transitData.planets.find(p => p.name === 'Saturn')?.signIndex || 0,
                 rahuSignIndex: transitData.planets.find(p => p.name === 'Rahu')?.signIndex || 0,
                 ketuSignIndex: transitData.planets.find(p => p.name === 'Ketu')?.signIndex || 0,
+                sunSignIndex: transitData.planets.find(p => p.name === 'Sun')?.signIndex || 0,
+                moonSignIndex: transitData.planets.find(p => p.name === 'Moon')?.signIndex || 0,
+                marsSignIndex: transitData.planets.find(p => p.name === 'Mars')?.signIndex || 0,
+                mercurySignIndex: transitData.planets.find(p => p.name === 'Mercury')?.signIndex || 0,
+                venusSignIndex: transitData.planets.find(p => p.name === 'Venus')?.signIndex || 0,
             };
 
             // 2. Calculate Current Dasa
@@ -61,6 +67,7 @@ const RuleBasedPredictions: React.FC<RuleBasedPredictionsProps> = ({ data, langu
             // 4. Run Predictions
             const results: PredictionResult[] = [];
 
+
             // Job
             results.push(predictJobTiming(
                 { maha: currentDasa.maha, bhukti: currentDasa.bhukti },
@@ -68,6 +75,16 @@ const RuleBasedPredictions: React.FC<RuleBasedPredictionsProps> = ({ data, langu
                 ascendant.signIndex,
                 moon.signIndex,
                 planets,
+                language
+            ));
+
+            // Foreign Settlement (New - Moved to Top)
+            results.push(predictForeignTravel(
+                planets,
+                ascendant.signIndex,
+                moon.signIndex,
+                subathuvamScores,
+                { maha: currentDasa.maha, bhukti: currentDasa.bhukti },
                 language
             ));
 
@@ -104,6 +121,8 @@ const RuleBasedPredictions: React.FC<RuleBasedPredictionsProps> = ({ data, langu
                 language
             ));
 
+
+
             setPredictions(results);
             setLoading(false);
         };
@@ -129,6 +148,7 @@ const RuleBasedPredictions: React.FC<RuleBasedPredictionsProps> = ({ data, langu
                             {index === 1 && <Heart className="w-12 h-12" />}
                             {index === 2 && <HelpCircle className="w-12 h-12" />}
                             {index === 3 && <Star className="w-12 h-12" />}
+                            {index === 4 && <Globe className="w-12 h-12" />}
                         </div>
 
                         <h3 className="text-lg font-semibold text-purple-300 mb-2">{pred.question}</h3>

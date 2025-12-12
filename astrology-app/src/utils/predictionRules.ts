@@ -1041,6 +1041,13 @@ export const predictCareerPath = (
     const question = isTamil ? "எந்த வேலை எனக்கு ஏற்றது? (தொழில்/வேலை)" : "Which Career is suitable? (Job vs Business)";
 
     const getP = (name: string) => getPlanetPosition(planets, name);
+
+    // House Definitions
+    const house6Sign = (ascendantSign + 5) % 12;
+    const house8Sign = (ascendantSign + 7) % 12;
+    const lord6 = SIGN_LORDS[house6Sign];
+    const lord8 = SIGN_LORDS[house8Sign];
+
     // Safe access to scores
     const saturnScore = subathuvamScores['Saturn']?.totalScore || 0;
     const mercuryScore = subathuvamScores['Mercury']?.totalScore || 0;
@@ -1048,9 +1055,11 @@ export const predictCareerPath = (
     const marsScore = subathuvamScores['Mars']?.totalScore || 0;
     const jupiterScore = subathuvamScores['Jupiter']?.totalScore || 0;
     const venusScore = subathuvamScores['Venus']?.totalScore || 0;
+    const moonScore = subathuvamScores['Moon']?.totalScore || 0;
 
     let careerType = "";
     let reasons: string[] = [];
+    let currentFocus = "";
 
     // 1. Job vs Business (Saturn vs Mercury)
     const isBusiness = mercuryScore > saturnScore && mercuryScore > 15;
@@ -1058,15 +1067,15 @@ export const predictCareerPath = (
     if (isBusiness) {
         careerType = isTamil ? "சொந்த தொழில் (Business)" : "Business / Self-Employment";
         reasons.push(isTamil
-            ? `புதன் (${mercuryScore.toFixed(1)}) சனியை விட வலுவாக உள்ளார் (வியாபார சிந்தனை).`
-            : `Mercury (${mercuryScore.toFixed(1)}) is stronger than Saturn (Business aptitude).`);
+            ? `புதன் (${mercuryScore.toFixed(0)}) சனியை விட வலுவாக உள்ளார் (வியாபார சிந்தனை).`
+            : `Mercury (${mercuryScore.toFixed(0)}) is stronger than Saturn (Business aptitude).`);
     } else {
         const diff = saturnScore - mercuryScore;
         if (diff > 10) {
             careerType = isTamil ? "அரசு/தனியார் வேலை (Job/Service)" : "Job / Service (Employment)";
             reasons.push(isTamil
-                ? `சனி (${saturnScore.toFixed(1)}) புதனை விட வலுவாக உள்ளார் (உழைப்பு/சேவை).`
-                : `Saturn (${saturnScore.toFixed(1)}) is stronger than Mercury (Service oriented).`);
+                ? `சனி (${saturnScore.toFixed(0)}) புதனை விட வலுவாக உள்ளார் (உழைப்பு/சேவை).`
+                : `Saturn (${saturnScore.toFixed(0)}) is stronger than Mercury (Service oriented).`);
         } else {
             careerType = isTamil ? "வேலை அல்லது தொழில் (இரண்டும் சாத்தியம்)" : "Job or Business (Mixed Potential)";
             reasons.push(isTamil
@@ -1075,18 +1084,17 @@ export const predictCareerPath = (
         }
     }
 
-    // 2. Career Domain (Strongest Planet)
-    // Exclude Rahu/Ketu for domain usually, focus on 5 Tara Grahas + Sun/Moon
+    // 2. Career Domain Ranking
     const scores = [
-        { name: isTamil ? 'சூரியன் (நிர்வாகம்/அரசு)' : 'Sun (Govt/Admin)', val: sunScore, planet: 'Sun' },
-        { name: isTamil ? 'செவ்வாய் (பொறியியல்/சீருடை)' : 'Mars (Engineering/Uniform)', val: marsScore, planet: 'Mars' },
-        { name: isTamil ? 'குரு (நிதி/ஆசிரியர்)' : 'Jupiter (Finance/Teaching)', val: jupiterScore, planet: 'Jupiter' },
-        { name: isTamil ? 'சுக்கிரன் (கலை/மென்பொருள்)' : 'Venus (Arts/IT/Luxury)', val: venusScore, planet: 'Venus' },
-        { name: isTamil ? 'புதன் (கணக்கு/தொடர்பு)' : 'Mercury (Accounts/Comm)', val: mercuryScore, planet: 'Mercury' },
-        { name: isTamil ? 'சனி (தொழிற்சாலை/உழைப்பு)' : 'Saturn (Industry/Service)', val: saturnScore, planet: 'Saturn' }
+        { name: isTamil ? 'சூரியன் (நிர்வாகம்/அரசு)' : 'Sun (Govt/Admin)', val: sunScore, planet: 'Sun', domain: isTamil ? "அரசு, அரசியல், நிர்வாகம்" : "Government, Politics, Admin" },
+        { name: isTamil ? 'செவ்வாய் (பொறியியல்/சீருடை)' : 'Mars (Engineering/Uniform)', val: marsScore, planet: 'Mars', domain: isTamil ? "ரியல் எஸ்டேட், சீருடைப் பணி, பொறியியல்" : "Real Estate, Engineering, Uniformed Services" },
+        { name: isTamil ? 'குரு (நிதி/ஆசிரியர்)' : 'Jupiter (Finance/Teaching)', val: jupiterScore, planet: 'Jupiter', domain: isTamil ? "வங்கி, கல்வி, சட்டம், ஆன்மீகம்" : "Banking, Education, Law, Finance" },
+        { name: isTamil ? 'சுக்கிரன் (கலை/மென்பொருள்)' : 'Venus (Arts/IT/Luxury)', val: venusScore, planet: 'Venus', domain: isTamil ? "கலை, ஐடி (IT), சினிமா, வாகனம்" : "Arts, IT, Media, Luxury Goods" },
+        { name: isTamil ? 'புதன் (கணக்கு/தொடர்பு)' : 'Mercury (Accounts/Comm)', val: mercuryScore, planet: 'Mercury', domain: isTamil ? "கணக்கு, எழுத்து, ஜோதிடம், வியாபாரம்" : "Accounting, Communication, Business, Data" },
+        { name: isTamil ? 'சனி (தொழிற்சாலை/உழைப்பு)' : 'Saturn (Industry/Service)', val: saturnScore, planet: 'Saturn', domain: isTamil ? "பொறிமுறை, தொழிற்சாலை, கடின உழைப்பு" : "Manufacturing, Service, Labor" },
+        { name: isTamil ? 'சந்திரன் (உணவு/பயணம்)' : 'Moon (Food/Travel)', val: moonScore, planet: 'Moon', domain: isTamil ? "உணவு, பயணம், ஏற்றுமதி" : "Food, Travel, Liquids" }
     ];
 
-    // Filter out weak planets (<10)
     const strongDomains = scores.filter(s => s.val > 10).sort((a, b) => b.val - a.val);
 
     let domainText = "";
@@ -1096,10 +1104,9 @@ export const predictCareerPath = (
             ? `சிறந்த துறை: ${top.name}`
             : `Best Domain: ${top.name}`;
         reasons.push(isTamil
-            ? `${top.planet} மிக அதிக சுபத்துவ பலம் (${top.val.toFixed(1)}) பெற்றுள்ளார்.`
-            : `${top.planet} has the highest Subathuvam strength (${top.val.toFixed(1)}).`);
+            ? `${top.planet} மிக அதிக சுபத்துவ பலம் (${top.val.toFixed(0)}) பெற்றுள்ளார்.`
+            : `${top.planet} has the highest Subathuvam strength (${top.val.toFixed(0)}).`);
 
-        // 2nd Best
         if (strongDomains.length > 1) {
             const second = strongDomains[1];
             domainText += isTamil ? `, ${second.name}` : `, ${second.name}`;
@@ -1108,15 +1115,42 @@ export const predictCareerPath = (
         domainText = isTamil ? "பொதுவான துறை" : "General Stream";
     }
 
-    // 3. Dasa Influence
+    // 3. Dasa Influence & 6/8 Rules (The User Request)
     if (currentDasa) {
         const dasaLord = currentDasa.maha.planet;
+
+        // Find Dasa Lord's Domain
+        const dasaPlanetInfo = scores.find(s => s.planet === dasaLord);
+        if (dasaPlanetInfo && dasaPlanetInfo.val > 10) {
+            currentFocus = isTamil
+                ? `தற்போதைய கவனம்: ${dasaPlanetInfo.domain} (${dasaLord} தசை).`
+                : `Current Focus: ${dasaPlanetInfo.domain} (Due to ${dasaLord} Dasa).`;
+        }
+
         reasons.push(isTamil
             ? `தற்போதைய தசை: ${dasaLord} (இப்போதைய கவனம்).`
             : `Current Dasa: ${dasaLord} (Current focus).`);
+
+        // 6th Lord Rule
+        if (dasaLord === lord6) {
+            reasons.push(isTamil
+                ? "எச்சரிக்கை: 6-ம் அதிபதி தசை நடப்பதால், சொந்த தொழில் செய்வதை விட வேலைக்கு செல்வதே சிறந்தது (கடன் பிரச்சனை வரலாம்)."
+                : "Warning: Running 6th Lord Dasa. Employment is safer than Business (Risk of Debt).");
+            if (isBusiness) {
+                currentFocus += isTamil ? " (வேலையில் தொடர்வது நல்லது)" : " (Better to stick to Service).";
+            }
+        }
+
+        // 8th Lord Rule
+        else if (dasaLord === lord8) {
+            reasons.push(isTamil
+                ? "குறிப்பு: 8-ம் அதிபதி தசை. எதிர்பாராத மாற்றங்கள் வரலாம். ஆராய்ச்சி/அயல்நாடு/இன்சூரன்ஸ் துறை ஏற்றது."
+                : "Note: Running 8th Lord Dasa. Expect sudden changes. Research/Audit/Insurance fields are favorable.");
+            currentFocus += isTamil ? " (மாற்றங்கள் வரலாம்)" : " (Expect Changes).";
+        }
     }
 
-    const answer = `**${careerType}**\n${domainText}`;
+    const answer = `**${careerType}**\n${domainText}\n\n**${currentFocus}**`;
     const reasonText = reasons.join('\n- ');
 
     return {
@@ -1124,5 +1158,176 @@ export const predictCareerPath = (
         answer,
         reason: isTamil ? `**காரணங்கள்:**\n- ${reasonText}` : `**Reasons:**\n- ${reasonText}`,
         isFavorable: true
+    };
+};
+
+// 5. Foreign Settlement Prediction (Aditya Guruji's 8-12 Subathuva Rule)
+export const predictForeignTravel = (
+    planets: any[],
+    ascendantSign: number,
+    moonSignIndex: number,
+    subathuvamScores: Record<string, SubathuvamResult>,
+    currentDasa?: { maha: DashaPeriod, bhukti?: DashaPeriod },
+    language: 'en' | 'ta' = 'en'
+): PredictionResult => {
+    const isTamil = language === 'ta';
+    const question = isTamil ? "வெளிநாட்டில் செட்டில் ஆக முடியுமா?" : "Can I settle abroad?";
+
+    const getP = (name: string) => getPlanetPosition(planets, name);
+
+    // 1. Lagna Based Houses
+    const l8 = (ascendantSign + 7) % 12;
+    const l12 = (ascendantSign + 11) % 12;
+    const l9 = (ascendantSign + 8) % 12;
+
+    const lord8_Lagna = SIGN_LORDS[l8];
+    const lord12_Lagna = SIGN_LORDS[l12];
+    const lord9_Lagna = SIGN_LORDS[l9];
+
+    // 2. Rasi Based Houses (Moon Sign)
+    const r8 = (moonSignIndex + 7) % 12;
+    const r12 = (moonSignIndex + 11) % 12;
+
+    const lord8_Rasi = SIGN_LORDS[r8];
+    const lord12_Rasi = SIGN_LORDS[r12];
+
+    // Scores (Lagna)
+    const s8_L = subathuvamScores[lord8_Lagna]?.totalScore || 0;
+    const s12_L = subathuvamScores[lord12_Lagna]?.totalScore || 0;
+
+    // Scores (Rasi)
+    const s8_R = subathuvamScores[lord8_Rasi]?.totalScore || 0;
+    const s12_R = subathuvamScores[lord12_Rasi]?.totalScore || 0;
+
+    // Sign Nature Check (Moveable/Water) from Lagna mostly used, but checking Rasi helps
+    const moveableSigns = [0, 3, 6, 9];
+    const waterSigns = [3, 7, 11];
+
+    const is8Moveable = moveableSigns.includes(l8) || moveableSigns.includes(r8);
+    const is12Moveable = moveableSigns.includes(l12) || moveableSigns.includes(r12);
+    const is8Water = waterSigns.includes(l8) || waterSigns.includes(r8);
+    const is12Water = waterSigns.includes(l12) || waterSigns.includes(r12);
+
+    let foreignScore = 0;
+    let reasons: string[] = [];
+    let strongLagna = false;
+    let strongRasi = false;
+
+    // 1. Lagna Strength (8th & 12th)
+    if (s8_L > 40 && s12_L > 40) {
+        strongLagna = true;
+        foreignScore += 50;
+        reasons.push(isTamil
+            ? `லக்ன ரீதியாக 8 & 12ம் அதிபதிகள் சுபத்துவமாக உள்ளனர்.`
+            : `Lagna: 8th & 12th Lords are Subathuva.`);
+    } else if (s12_L > 40) {
+        foreignScore += 20;
+    }
+
+    // 2. Rasi Strength (8th & 12th from Moon)
+    if (s8_R > 40 && s12_R > 40) {
+        strongRasi = true;
+        foreignScore += 30; // Add bonus
+        reasons.push(isTamil
+            ? `ராசி ரீதியாக (சந்திரன்) 8 & 12ம் அதிபதிகள் சுபத்துவமாக உள்ளனர்.`
+            : `Rasi (Moon): 8th & 12th Lords are Subathuva.`);
+    }
+
+    // 3. Moveable/Water Signs
+    if (is8Moveable || is12Moveable) {
+        foreignScore += 20;
+        reasons.push(isTamil
+            ? "8/12-ம் வீடுகள் சர ராசியில் (Moveable) உள்ளன."
+            : "8th/12th Houses in Moveable Signs (Displacement).");
+    }
+    if (is8Water || is12Water) {
+        foreignScore += 10;
+        reasons.push(isTamil
+            ? "நீர் ராசி தொடர்பு (கடல் கடந்து செல்லும் யோகம்)."
+            : "Water Sign connection (Ocean travel).");
+    }
+
+    // 4. Rahu Influence (Foreign Karaka)
+    const rahu = getP('Rahu');
+    if (rahu) {
+        // Check Rahu position from Lagna OR Rasi
+        const rahuInLqn8 = rahu.signIndex === l8;
+        const rahuInLqn12 = rahu.signIndex === l12;
+        const rahuInRasi8 = rahu.signIndex === r8;
+        const rahuInRasi12 = rahu.signIndex === r12;
+
+        if (rahuInLqn8 || rahuInLqn12 || rahuInRasi8 || rahuInRasi12) {
+            foreignScore += 25;
+            reasons.push(isTamil
+                ? "ராகு 8/12-ல் உள்ளார் (வெளிநாட்டு காரகன்)."
+                : "Rahu in 8th/12th House (Foreign Karaka).");
+        }
+
+        // Rahu Conjunctions with 8/12 Lords (Lagna or Rasi)
+        const relevantLords = [lord8_Lagna, lord12_Lagna, lord8_Rasi, lord12_Rasi];
+        let rahuConnected = false;
+
+        for (const ld of relevantLords) {
+            const p = getP(ld);
+            if (p && p.signIndex === rahu.signIndex) rahuConnected = true;
+        }
+
+        if (rahuConnected) {
+            foreignScore += 15;
+            reasons.push(isTamil
+                ? "ராகு 8/12 அதிபதியுடன் சேர்க்கை."
+                : "Rahu conjoined with 8th/12th Lord.");
+        }
+    }
+
+    // 5. Dasa Check
+    if (currentDasa) {
+        const dasaLord = currentDasa.maha.planet;
+        // Check if Dasa Lord is connected to Foreign Travel (Lagna Or Rasi Lords)
+        const foreignLords = [lord8_Lagna, lord12_Lagna, lord9_Lagna, lord8_Rasi, lord12_Rasi, 'Rahu'];
+
+        if (foreignLords.includes(dasaLord)) {
+            foreignScore += 20;
+            reasons.push(isTamil
+                ? `தற்போதைய தசை (${dasaLord}) வெளிநாட்டு யோகத்திற்கு சாதகம்.`
+                : `Current Dasa (${dasaLord}) supports Foreign Travel.`);
+        }
+    }
+
+    // Verdict Logic
+    let answer = "";
+    let isFavorable = true;
+
+    // Aditya Guruji's Strong Rule: IF Subathuva is present in 8 & 12
+    if (strongLagna || strongRasi) {
+        if (foreignScore >= 80) {
+            answer = isTamil
+                ? "**நிரந்தர குடியுரிமை (Permanent Settlement)**: ஜாதகத்தில் 8-12 சுபத்துவ விதி (லக்னம்/ராசி) வலுவாக உள்ளது."
+                : "**Permanent Settlement**: Strong 8-12 Subathuva Rule (Lagna/Rasi) active.";
+        } else {
+            answer = isTamil
+                ? "**நீண்ட கால வேலை/வாழ்க்கை**: 8-12 விதி சாதகமாக உள்ளது."
+                : "**Long Term Stay**: 8-12 Rule is favorable.";
+        }
+    } else {
+        // Moderate scores
+        if (foreignScore >= 50) {
+            answer = isTamil
+                ? "**வெளிநாட்டு வேலை/பயணம்**: குறுகிய கால அல்லது வேலை நிமித்தம் செல்லலாம்."
+                : "**Work / Short Stay**: Good chance for work, but permanent settlement needs stronger Subathuva.";
+        } else {
+            answer = isTamil
+                ? "**குறைந்த வாய்ப்பு**: உள்ளூர் வாழ்க்கை சிறந்தது."
+                : "**Low Chance**: Domestic life is more suitable.";
+            isFavorable = false;
+        }
+    }
+
+    const reasonText = reasons.join('\n- ');
+    return {
+        question,
+        answer,
+        reason: isTamil ? `**காரணங்கள்:**\n- ${reasonText}` : `**Reasons:**\n- ${reasonText}`,
+        isFavorable
     };
 };
