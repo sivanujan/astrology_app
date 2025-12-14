@@ -15,9 +15,27 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 
-// Wrapper component to consume chart data for routing logic
 const AppRoutes = () => {
-  const { chartData } = useChartData();
+  const { chartData, setChartData } = useChartData();
+
+  // Robust hydration check: If context is empty but storage has data, restore it immediately
+  // This prevents the "Redirect to /" flash when reloading on protected pages
+  React.useEffect(() => {
+    if (!chartData) {
+      try {
+        const saved = localStorage.getItem('astrology_chart_data');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setChartData(parsed);
+        }
+      } catch (e) {
+        console.error("Hydration failed", e);
+      }
+    }
+  }, [chartData, setChartData]);
+
+  // Helper check for routing
+  const hasData = chartData || localStorage.getItem('astrology_chart_data');
 
   return (
     <Routes>
@@ -29,7 +47,7 @@ const AppRoutes = () => {
       {/* Semi-Protected / Public but needs data */}
       <Route
         path="/chart"
-        element={chartData ? <SouthIndianChart data={chartData} /> : <Navigate to="/" />}
+        element={hasData ? <SouthIndianChart data={chartData} /> : <Navigate to="/" />}
       />
 
       {/* Protected Routes */}
@@ -41,31 +59,31 @@ const AppRoutes = () => {
 
       <Route path="/analysis" element={
         <ProtectedRoute>
-          {chartData ? <ChartAnalysis data={chartData} /> : <Navigate to="/" />}
+          {hasData ? <ChartAnalysis data={chartData} /> : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/dasha" element={
         <ProtectedRoute>
-          {chartData ? <DashaPeriods data={chartData} /> : <Navigate to="/" />}
+          {hasData ? <DashaPeriods data={chartData} /> : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/predictions" element={
         <ProtectedRoute>
-          {chartData ? <AIPredictions data={chartData} /> : <Navigate to="/" />}
+          {hasData ? <AIPredictions data={chartData} /> : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/predictions-faq" element={
         <ProtectedRoute>
-          {chartData ? <GurujiPredictions data={chartData} /> : <Navigate to="/" />}
+          {hasData ? <GurujiPredictions data={chartData} /> : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/daily-snapshot" element={
         <ProtectedRoute>
-          {chartData ? <DailySnapshot data={chartData} /> : <Navigate to="/" />}
+          {hasData ? <DailySnapshot data={chartData} /> : <Navigate to="/" />}
         </ProtectedRoute>
       } />
     </Routes>

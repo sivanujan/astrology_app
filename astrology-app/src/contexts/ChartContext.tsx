@@ -20,7 +20,32 @@ interface ChartProviderProps {
 }
 
 export const ChartProvider: React.FC<ChartProviderProps> = ({ children }) => {
-    const [chartData, setChartData] = useState<any | null>(null);
+    // Initialize from localStorage if available
+    const [chartData, setChartDataState] = useState<any | null>(() => {
+        try {
+            const saved = localStorage.getItem('astrology_chart_data');
+            return saved ? JSON.parse(saved) : null;
+        } catch (e) {
+            console.error("Failed to load chart data", e);
+            return null;
+        }
+    });
+
+    const setChartData = (data: any) => {
+        setChartDataState(data);
+        try {
+            if (data) {
+                // Ensure data is serializable
+                const serialized = JSON.stringify(data);
+                localStorage.setItem('astrology_chart_data', serialized);
+                console.log("Chart data saved via persist");
+            } else {
+                localStorage.removeItem('astrology_chart_data');
+            }
+        } catch (e) {
+            console.error("Failed to save chart data - Storage Error?", e);
+        }
+    };
 
     return (
         <ChartContext.Provider value={{ chartData, setChartData }}>

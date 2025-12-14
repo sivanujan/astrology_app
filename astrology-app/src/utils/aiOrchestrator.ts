@@ -673,15 +673,19 @@ export async function queryAstrologyOrchestrator(
     }
 
     // 2. Prepare Context
-    const context = prepareContext(chartData, intent, isComprehensiveAnalysis);
+    const context = prepareContext(chartData, intent, isComprehensiveAnalysis, language);
 
     // 3. Construct Prompt
     let systemPrompt = "";
 
+    const languageInstruction = language === 'ta'
+        ? `\n\n**CRITICAL INSTRUCTION - TAMIL LANGUAGE:**\n1. The user has requested the output in TAMIL.\n2. You MUST write the 'analysis', 'title', 'reasons', and 'final_verdict' fields in TAMIL script.\n3. **FOR HOUSE TITLES**: You MUST use the exact strings provided in 'OutputFormatGuide.HouseTitles' array from the input. Do NOT translate them yourself.\n4. Do not use Tanglish. Use pure, high-quality Tamil.\n5. Ensure astrological terms are correctly translated (e.g., "Lagna" -> "லக்னம்", "Aspect" -> "பார்வை").`
+        : "";
+
     if (isComprehensiveAnalysis) {
         systemPrompt = `
 You are an expert Vedic Astrologer following **Aditya Guruji's Subathuvam System**.
-Task: Perform a deep "Bava-by-Bava" (House-by-House) Analysis.
+Task: Perform a deep "Bava-by-Bava" (House-by-House) Analysis.${languageInstruction}
 
 **Core Philosophy:**
 - **Subathuvam (Goodness)**: A planet becomes good if it is touched by Jupiter, Venus, or Mercury (Solo).
@@ -741,7 +745,7 @@ For each house:
                 "house_number": 1,
                 "title": "${language === 'ta' ? HOUSE_NAMES_TA[0] : HOUSE_NAMES_EN[0]}",
                 "status": "Excellent/Good/Average/Challenging",
-                "analysis": "Detailed analysis using Subathuvam/Pavathuvam logic.",
+                "analysis": "${language === 'ta' ? 'பாவகத்தின் விரிவான ஆய்வு (தமிழில்).' : 'Detailed analysis using Subathuvam/Pavathuvam logic.'}",
                 "guruji_rule_applied": "e.g., 'Subathuvam wins over weak placement'"
             }
             // ... Repeat for all 12 houses
@@ -1172,7 +1176,7 @@ const getMockAnalysis = (isTamil: boolean, reason: string = ""): OrchestratorRes
     };
 };
 
-const prepareContext = (data: any, intent: string, isComprehensive: boolean = false) => {
+const prepareContext = (data: any, intent: string, isComprehensive: boolean = false, language: string = 'en') => {
     const { planets, ascendant, currentDasa } = data;
     // Calculate subathuvam scores if not provided
     const subathuvamScores = data.subathuvamScores || calculateAdityaGurujiSubathuvam(planets);
@@ -1251,6 +1255,7 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
     });
 
     const baseContext = {
+        TargetLanguage: language === 'ta' ? "TAMIL (தமிழ்)" : "ENGLISH",
         Lagna: ZODIAC_SIGNS[ascSignIndex], // FORCE CORRECT NAME FROM INDEX
         LagnaLord: {
             name: lagnaLord,
@@ -1273,12 +1278,16 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
             bhukti_end_date: currentDasa.bhukti?.endDate ? new Date(currentDasa.bhukti.endDate).toLocaleDateString() : "Unknown",
             timeline_summary: "See 'dasa_schedule' below for full timeline."
         } : "Unknown",
-        DasaSchedule: getReadableDashaSchedule(data.dashaPeriods), // Helper function to be added
+        DasaSchedule: getReadableDashaSchedule(data.dashaPeriods),
         FunctionalMalefics: getFunctionalNature(ascSignIndex),
         SpecialRulesAnalysis: advancedRules,
         HouseLords: houseLords,
         CalculatedAspects: calculatedAspects,
-        KeyPlanets: comprehensivePlanets
+        KeyPlanets: comprehensivePlanets,
+        // Provide the titles directly so AI doesn't have to guess or translate
+        OutputFormatGuide: {
+            HouseTitles: language === 'ta' ? HOUSE_NAMES_TA : HOUSE_NAMES_EN
+        }
     };
 
     console.log("AI CONTEXT GENERATED:", JSON.stringify(baseContext, null, 2));

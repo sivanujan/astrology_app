@@ -17,6 +17,8 @@ import {
     predictForeignTravel
 } from '../utils/predictionRules';
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
+import { useAuth } from '../contexts/AuthContext';
+import { predictionService, generateChartId } from '../services/predictionService';
 
 interface GurujiPredictionsProps {
     data: any;
@@ -24,6 +26,7 @@ interface GurujiPredictionsProps {
 
 const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const { t, language } = useLanguage();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [aiResponse, setAiResponse] = useState<OrchestratorResponse | null>(null);
@@ -61,20 +64,41 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
         currentDasa: currentDasha
     };
 
-    const fetchAnalysis = async () => {
+    const fetchAnalysis = async (forceRecheck = false) => {
+        if (!user) return; // Guard for no user (though likely protected route)
+
         setIsLoading(true);
         setError('');
+
         try {
+            const chartId = generateChartId({ name: data.userDetails.name }, birthDate, language);
+
+            // 1. Check Cache first (if not forcing recheck)
+            if (!forceRecheck) {
+                const cached = await predictionService.getStoredPrediction(user.uid, chartId);
+                if (cached && cached.data) {
+                    console.log("Loaded prediction from cache");
+                    setAiResponse(cached.data);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
+            // 2. Fallback to API
             const question = isTamil ? "முழுமையான பாவக பகுப்பாய்வு தாருங்கள்" : "Give me a comprehensive house-by-house analysis";
             const response = await queryAstrologyOrchestrator(question, chartData, language);
+
+            // 3. Save to Cache
+            if (response && response.bava_analysis_report) {
+                await predictionService.savePrediction(user.uid, chartId, response, language);
+            }
+
             setAiResponse(response);
 
         } catch (err: any) {
             console.error("Prediction Error:", err);
             const errorMessage = err.message || "Failed to generate predictions";
             setError(errorMessage);
-
-
         } finally {
             setIsLoading(false);
         }
@@ -82,11 +106,10 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
     // Auto-fetch comprehensive analysis on mount
     useEffect(() => {
-        // fetchAnalysis(); // OPTIONAL: Disable auto-fetch if we only want static Q&A primarily, but user asked for "Our Predictions" which implies the House Analysis is still kept.
-        // The user said "in the Our Predictions remove the final Final Verdict and add basice quesion... and add button below for more question it will move to AI Insights"
-        // So I will KEEP the House Analysis fetching.
-        fetchAnalysis();
-    }, [language]);
+        if (user) {
+            fetchAnalysis();
+        }
+    }, [language, user]);
 
     const toggleExpand = (id: number) => {
         setExpandedId(expandedId === id ? null : id);
@@ -103,11 +126,23 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                     <Sparkles className="w-8 h-8 text-purple-400" />
                     {isTamil ? "எங்கள் கணிப்புகள்" : "Our Predictions"}
                 </h2>
-                <p className="text-slate-400 mt-2">
-                    {isTamil
-                        ? "விதிமுறை அடிப்படையிலான கேள்விகள் மற்றும் பாவக பகுப்பாய்வு."
-                        : "Rule-based answers and comprehensive house analysis."}
-                </p>
+                <div className="flex justify-center items-center gap-4 mt-2">
+                    <p className="text-slate-400">
+                        {isTamil
+                            ? "விதிமுறை அடிப்படையிலான கேள்விகள் மற்றும் பாவக பகுப்பாய்வு."
+                            : "Rule-based answers and comprehensive house analysis."}
+                    </p>
+                    {/* Recheck Button */}
+                    <button
+                        onClick={() => fetchAnalysis(true)}
+                        disabled={isLoading}
+                        className="text-sm flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-full border border-slate-700 transition"
+                        title={isTamil ? "மீண்டும் ஆய்வு செய்" : "Force Re-analysis"}
+                    >
+                        <Sparkles className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                        {isTamil ? "புதுப்பி" : "Recheck"}
+                    </button>
+                </div>
             </motion.div>
 
             {/* --- Lagna Summary (Moved Top) --- */}
@@ -250,7 +285,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 <div className="text-center p-8 glass-panel border border-red-800/30 bg-red-900/10 mt-8">
                     <p className="text-red-400">{error}</p>
                     <button
-                        onClick={fetchAnalysis}
+                        onClick={() => fetchAnalysis(true)}
                         className="mt-4 px-4 py-2 bg-purple-600 rounded-lg text-white font-medium hover:bg-purple-700 transition"
                     >
                         {isTamil ? "மீண்டும் முயற்சி" : "Retry"}

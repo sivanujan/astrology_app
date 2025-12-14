@@ -150,6 +150,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    // Auto-logout functionality
+    useEffect(() => {
+        // 1 hour in milliseconds
+        const INACTIVITY_TIMEOUT = 60 * 60 * 1000;
+
+        let timeoutId: NodeJS.Timeout;
+
+        const resetTimer = () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (user) {
+                timeoutId = setTimeout(() => {
+                    console.log('User inactive for 1 hour, logging out...');
+                    logout();
+                }, INACTIVITY_TIMEOUT);
+            }
+        };
+
+        const handleActivity = () => {
+            resetTimer();
+        };
+
+        if (user) {
+            // Initial timer start
+            resetTimer();
+
+            // Add event listeners for user activity
+            window.addEventListener('mousemove', handleActivity);
+            window.addEventListener('keydown', handleActivity);
+            window.addEventListener('click', handleActivity);
+            window.addEventListener('scroll', handleActivity);
+        }
+
+        // Cleanup
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            window.removeEventListener('mousemove', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
+            window.removeEventListener('click', handleActivity);
+            window.removeEventListener('scroll', handleActivity);
+        };
+    }, [user]);
+
     const value = {
         user,
         loading,
