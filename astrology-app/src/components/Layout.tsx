@@ -4,6 +4,7 @@ import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Loc
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import PlanetaryBackground from './PlanetaryBackground';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
@@ -47,6 +48,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     />
                 ))}
             </div>
+
+            {/* Dynamic Planetary Background */}
+            <PlanetaryBackground />
 
             {/* Animated Planets */}
             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">

@@ -9,6 +9,8 @@ import { saveGuestBirthData } from '../hooks/useSaveGuestData';
 import { useAuth } from '../contexts/AuthContext';
 
 import { useLanguage } from '../contexts/LanguageContext';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const InputForm: React.FC = () => {
     const navigate = useNavigate();
@@ -97,6 +99,23 @@ const InputForm: React.FC = () => {
                 latitude: formData.lat!,
                 longitude: formData.lng!
             });
+        } else {
+            // Auto-save to Dashboard for logged-in users
+            try {
+                await addDoc(collection(db, 'charts'), {
+                    userId: user.uid,
+                    name: formData.name,
+                    birth_details: {
+                        dob: birthDate,
+                        place: formData.city,
+                        latitude: formData.lat,
+                        longitude: formData.lng
+                    },
+                    createdAt: new Date()
+                });
+            } catch (error) {
+                console.error("Error auto-saving chart:", error);
+            }
         }
 
         setChartData(fullChartData);

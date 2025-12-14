@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X } from 'lucide-react';
+import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X, Clock } from 'lucide-react';
+
+// ... (lines 5-223)
+
+
 import GurujiPredictions from '../components/GurujiPredictions';
 import { useAuth } from '../contexts/AuthContext';
 import { useChartData } from '../contexts/ChartContext';
@@ -224,6 +228,10 @@ const Dashboard: React.FC = () => {
                                     <div className="flex items-center gap-2">
                                         <Calendar className="w-4 h-4 text-yellow-400" />
                                         <span>{new Date(chart.dob).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="w-4 h-4 text-yellow-400" />
+                                        <span>{new Date(chart.dob).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Star className="w-4 h-4 text-yellow-400" />
