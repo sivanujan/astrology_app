@@ -19,6 +19,7 @@ import {
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 import { useAuth } from '../contexts/AuthContext';
 import { predictionService, generateChartId } from '../services/predictionService';
+import { generatePDF } from '../utils/pdfGenerator';
 
 interface GurujiPredictionsProps {
     data: any;
@@ -115,6 +116,15 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
         setExpandedId(expandedId === id ? null : id);
     };
 
+    const handleDownloadPDF = () => {
+        if (!data) return;
+        const pdfData = {
+            ...data,
+            housePredictions: aiResponse?.bava_analysis_report?.house_predictions
+        };
+        generatePDF(pdfData, language);
+    };
+
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20">
             <motion.div
@@ -132,6 +142,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                             ? "விதிமுறை அடிப்படையிலான கேள்விகள் மற்றும் பாவக பகுப்பாய்வு."
                             : "Rule-based answers and comprehensive house analysis."}
                     </p>
+
                     {/* Recheck Button */}
                     <button
                         onClick={() => fetchAnalysis(true)}
@@ -141,6 +152,16 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                     >
                         <Sparkles className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                         {isTamil ? "புதுப்பி" : "Recheck"}
+                    </button>
+
+                    {/* Download PDF Button */}
+                    <button
+                        onClick={handleDownloadPDF}
+                        className="text-sm flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-full border border-slate-700 transition"
+                        title={isTamil ? "PDF பதிவிறக்கம்" : "Download PDF"}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                        {isTamil ? "PDF" : "PDF"}
                     </button>
                 </div>
             </motion.div>

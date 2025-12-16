@@ -658,6 +658,13 @@ export async function queryAstrologyOrchestrator(
     apiKey?: string // Optional user-provided key
 ): Promise<OrchestratorResponse> {
 
+    // Store original language request
+    const requestedLanguage = language;
+
+    // ALWAYS generate predictions in English first to avoid Gemini API errors
+    // We'll translate to Tamil afterwards if needed
+    const generationLanguage = 'en';
+
     // 1. Intent Classification
     let intent = "General Prediction";
     let isComprehensiveAnalysis = false;
@@ -672,8 +679,8 @@ export async function queryAstrologyOrchestrator(
         isComprehensiveAnalysis = true;
     }
 
-    // 2. Prepare Context
-    const context = prepareContext(chartData, intent, isComprehensiveAnalysis, language);
+    // 2. Prepare Context (always in English for generation)
+    const context = prepareContext(chartData, intent, isComprehensiveAnalysis, generationLanguage);
 
     // 3. Construct Prompt
     let systemPrompt = "";
