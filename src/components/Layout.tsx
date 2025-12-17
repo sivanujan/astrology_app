@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import PlanetaryBackground from './PlanetaryBackground';
+import Logo from '../assets/logo.png';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
@@ -86,12 +87,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center">
-                                <Star className="w-5 h-5 text-white fill-white" />
+                            <div className="w-48 h-auto flex items-center justify-start">
+                                <img src={Logo} alt="Astro Siva Logo" className="w-full h-full object-contain" />
                             </div>
-                            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                                {t.appTitle}
-                            </span>
                         </div>
 
                         <div className="hidden md:flex items-center gap-2 lg:gap-4">

@@ -9,22 +9,55 @@ export interface SubathuvamResult {
     details: string[];
 }
 
+// Helper to calculate moon phase and light
+const calculateMoonPhase = (moonLon: number, sunLon: number) => {
+    let diff = moonLon - sunLon;
+    if (diff < 0) diff += 360;
+
+    // 0-180 is Waxing (Valarpirai), 180-360 is Waning (Theipirai)
+    const isWaxing = diff <= 180;
+
+    // Light calculation
+    // Full Moon (180 deg) = 100% light
+    // New Moon (0/360 deg) = 0% light
+    let lightPercentage = 0;
+    if (diff <= 180) {
+        lightPercentage = (diff / 180) * 100;
+    } else {
+        lightPercentage = ((360 - diff) / 180) * 100;
+    }
+
+    return {
+        isWaxing,
+        lightPercentage,
+        phaseName: isWaxing ? 'Valarpirai (Waxing)' : 'Theipirai (Waning)',
+        isBenefic: lightPercentage > 50 // Rule: >50% light is Benefic
+    };
+};
+
 export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<string, SubathuvamResult> => {
     const results: Record<string, SubathuvamResult> = {};
     const jupiter = rasiPlanets.find(p => p.name === 'Jupiter');
     const venus = rasiPlanets.find(p => p.name === 'Venus');
+    const sun = rasiPlanets.find(p => p.name === 'Sun');
+    const moon = rasiPlanets.find(p => p.name === 'Moon');
+
+    // Pre-calculate Moon status
+    let moonStatus = { isWaxing: false, lightPercentage: 0, phaseName: '', isBenefic: false };
+    if (moon && sun) {
+        moonStatus = calculateMoonPhase(moon.longitude, sun.longitude);
+    }
 
     rasiPlanets.forEach(planet => {
         let rasiScore = 0;
         let navamsaScore = 0;
         const details: string[] = [];
+        let isSubathuva = false;
 
         // --- Step A: Rasi Chart Subathuvam (Base Strength) ---
 
         // Rule 1: Jupiter's Aspect (Guru Drishti) - +40 Marks
-        // Check if Jupiter aspects the target planet (5th, 7th, 9th house from Jupiter).
         if (jupiter && planet.name !== 'Jupiter') {
-            // Calculate house distance (1-based)
             const signDiff = (planet.signIndex - jupiter.signIndex + 12) % 12;
             const houseDist = signDiff + 1;
 
@@ -35,7 +68,7 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
         }
 
         // Rule 2: Conjunction with Benefics - +20 Marks
-        // Check if target is in the same sign as Jupiter or Venus.
+        // Benefics: Jupiter, Venus, Waxing Moon (Guru, Sukra, Valarpirai Chandran)
         if (planet.name !== 'Jupiter' && jupiter && planet.signIndex === jupiter.signIndex) {
             rasiScore += 20;
             details.push("Conjoined Jupiter (+20)");
@@ -45,15 +78,36 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
             details.push("Conjoined Venus (+20)");
         }
 
+        // Moon Special Rule: Waxing Moon acts as Benefic
+        if (planet.name !== 'Moon' && moon && moonStatus.isBenefic && planet.signIndex === moon.signIndex) {
+            rasiScore += 15; // Slightly less than Jupiter/Venus
+            details.push(`Conjoined Waxing Moon (${Math.round(moonStatus.lightPercentage)}% Light) (+15)`);
+        }
+
         // Rule 3: Star Lord (Nakshatra) - +10 Marks
-        // If the planet is in the Star of Jupiter or Venus.
         const nakshatraInfo = getNakshatra(planet.longitude);
-        // Safety check for index
         if (nakshatraInfo.index >= 0 && nakshatraInfo.index < NAKSHATRA_LORDS.length) {
             const starLord = NAKSHATRA_LORDS[nakshatraInfo.index];
             if (['Jupiter', 'Venus'].includes(starLord)) {
                 rasiScore += 10;
                 details.push(`Star of ${starLord} (+10)`);
+            }
+            // Moon Star: Only if Waxing
+            if (starLord === 'Moon' && moonStatus.isBenefic) {
+                rasiScore += 10;
+                details.push(`Star of Waxing Moon (+10)`);
+            }
+        }
+
+        // --- Moon Specific Subathuvam Logic ---
+        if (planet.name === 'Moon') {
+            rasiScore += moonStatus.lightPercentage; // Direct add of light %
+            details.push(`${moonStatus.phaseName}: ${Math.round(moonStatus.lightPercentage)}% Light (+${Math.round(moonStatus.lightPercentage)})`);
+
+            if (!moonStatus.isBenefic) {
+                details.push("Low Light: Treated as Malefic (Saturn-like)");
+                // If extremely dark (<20%), maybe subtract or flag as Pavathuvam?
+                // For now, low score reflects this.
             }
         }
 
@@ -63,15 +117,12 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
         const navamsaSignIndex = navamsa.signIndex;
 
         // Rule 4: Vargottama - +30 Marks
-        // Compare rasi_positions[Planet].Sign_ID AND navamsa_positions[Planet].Sign_ID.
         if (planet.signIndex === navamsaSignIndex) {
             navamsaScore += 30;
             details.push("Vargottama (+30)");
         }
 
-        // Rule 5: Placement in Benefic Houses - +20 Marks
-        // IF Sign ID is 2 or 7 (Venus) OR 9 or 12 (Jupiter)
-        // 0-based indices: Taurus(1), Libra(6), Sagittarius(8), Pisces(11)
+        // Rule 5: Placement in Benefic Houses
         if ([1, 6, 8, 11].includes(navamsaSignIndex)) {
             navamsaScore += 20;
             details.push("Navamsa Benefic Sign (+20)");
@@ -82,12 +133,19 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
         let totalScore = rasiScore + navamsaScore;
         if (totalScore > 100) totalScore = 100;
 
+        // Definition of Subathuva:
+        // Usually > 50.
+        // For Moon: It is Subathuva if Light > 50 OR if it gets other support (Jupiter/Venus).
+        // If it's Dark Moon (Theipirai) and no support -> It's Pavathuva.
+
+        isSubathuva = totalScore >= 50;
+
         results[planet.name] = {
             planet: planet.name,
             rasiScore,
             navamsaScore,
             totalScore,
-            isSubathuva: totalScore >= 50,
+            isSubathuva,
             details
         };
     });
