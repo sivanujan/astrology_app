@@ -1,4 +1,6 @@
 import puppeteer from 'puppeteer';
+import * as fs from 'fs';
+import * as path from 'path';
 import { calculateDashaPeriods } from './dashaCalculation';
 
 interface ChartData {
@@ -48,8 +50,21 @@ export async function generatePDFWithPuppeteer(data: ChartData, language: 'en' |
 
     const isTamil = language === 'ta';
 
-    // Create HTML content with Tamil font support
-    const htmlContent = createHTMLTemplate(data, isTamil);
+    // Read logo file
+    let logoBase64 = '';
+    try {
+        const logoPath = path.resolve(process.cwd(), 'src/assets/logo.png');
+        if (fs.existsSync(logoPath)) {
+            const logoBuffer = fs.readFileSync(logoPath);
+            logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+        } else {
+            console.warn('Logo file not found at:', logoPath);
+        }
+    } catch (e) {
+        console.error('Error reading logo file:', e);
+    }
+
+    const htmlContent = createHTMLTemplate(data, isTamil, logoBase64);
 
     // Launch Puppeteer
     const browser = await puppeteer.launch({
@@ -83,9 +98,16 @@ export async function generatePDFWithPuppeteer(data: ChartData, language: 'en' |
     }
 }
 
-function createHTMLTemplate(data: ChartData, isTamil: boolean): string {
+function createHTMLTemplate(data: ChartData, isTamil: boolean, logoBase64: string = ''): string {
     const { userDetails, planets, ascendant, dashaPeriods, housePredictions } = data;
+
+    // ... existing logic ...
+
+    // Use base64 logo if available
+    const logoSrc = logoBase64 || 'file:///C:/Users/Sivanujan_PC/Desktop/astrology/astrology_app/astrology-app/src/assets/logo.png';
     const genDate = new Date().toLocaleDateString('en-GB');
+
+    // ... mapping names etc ...
 
     // Helper to get nakshatra
     const getNakshatra = (longitude: number) => {
@@ -345,7 +367,7 @@ function createHTMLTemplate(data: ChartData, isTamil: boolean): string {
 <body>
     <div class="header">
         <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 8px;">
-            <img src="file:///C:/Users/Sivanujan_PC/Desktop/astrology/astrology_app/astrology-app/src/assets/logo.png" alt="Logo" style="height: 40px; width: auto;" onerror="this.style.display='none'">
+            <img src="${logoSrc}" alt="Logo" style="height: 50px; width: auto;" onerror="this.style.display='none'">
             <div>
                 <h1>${isTamil ? 'சிவா அஸ்ட்ரோ அறிக்கை' : 'Astro Siva Report'}</h1>
             </div>

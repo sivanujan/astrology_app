@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev --prefix backend\"",
+    "dev:all": "concurrently \"npm run dev\" \"npm run server:dev\" \"npm run dev --prefix backend\"",
     "server": "tsx server/index.ts",
     "server:dev": "nodemon --watch server --exec tsx server/index.ts",
     "dev:full": "concurrently \"npm run dev\" \"npm run server:dev\"",

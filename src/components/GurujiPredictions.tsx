@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe } from 'lucide-react';
@@ -16,7 +16,7 @@ import {
     predictCareerPath,
     predictForeignTravel
 } from '../utils/predictionRules';
-import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
+import { queryAstrologyOrchestrator, OrchestratorResponse, translateAnalysisReport } from '../utils/aiOrchestrator';
 import { useAuth } from '../contexts/AuthContext';
 import { predictionService, generateChartId } from '../services/predictionService';
 import { generatePDF } from '../utils/pdfGenerator';
@@ -33,6 +33,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const [aiResponse, setAiResponse] = useState<OrchestratorResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const isFetchingRef = useRef(false);
 
     if (!data) return null;
 
@@ -66,8 +67,13 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     };
 
     const fetchAnalysis = async (forceRecheck = false) => {
-        if (!user) return; // Guard for no user (though likely protected route)
+        if (!user) return;
+        if (isFetchingRef.current) {
+            console.log("Fetch already in progress, skipping...");
+            return;
+        }
 
+        isFetchingRef.current = true;
         setIsLoading(true);
         setError('');
 
@@ -79,29 +85,113 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 const cached = await predictionService.getStoredPrediction(user.uid, chartId);
                 if (cached && cached.data) {
                     console.log("Loaded prediction from cache");
-                    setAiResponse(cached.data);
-                    setIsLoading(false);
-                    return;
+
+                    // AUTO-FIX: Check if Tamil cache actually has English content (Bad Cache from previous errors)
+                    let isValidCache = true;
+                    if (isTamil) {
+                        const firstHouseTitle = cached.data.bava_analysis_report?.house_predictions?.[0]?.title;
+                        // Check for English title "Self & Health" or missing Tamil answer
+                        if (firstHouseTitle === "Self & Health" || !cached.data.final_answer_tamil) {
+                            console.warn("[Fix] Found English content in Tamil cache. Ignoring cache to force clean translation...");
+                            isValidCache = false;
+                        }
+                    }
+
+                    if (isValidCache) {
+                        setAiResponse(cached.data);
+                        setIsLoading(false);
+                        isFetchingRef.current = false;
+                        return;
+                    }
+                    // If invalid, fall through to fallback logic below
+                }
+
+                // NEW: If Tamil, check if English version exists to translate
+                if (isTamil) {
+                    let sourceData: OrchestratorResponse | null = null;
+
+                    // Strategy A: Check in-memory state (User just switched from English)
+                    if (aiResponse && aiResponse.bava_analysis_report) {
+                        console.log("[Debug] Using current in-memory response as source for translation.");
+                        sourceData = aiResponse;
+                    }
+                    // Strategy B: Check English Cache (User loaded app directly in Tamil or state is empty)
+                    else {
+                        const englishChartId = generateChartId({ name: data.userDetails.name }, birthDate, 'en');
+                        console.log("[Debug] Checking English Cache:", englishChartId);
+                        const cachedEnglish = await predictionService.getStoredPrediction(user.uid, englishChartId);
+                        if (cachedEnglish && cachedEnglish.data) {
+                            console.log("[Debug] English Cache Found.");
+                            sourceData = cachedEnglish.data;
+                        }
+                    }
+
+                    if (sourceData) {
+                        console.log("Found source data, starting translation...");
+                        try {
+                            const translatedData = await translateAnalysisReport(sourceData);
+                            console.log("[Debug] Translation completed.");
+
+                            // Save to Tamil cache
+                            await predictionService.savePrediction(user.uid, chartId, translatedData, language);
+                            setAiResponse(translatedData);
+                            setIsLoading(false);
+                            return;
+                        } catch (transErr) {
+                            console.error("Translation failed, falling back to API:", transErr);
+                            // Do NOT set isLoading(false) here, so it continues to the API fallback below
+                        }
+                    } else {
+                        console.log("[Debug] No English source found. Proceeding to fresh generation.");
+                    }
                 }
             }
 
-            // 2. Fallback to API
-            const question = isTamil ? "முழுமையான பாவக பகுப்பாய்வு தாருங்கள்" : "Give me a comprehensive house-by-house analysis";
-            const response = await queryAstrologyOrchestrator(question, chartData, language);
+            // 2. Fallback to API (Fresh Generation)
+            // Strategy: ALWAYS generate in English first, then translate to Tamil.
+            // This ensures we have both versions saved and avoids Tamil generation issues.
 
-            // 3. Save to Cache
-            if (response && response.bava_analysis_report) {
-                await predictionService.savePrediction(user.uid, chartId, response, language);
+            const question_en = "Give me a comprehensive house-by-house analysis";
+            console.log("[Debug] Generating fresh English prediction...");
+            const englishResponse = await queryAstrologyOrchestrator(question_en, chartData, 'en');
+
+            if (englishResponse && englishResponse.bava_analysis_report) {
+                // 1. Save English Version
+                const enChartId = generateChartId({ name: data.userDetails.name }, birthDate, 'en');
+                await predictionService.savePrediction(user.uid, enChartId, englishResponse, 'en');
+                console.log("[Debug] Saved English prediction.");
+
+                // 2. Generate & Save Tamil Version (Auto-Translate)
+                try {
+                    console.log("[Debug] Auto-translating to Tamil...");
+                    const tamilResponse = await translateAnalysisReport(englishResponse);
+                    const taChartId = generateChartId({ name: data.userDetails.name }, birthDate, 'ta');
+                    await predictionService.savePrediction(user.uid, taChartId, tamilResponse, 'ta');
+                    console.log("[Debug] Saved Tamil prediction.");
+
+                    // 3. Set State based on Current Language
+                    if (isTamil) {
+                        setAiResponse(tamilResponse);
+                    } else {
+                        setAiResponse(englishResponse);
+                    }
+                } catch (transErr) {
+                    console.error("Auto-translation failed:", transErr);
+                    // Fallback: If translation fails, show English
+                    setAiResponse(englishResponse);
+                }
+            } else {
+                throw new Error("Failed to generate valid prediction.");
             }
-
-            setAiResponse(response);
 
         } catch (err: any) {
             console.error("Prediction Error:", err);
-            const errorMessage = err.message || "Failed to generate predictions";
-            setError(errorMessage);
+            setError(err.message || "Failed to generate prediction. Please try again.");
+            // Only set AI response if we don't have one (keep partial/old data if useful?)
+            // setAiResponse(null); 
         } finally {
             setIsLoading(false);
+            isFetchingRef.current = false;
         }
     };
 

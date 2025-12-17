@@ -26,7 +26,7 @@ export interface OrchestratorResponse {
 }
 
 const OPENROUTER_API_KEY = "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";
-const GOOGLE_API_KEY = "AIzaSyB-2BLsNejQ281mIQ9ip9rxTtcPNo5spX8";
+const GOOGLE_API_KEY = "AIzaSyBJTVK7y4U7Sb9V1oslE2uG_2t2ERq4Tdo";
 
 const FREE_MODELS = [
     "tngtech/deepseek-r1t2-chimera:free",
@@ -926,7 +926,12 @@ Output Format (JSON):
                 continue;
             }
 
-            const content = data.choices[0].message.content;
+            let content = data.choices[0].message.content;
+
+            // FIX: Clean markdown code blocks if present (Models often return markdown)
+            if (content.includes('```')) {
+                content = content.replace(/```json/g, "").replace(/```/g, "").trim();
+            }
 
             try {
                 return JSON.parse(content);
@@ -1182,6 +1187,173 @@ const getMockAnalysis = (isTamil: boolean, reason: string = ""): OrchestratorRes
         reasoning: "Mock Reasoning"
     };
 };
+
+const TAMIL_ASTRO_GLOSSARY: Record<string, string> = {
+    "Lagna": "லக்னம்",
+    "Ascendant": "லக்னம்",
+    "Dasa": "திசை",
+    "Bhukti": "புத்தி",
+    "Subathuvam": "சுபத்துவம்",
+    "Pavathuvam": "பாவத்துவம்",
+    "Subathuva": "சுபத்துவ", // Variations
+    "Pavathuva": "பாவத்துவ",
+    "Exalted": "உச்சம்",
+    "Exaltation": "உச்சம்",
+    "Debilitated": "நீசம்",
+    "Debilitation": "நீசம்",
+    "Aspect": "பார்வை",
+    "Aspects": "பார்க்கிறார்",
+    "Conjunction": "சேர்க்கை",
+    "Conjunct": "சேர்ந்து",
+    "Benefic": "சுபர்",
+    "Malefic": "பாவர்",
+    "Retrograde": "வக்ரம்",
+    "Combustion": "அஸ்தமனம்",
+    "Friendly": "நட்பு",
+    "Enemy": "பகை",
+    "Neutral": "சமம்",
+    "Own House": "சொந்த வீடு",
+    "Moolatrikona": "மூலத்திரிகோணம்",
+    "Rasi": "ராசி",
+    "Navamsa": "நவாம்சம்",
+    "Kendra": "கேந்திரம்",
+    "Kona": "கோணம்",
+    "Trikona": "திரிகோணம்",
+    "Upachaya": "உபஜெயம்",
+    "Maraka": "மாரகம்",
+    "Badhaka": "பாதகம்",
+    "Yogakaraka": "யோககாரகன்",
+    "Digbala": "திக்பலம்",
+    "Directional Strength": "திக்பலம்"
+};
+
+function refineTamilTranslation(text: string): string {
+    if (!text) return text;
+    let refined = text;
+    for (const [english, tamil] of Object.entries(TAMIL_ASTRO_GLOSSARY)) {
+        // Use regex with word boundary to avoid partial replacements inside other words
+        // Case insensitive global replacement
+        const regex = new RegExp(`\\b${english}\\w*`, 'gi'); // \w* to match plurals/suffixes loosely? No, be careful.
+        // Let's stick to word boundary for simple terms and explicit variations in glossary.
+        const safeRegex = new RegExp(`\\b${english}\\b`, 'gi');
+        refined = refined.replace(safeRegex, tamil);
+    }
+    return refined;
+}
+
+// Helper for Google Translate API V2
+async function translateStrings(texts: string[], target: string = 'ta'): Promise<string[]> {
+    const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
+
+    // Google Translate V2 limits: 128 strings per request implies filtering or chunks? 
+    // Actually limit is usually 2048 chars per 'q' or payload size. 
+    // We have ~50 strings. If the total length is huge, we might hit limits.
+    // But for this use case (short astrology predictions), it's likely fine (~2-3k chars).
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            q: texts,
+            target: target,
+            format: 'text',
+            source: 'en'
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Google Translate API Error: ${error.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    // data.data.translations is array of { translatedText: "..." }
+    return data.data.translations.map((t: any) => t.translatedText);
+}
+
+export async function translateAnalysisReport(englishResponse: OrchestratorResponse): Promise<OrchestratorResponse> {
+    const report = englishResponse.bava_analysis_report;
+    if (!report) return englishResponse;
+
+    try {
+        const textsToTranslate: string[] = [];
+
+        // 1. Collect all text fields in a deterministic order
+        textsToTranslate.push(englishResponse.primary_analysis.status);
+        textsToTranslate.push(englishResponse.primary_analysis.dasa_verdict);
+        textsToTranslate.push(englishResponse.model_consensus);
+        textsToTranslate.push(englishResponse.reasoning);
+
+        // Bava Report Fields
+        textsToTranslate.push(report.lagna_summary);
+        textsToTranslate.push(report.final_verdict);
+
+        // Houses (12 houses * 4 fields = 48 strings)
+        report.house_predictions.forEach(house => {
+            textsToTranslate.push(house.title);
+            textsToTranslate.push(house.status);
+            textsToTranslate.push(house.analysis);
+            textsToTranslate.push(house.guruji_rule_applied);
+        });
+
+        // 2. Call API (Single Batch Request)
+        console.log(`[Translation] Batch translating ${textsToTranslate.length} fields via Google Cloud Translation API...`);
+        const translatedTextsRaw = await translateStrings(textsToTranslate, 'ta');
+
+        if (translatedTextsRaw.length !== textsToTranslate.length) {
+            console.warn(`[Translation] Mismatch in translated count. Expected ${textsToTranslate.length}, got ${translatedTextsRaw.length}`);
+        }
+
+        // 3. Refine Translation (Glossary Fixes)
+        const translatedTexts = translatedTextsRaw.map(refineTamilTranslation);
+
+        // 3. Reconstruct Object
+        let tIndex = 0;
+
+        const translatedPrimary = {
+            ...englishResponse.primary_analysis,
+            status: translatedTexts[tIndex++] || englishResponse.primary_analysis.status,
+            dasa_verdict: translatedTexts[tIndex++] || englishResponse.primary_analysis.dasa_verdict,
+        };
+        const translatedConsensus = translatedTexts[tIndex++] || englishResponse.model_consensus;
+        const translatedReasoning = translatedTexts[tIndex++] || englishResponse.reasoning;
+
+        const translatedLagnaSummary = translatedTexts[tIndex++] || report.lagna_summary;
+        const translatedFinalVerdict = translatedTexts[tIndex++] || report.final_verdict;
+
+        const translatedHouses = report.house_predictions.map(house => {
+            return {
+                ...house,
+                title: translatedTexts[tIndex++] || house.title,
+                status: translatedTexts[tIndex++] || house.status,
+                analysis: translatedTexts[tIndex++] || house.analysis,
+                guruji_rule_applied: translatedTexts[tIndex++] || house.guruji_rule_applied
+            };
+        });
+
+        return {
+            ...englishResponse,
+            primary_analysis: translatedPrimary,
+            model_consensus: translatedConsensus,
+            reasoning: translatedReasoning,
+            final_answer_tamil: "மொழிபெயர்க்கப்பட்ட முழுமையான பாவக பகுப்பாய்வு கீழே உள்ளது.",
+            // Keep original English answer content? No, user usually wants translation.
+            // But final_answer_english field should logically stay English.
+            final_answer_english: englishResponse.final_answer_english,
+            bava_analysis_report: {
+                lagna_summary: translatedLagnaSummary,
+                final_verdict: translatedFinalVerdict,
+                house_predictions: translatedHouses
+            }
+        };
+
+    } catch (error) {
+        console.error("Translation logic failed:", error);
+        throw error;
+    }
+}
 
 const prepareContext = (data: any, intent: string, isComprehensive: boolean = false, language: string = 'en') => {
     const { planets, ascendant, currentDasa } = data;
