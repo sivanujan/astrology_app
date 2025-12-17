@@ -144,26 +144,16 @@ const Dashboard: React.FC = () => {
 
             {/* Main Content */}
             <div className="relative z-10 max-w-7xl mx-auto p-6">
-                {/* Add New Chart Button */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Add New Chart Button - Centered */}
+                <div className="flex justify-center mb-8">
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleNewChart}
-                        className="flex items-center justify-center gap-3 px-6 py-8 bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 font-bold rounded-xl hover:from-yellow-400 hover:to-orange-500 transition shadow-lg shadow-yellow-500/20"
+                        className="flex items-center justify-center gap-3 px-12 py-6 bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 font-bold rounded-xl hover:from-yellow-400 hover:to-orange-500 transition shadow-lg shadow-yellow-500/20 w-full max-w-2xl text-lg"
                     >
-                        <Plus className="w-6 h-6" />
+                        <Plus className="w-8 h-8" />
                         {t.dashboard.createBtn}
-                    </motion.button>
-
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => navigate('/predictions-faq')}
-                        className="flex items-center justify-center gap-3 px-6 py-8 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition shadow-lg backdrop-blur-sm"
-                    >
-                        <MessageCircle className="w-6 h-6 text-purple-400" />
-                        Basic Questions & Answers
                     </motion.button>
                 </div>
 

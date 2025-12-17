@@ -63,7 +63,11 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
         planets,
         ascendant,
         subathuvamScores: agScores,
-        currentDasa: currentDasha
+        currentDasa: currentDasha,
+        userDetails: {
+            ...data.userDetails,
+            uid: user?.uid // Inject UID for logging
+        }
     };
 
     const fetchAnalysis = async (forceRecheck = false) => {

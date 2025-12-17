@@ -1,5 +1,7 @@
 import { SIGN_LORDS, NAKSHATRAS, ZODIAC_SIGNS, EXALTATION_POINTS, DEBILITATION_POINTS, PLANETS } from './constants';
 import { calculateAdityaGurujiSubathuvam, generateSpecialPredictions, getFunctionalNature } from './adityaGurujiSubathuvam';
+import { adminService } from '../services/adminService';
+import { predictionService } from '../services/predictionService';
 
 export interface OrchestratorResponse {
     intent: string;
@@ -68,7 +70,7 @@ const HOUSE_NAMES_TA = [
     "இழப்பு & மோட்சம் (Loss & Liberation)"
 ];
 
-const LAGNA_SPECIFIC_RULES: Record<string, string> = {
+export const LAGNA_SPECIFIC_RULES: Record<string, string> = {
 
     "Simha": `
     Aditya Guruji’s Subathuvam System for Simha Lagna (Leo).
@@ -495,22 +497,26 @@ const LAGNA_SPECIFIC_RULES: Record<string, string> = {
     Aditya Guruji’s Subathuvam System for Kataka Lagna (Cancer).
 
     The Rules (From Database):
-    1. Lagna Lord (Moon):
-       - Role: Lagna Lord (Manokaragan).
-       - Rule: "லக்னாதிபதி சந்திரன் வளர்பிறையாக அல்லது பௌர்ணமியாக இருப்பது ஜாதகத்திற்கு உயிர். தேய்பிறையாக இருந்தால் குரு பார்வை அவசியம்."
-       - Check: Is Moon Waxing/Full? -> "Bright Future & Strong Mind."
-       - Check: Is Moon Waning? -> "Lack of confidence (Need Guru aspect)."
-    2. Yogakaraka (Mars):
+    1. Lagna Lord (Moon) - The Life Force:
+       - Role: Lagna Lord (Manokaragan - Mind).
+       - Rule: "லக்னாதிபதி சந்திரன் வளர்பிறையாக (Waxing) அல்லது பௌர்ணமியாக (Full) இருப்பது ஜாதகத்திற்கு உயிர் (Oli/Light). தேய்பிறையாக (Waning) இருந்தால் குரு பார்வை அவசியம்."
+       - **CRITICAL**: Check 'MoonPhaseInfo' in the input.
+       - Check: Is Moon Waxing or Full? -> "Excellent! The user has strong mental willpower, confidence, and a 'giving' nature (Lighting up others' lives)."
+       - Check: Is Moon Waning? -> "Confidence might fluctuate. Needs Jupiter's aspect to stabilize. If Jupiter aspects, it fixes the flaw."
+    2. Character & Personality:
+       - If Moon has Light (Waxing/Full): "Motherly, Caring, Emotional, Resilient."
+       - If Moon is Dark (New Moon/Waning) without Guru: "Moody, Over-sensitive, Dependent."
+    3. Yogakaraka (Mars):
        - Role: 5th & 10th Lord (Absolute Yogakaraka).
        - Rule: "கடகத்திற்கு செவ்வாய் மட்டுமே ராஜயோகம் தருபவர்."
        - Check: Is Mars Strong (1, 2, 5, 9, 10)? -> "High Authority, Police/Govt Job, Land Assets."
        - Check: Is Mars with Moon? -> "Chandra-Mangala Yoga (Wealth)."
-    3. The Protector (Jupiter):
+    4. The Protector (Jupiter):
        - Role: 9th Lord (Bhagyadhipathi).
        - Rule: "பாக்கியாதிபதி. 1-ல் (உச்சம்), 5, 9-ல் இருப்பது சிறப்பு."
        - Check: Is Jupiter Exalted (1st)? -> "Hamsa Yoga (Divine Grace)."
        - Check: Does Jupiter aspect Moon? -> "Gaja Kesari Yoga (Fame)."
-    4. The 'Problem' Planet (Saturn):
+    5. The 'Problem' Planet (Saturn):
        - Role: Maraka & 8th Lord.
        - Rule: "கடகத்திற்கு சனி ஆகாதவர். 3, 6, 11-ல் இருப்பது நல்லது."
        - Check: Is Saturn in 7 or 8? -> WARNING: "Marriage delay or Health struggle likely."
@@ -518,9 +524,9 @@ const LAGNA_SPECIFIC_RULES: Record<string, string> = {
 
     Prediction Logic (Execute Step-by-Step):
 
-    Check Lagna Lord (Moon):
-    - Waxing? -> "Good."
-    - Waning? -> "Weak (Needs Guru)."
+    Check Lagna Lord (Moon) & Character:
+    - **MOON LIGHT CHECK**: Is 'MoonPhaseInfo.is_waxing' true? -> "Great Character/Strength."
+    - Else -> "Weak (Needs Guru)."
     - Output Rule: Use lord_rules.Moon.rule_tamil.
 
     Check The Yogakaraka (Mars):
@@ -535,8 +541,8 @@ const LAGNA_SPECIFIC_RULES: Record<string, string> = {
     - In 3/6/11? -> "Good."
 
     Output Format (Tamil): "கடக லக்ன விதிகளின்படி, உங்கள் ஜாதகத்தில்..."
-    (Explain Moon & Mars status - The Core)
-    (Explain Jupiter status - The Luck)
+    (Explain Moon's Light Status & Character - The Most Important)
+    (Explain Mars & Jupiter status - The Luck)
     (Explain Saturn status - The Warning/Good News)
     (Final Verdict based on Rules)
     `,
@@ -679,8 +685,23 @@ export async function queryAstrologyOrchestrator(
         isComprehensiveAnalysis = true;
     }
 
+    // 2. Fetch Dynamic Rules from DB (with cache/fallback)
+    let dynamicRulesMap: Record<string, string> = {};
+    try {
+        const rules = await adminService.getAllRules();
+        rules.forEach(r => {
+            if (r.key && r.content) {
+                dynamicRulesMap[r.key] = r.content;
+            }
+        });
+        console.log(`[AI] Loaded ${Object.keys(dynamicRulesMap).length} dynamic rules.`);
+    } catch (e) {
+        console.warn("[AI] Failed to fetch dynamic rules, using built-in defaults.", e);
+    }
+
     // 2. Prepare Context (always in English for generation)
-    const context = prepareContext(chartData, intent, isComprehensiveAnalysis, generationLanguage);
+    // Pass dynamic rules to context preparer
+    const context = prepareContext(chartData, intent, isComprehensiveAnalysis, generationLanguage, dynamicRulesMap);
 
     // 3. Construct Prompt
     let systemPrompt = "";
@@ -720,7 +741,7 @@ For each house:
 - Prediction: "Though 7th Lord is hidden, the high Subathuvam guarantees a good marriage, but with some initial delay."
 
 **Execution Loop (Internal Thought Process):**
-1. Analyze Lagna (1st): Check Lagna Lord strength & Aspects on Lagna. (Key: Health, Status).
+1. Analyze Lagna (1st): Check Lagna Lord strength & Aspects on Lagna. **Describe User's Character/Nature based on Lagna Lord & Moon Phase.** (Key: Health, Status, Personality).
 2. Analyze 2nd House: Check 2nd Lord & Occupants. (Key: Family, Speech, Wealth).
 3. Analyze 3rd House: Check 3rd Lord & Mars. (Key: Courage, Siblings).
 4. Analyze 4th House: Check 4th Lord, Moon, Mercury. (Key: Mother, House, Education).
@@ -786,7 +807,9 @@ For each house:
                 "Scorpio": "Vrischika"
             };
             const mappedLagna = signMap[lagnaName] || lagnaName;
-            const lagnaRule = LAGNA_SPECIFIC_RULES[mappedLagna];
+
+            // PRIORITY: DB Rule > Static Rule
+            const lagnaRule = (dynamicRulesMap && dynamicRulesMap[mappedLagna]) ? dynamicRulesMap[mappedLagna] : LAGNA_SPECIFIC_RULES[mappedLagna];
 
             if (lagnaRule) {
                 intentPrompt = `\n\n*** SPECIAL GURUJI RULE FOR ${mappedLagna.toUpperCase()} LAGNA ***\n${lagnaRule}\n\nApply these specific rules strictly.`;
@@ -825,6 +848,17 @@ DO NOT CALCULATE DASA PERIODS YOURSELF. USE THE 'CurrentDasa' PROVIDED IN THE CO
 The context contains the EXACT current Dasa, Bhukti, and Antaram. Trust this data implicitly.
 If context says "Saturn Dasa", then the prediction MUST be based on Saturn Dasa.
 DO NOT HALLUCINATE OR RE-CALCULATE DATES.
+
+6. **DYNAMIC SYSTEM RULES (Admin Configured)**:
+   The following rules are high-priority overrides added by the Administrator. You MUST follow them:
+   ${dynamicRulesMap
+                ? Object.entries(dynamicRulesMap)
+                    .filter(([key]) => !['Simha', 'Kanni', 'Thula', 'Rishaba', 'Meena', 'Makara', 'Mesha', 'Mithuna', 'Kataka', 'Dhanusu', 'Kumbha', 'Vrischika'].includes(key))
+                    .map(([key, content]) => `   - **RULE [${key}]**: ${content}`)
+                    .join('\n')
+                : "   (No dynamic rules active)"
+            }
+
 ${(context as any).CurrentDasa && (context as any).CurrentDasa.lord
                 ? `The user is currently running **${(context as any).CurrentDasa.lord} Dasa** and **${(context as any).CurrentDasa.bhukti} Bhukti**. 
 CONFIRM THIS IN YOUR RESPONSE.`
@@ -1349,13 +1383,14 @@ export async function translateAnalysisReport(englishResponse: OrchestratorRespo
             }
         };
 
+
     } catch (error) {
         console.error("Translation logic failed:", error);
         throw error;
     }
 }
 
-const prepareContext = (data: any, intent: string, isComprehensive: boolean = false, language: string = 'en') => {
+const prepareContext = (data: any, intent: string, isComprehensive: boolean = false, language: string = 'en', dynamicRules: Record<string, string> = {}) => {
     const { planets, ascendant, currentDasa } = data;
     // Calculate subathuvam scores if not provided
     const subathuvamScores = data.subathuvamScores || calculateAdityaGurujiSubathuvam(planets);
@@ -1466,7 +1501,29 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
         // Provide the titles directly so AI doesn't have to guess or translate
         OutputFormatGuide: {
             HouseTitles: language === 'ta' ? HOUSE_NAMES_TA : HOUSE_NAMES_EN
-        }
+        },
+        MoonPhaseInfo: (() => {
+            if (!moon) return { status: "Unknown", is_waxing: false };
+            const sun = planets.find((p: any) => p.name === 'Sun');
+            if (!sun) return { status: "Unknown", is_waxing: false };
+
+            // Calculate Elongation (Moon - Sun)
+            // Normalize to 0-360
+            let elongation = (moon.longitude - sun.longitude);
+            if (elongation < 0) elongation += 360;
+
+            // 0-180 = Waxing (Sukla), 180-360 = Waning (Krishna)
+            const isWaxing = elongation < 180;
+            const isFull = elongation > 170 && elongation < 190;
+            const isNew = elongation > 350 || elongation < 10;
+
+            return {
+                elongation_degrees: elongation.toFixed(1),
+                is_waxing: isWaxing,
+                phase_name: isNew ? "New Moon (Amavasya)" : isFull ? "Full Moon (Pournami)" : isWaxing ? "Waxing (Sukla Paksha)" : "Waning (Krishna Paksha)",
+                has_light: isWaxing || isFull // Guruji's rule: Waxing = Light
+            };
+        })()
     };
 
     console.log("AI CONTEXT GENERATED:", JSON.stringify(baseContext, null, 2));
@@ -1479,4 +1536,28 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
 
     return baseContext;
 };
+
+// --- LOGGING ---
+// Log interaction if user data is present
+async function logInteraction(userQuery: string, response: OrchestratorResponse, chartData: any, intent: string, language: string) {
+    try {
+        const userId = chartData?.userDetails?.uid ?? "anonymous"; // Ensure you pass uid in chartData if available, or handle auth upstream
+        const userName = chartData?.userDetails?.name ?? "User";
+
+        // We log the final answer (Tamil if Tamil, English if English)
+        const answer = language === 'ta' ? response.final_answer_tamil : response.final_answer_english;
+
+        await predictionService.logChatInteraction(
+            userId,
+            userName,
+            userQuery,
+            answer,
+            intent,
+            language,
+            { model_consensus: response.model_consensus }
+        );
+    } catch (e) {
+        console.error("Failed to log chat interaction", e);
+    }
+}
 0

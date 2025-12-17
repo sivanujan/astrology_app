@@ -6,6 +6,7 @@ import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
+import FeedbackWidget from './FeedbackWidget';
 
 interface AIPredictionsProps {
     data: any;
@@ -139,6 +140,10 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
             enrichedData = {
                 ...enrichedData,
+                userDetails: {
+                    ...data.userDetails,
+                    uid: user?.uid // Inject UID for logging
+                },
                 subathuvam_calculations: {
                     planetary_scores: subathuvamScores,
                     house_scores: houseScores
@@ -261,6 +266,15 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                         <p><strong>Key Planet:</strong> {msg.details.primary_analysis.key_planet} ({msg.details.primary_analysis.status})</p>
                                         <p><strong>Reasoning:</strong> {msg.details.reasoning}</p>
                                     </div>
+                                )}
+
+                                {/* FEEDBACK WIDGET */}
+                                {msg.role === 'ai' && user && msg.id && (
+                                    <FeedbackWidget
+                                        messageId={msg.id}
+                                        messagePath={`users/${user.uid}/charts/${`${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_')}/messages/${msg.id}`}
+                                        existingFeedback={msg.feedback}
+                                    />
                                 )}
                             </div>
                         </div>

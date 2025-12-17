@@ -14,6 +14,8 @@ import DailySnapshot from './components/DailySnapshot';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
@@ -43,6 +45,11 @@ const AppRoutes = () => {
       <Route path="/" element={<InputForm />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+
+      {/* Admin Routes */}
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
       {/* Semi-Protected / Public but needs data */}
       <Route
