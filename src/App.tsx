@@ -71,9 +71,7 @@ const AppRoutes = () => {
       } />
 
       <Route path="/dasha" element={
-        <ProtectedRoute>
-          {hasData ? <DashaPeriods data={chartData} /> : <Navigate to="/" />}
-        </ProtectedRoute>
+        hasData ? <DashaPeriods data={chartData} /> : <Navigate to="/" />
       } />
 
       <Route path="/predictions" element={

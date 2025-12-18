@@ -19,7 +19,7 @@ import { calculateAdityaGurujiSubathuvam, calculateDigbalaAndYogas, getFunctiona
 // predictionRules imports removed as they are used in RuleBasedPredictions.tsx
 import { useLanguage } from '../contexts/LanguageContext';
 import { TAMIL_PLANET_NAMES, TAMIL_NAKSHATRAS } from '../utils/translations';
-import RuleBasedPredictions from './RuleBasedPredictions';
+
 
 interface ChartAnalysisProps {
     data: any;
@@ -31,32 +31,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
     // Lazy load the PDF generator to avoid blocking initial render? 
     // For now simple import is fine.
 
-    const handleDownloadPDF = async () => {
-        try {
-            const { generatePDF } = await import('../utils/pdfGenerator');
 
-            // Always calculate Dasha periods for PDF to ensure latest data
-            let pdfData = { ...data };
-            const moon = data.planets.find((p: any) => p.name === 'Moon');
-            if (moon && data.userDetails?.date && data.userDetails?.time) {
-                const birthDate = new Date(`${data.userDetails.date}T${data.userDetails.time}`);
-                if (!isNaN(birthDate.getTime())) {
-                    pdfData.dashaPeriods = calculateDashaPeriods(birthDate, moon.longitude);
-                    console.log("Calculated Dasha periods for PDF:", pdfData.dashaPeriods?.length);
-                } else {
-                    console.error("Invalid birth date for Dasha calculation");
-                }
-            } else {
-                console.error("Missing Moon or User Details for Dasha calculation", { moon: !!moon, date: data.userDetails?.date, time: data.userDetails?.time });
-            }
-
-            console.log("Generating PDF with data:", { ...pdfData, dashaPeriodsLength: pdfData.dashaPeriods?.length });
-            await generatePDF(pdfData, language as 'en' | 'ta');
-        } catch (error) {
-            console.error("PDF Generation failed:", error);
-            alert("Failed to generate PDF. Please try again.");
-        }
-    };
 
     if (!data) return null;
 
@@ -66,21 +41,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
     // Use shared logic for Yogas
     // 'calculateYogas' is imported at top level.
 
-    const { yogas: rawYogas, doshas: rawDoshas } = calculateYogas(planets, ascendant);
-
-
-    // Filter/Map for Localization if needed
-    // The shared function returns English strings. We can display them as is or map specific names if we have translation keys.
-    // For now, let's just use the raw results as they are decently descriptive.
-    // Or we can map strict names like "Parivartana Yoga" to `t.advancedYogas.parivartana`
-
-    const yogas = rawYogas.map(y => {
-        if (y.name === 'Parivartana Yoga') return { ...y, name: t.advancedYogas.parivartana || y.name };
-        if (y.name === 'Neecha Bhanga Raja Yoga') return { ...y, name: t.advancedYogas.neechaBhangaRajaYoga || y.name };
-        return y;
-    });
-
-    const doshas = rawDoshas;
+    const { yogas, doshas } = calculateYogas(planets, ascendant, language as 'en' | 'ta');
 
     const toggleSection = (section: string) => {
         setExpandedSection(expandedSection === section ? null : section);
@@ -112,15 +73,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                     {t.analysis.title}
                 </h2>
                 <p className="text-slate-400 mb-4">{t.analysis.subtitle}</p>
-                <div className="flex justify-center">
-                    <button
-                        onClick={handleDownloadPDF}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-                        {language === 'ta' ? 'PDF பதிவிறக்கம்' : 'Download PDF'}
-                    </button>
-                </div>
+
             </motion.div>
 
             {/* Planetary Positions Table */}
@@ -261,14 +214,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                 </div>
             </div>
 
-            {/* Rule Based Predictions (Guruji's Q&A) */}
-            <div className="mt-8">
-                <div className="flex items-center gap-2 mb-4 px-2">
-                    <Star className="w-6 h-6 text-purple-400" />
-                    <h3 className="text-xl font-bold text-white">{t.predictions?.title || "Guruji's Predictions"}</h3>
-                </div>
-                <RuleBasedPredictions data={data} language={language as 'en' | 'ta'} />
-            </div>
+
 
             {/* Subathuvam & Pavathuvam Analysis */}
             <div className="glass-panel p-6 mt-6">

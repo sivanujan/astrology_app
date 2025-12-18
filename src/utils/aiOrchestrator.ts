@@ -1470,6 +1470,7 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
 
     const baseContext = {
         TargetLanguage: language === 'ta' ? "TAMIL (தமிழ்)" : "ENGLISH",
+        Gender: data.userDetails?.gender || "Unknown",
         Lagna: ZODIAC_SIGNS[ascSignIndex], // FORCE CORRECT NAME FROM INDEX
         LagnaLord: {
             name: lagnaLord,

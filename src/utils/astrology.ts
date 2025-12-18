@@ -406,7 +406,7 @@ export interface DashaPeriod {
     endDate: Date;
     durationYears: number;
     subPeriods?: DashaPeriod[];
-    level: 'Maha' | 'Bhukti' | 'Antaram';
+    level: 'Maha' | 'Bhukti' | 'Antaram' | 'Sookshma' | 'Prana';
 }
 
 // Helper to add years (fractional) to date
@@ -417,7 +417,13 @@ const addYears = (date: Date, years: number): Date => {
     return result;
 };
 
-const generateSubPeriods = (parentPlanet: string, startDate: Date, parentDuration: number, level: 'Bhukti' | 'Antaram', grandParentPlanet?: string): DashaPeriod[] => {
+const generateSubPeriods = (
+    parentPlanet: string,
+    startDate: Date,
+    parentDuration: number,
+    level: 'Bhukti' | 'Antaram' | 'Sookshma' | 'Prana',
+    grandParentPlanet?: string
+): DashaPeriod[] => {
     const subPeriods: DashaPeriod[] = [];
     let currentSubDate = new Date(startDate);
 
@@ -430,23 +436,46 @@ const generateSubPeriods = (parentPlanet: string, startDate: Date, parentDuratio
 
         let durationYears = 0;
 
-        if (level === 'Bhukti') {
-            // Bhukti = (Maha Years * Bhukti Years) / 120
-            durationYears = (parentDuration * DASHA_YEARS[planet]) / 120;
-        } else {
-            // Antaram = (Bhukti Years * Antaram Years) / 120 (relative to Bhukti duration)
-            durationYears = parentDuration * (DASHA_YEARS[planet] / 120);
-        }
+        // Vimshottari Formula uses 120 year cycle ratio
+        // Duration = (ParentDuration * PlanetYears) / 120
+        durationYears = (parentDuration * DASHA_YEARS[planet]) / 120;
 
         const endDate = addYears(currentSubDate, durationYears);
 
-        subPeriods.push({
+        // Define Next Level
+        let nextLevel: 'Sookshma' | 'Prana' | null = null;
+        if (level === 'Antaram') nextLevel = 'Sookshma';
+        else if (level === 'Sookshma') nextLevel = 'Prana';
+
+        const period: DashaPeriod = {
             planet,
             startDate: new Date(currentSubDate),
             endDate: new Date(endDate),
             durationYears,
             level
-        });
+        };
+
+        // Recursive Generation for deep analysis if needed
+        // For performance, we might limit this, but user requested it.
+        // We will generate on-the-fly usually, but here we pre-calc?
+        // Actually, pre-calculating ALL 5 levels for a lifetime is huge.
+        // Better: `getCurrentDasha` should calculate detail on demand.
+        // But the user's `generate15DaysForecast` will iterate days, so we need a way to find it efficiently.
+        // Let's modify `calculateDashaPeriods` to NOT recurse all the way by default, 
+        // OR we implement a `getDasaDetails(date)` function that drills down.
+        // For now, let's keep the generator pure but maybe NOT loop Antaram->Sookshma for the whole life.
+        // Only generate 'Bhukti' and 'Antaram' here. Deep levels can be calc'd on demand.
+        // Wait, current code generates Antaram for ALL Bhuktis. That's already a lot.
+        // Adding Sookshma/Prana for ALL Antarams is 9x9x9x9x9 = 59000 objects. Too heavy.
+        // I will change this to ONLY generate up to Antaram here.
+        // And I will add a helper `getDeepDasa(date)` in `gocharam.ts` to calculate the 5 levels for just that day.
+
+        if (level === 'Bhukti') {
+            // Generate Antarams
+            period.subPeriods = generateSubPeriods(planet, currentSubDate, durationYears, 'Antaram', parentPlanet);
+        }
+
+        subPeriods.push(period);
 
         currentSubDate = endDate;
     }
@@ -687,9 +716,51 @@ export const calculateCurrentTransits = () => {
 };
 
 // 4. Calculate Yogas & Doshas (Shared Logic)
-export const calculateYogas = (planets: any[], ascendant: any) => {
+export const calculateYogas = (planets: any[], ascendant: any, language: 'en' | 'ta' = 'en') => {
     const yogas: { name: string, description: string }[] = [];
     const doshas: { name: string, description: string }[] = [];
+
+    const t = {
+        gajakesari: {
+            name: language === 'ta' ? 'கஜகேசரி யோகம்' : 'Gajakesari Yoga',
+            desc: language === 'ta'
+                ? 'சந்திரனும் குருவும் கேந்திரத்தில் உள்ளனர். இது அறிவு, செல்வம் மற்றும் புகழைத் தரும்.'
+                : 'Moon and Jupiter in Kendra. Indicates wisdom, wealth, and fame.'
+        },
+        manglik: {
+            name: language === 'ta' ? 'செவ்வாய் தோஷம்' : 'Manglik Dosha',
+            desc: language === 'ta'
+                ? 'செவ்வாய் (1/2/4/7/8/12) இடத்தில் உள்ளது. திருமணத்தில் தாமதம் அல்லது சிக்கல்களை ஏற்படுத்தலாம்.'
+                : 'Mars is in a sensitive position (1/2/4/7/8/12). May cause delay or difficulty in marriage.'
+        },
+        parivartana: {
+            name: language === 'ta' ? 'பரிவர்த்தனை யோகம்' : 'Parivartana Yoga',
+            desc: (p1: string, p2: string) => language === 'ta'
+                ? `${p1} மற்றும் ${p2} ராசி பரிமாற்றம் செய்துள்ளனர். இது இரு கிரகங்களையும் பலப்படுத்துகிறது.`
+                : `${p1} & ${p2} exchange signs. Strengthening both planets.`
+        },
+        neechaBhanga: {
+            name: language === 'ta' ? 'நீச பங்கம் ராஜ யோகம்' : 'Neecha Bhanga Raja Yoga',
+            desc: (p: string) => language === 'ta'
+                ? `${p} நீச பங்கம் அடைகிறது. பலவீனம் பலமாக மாறுகிறது.`
+                : `${p} gets cancellation of debilitation, converting weakness into strength.`
+        },
+        guruMangala: {
+            name: language === 'ta' ? 'குரு மங்கள யோகம்' : 'Guru-Mangala Yoga',
+            descConj: language === 'ta'
+                ? 'குரு மற்றும் செவ்வாய் சேர்க்கை. செல்வம் மற்றும் சொத்துக்களுக்கு நல்லது.'
+                : 'Jupiter and Mars conjunction. Good for wealth and property.',
+            descAspect: language === 'ta'
+                ? 'குரு மற்றும் செவ்வாய் பார்வை. ஆற்றல் மற்றும் முயற்சிக்கு நல்லது.'
+                : 'Jupiter and Mars mutual aspect. Good for energy and enterprise.'
+        },
+        budhaAditya: {
+            name: language === 'ta' ? 'புத-ஆதித்ய யோகம்' : 'Budha-Aditya Yoga',
+            desc: language === 'ta'
+                ? 'சூரியன் மற்றும் புதன் சேர்க்கை. அறிவு மற்றும் பேச்சுத் திறமைக்கு நல்லது.'
+                : 'Sun and Mercury conjunction. Good for intelligence and communication.'
+        }
+    };
 
     // Simple Gajakesari Yoga (Jupiter in Kendra from Moon)
     const moon = planets.find((p: any) => p.name === 'Moon');
@@ -700,7 +771,7 @@ export const calculateYogas = (planets: any[], ascendant: any) => {
         const diff = (jupiter.signIndex - moon.signIndex + 12) % 12; // 0=1st, 3=4th, 6=7th, 9=10th
         // Kendra houses are 1, 4, 7, 10 (Indices 0, 3, 6, 9)
         if ([0, 3, 6, 9].includes(diff)) {
-            yogas.push({ name: 'Gajakesari Yoga', description: 'Moon and Jupiter in Kendra. Indicates wisdom, wealth, and fame.' });
+            yogas.push({ name: t.gajakesari.name, description: t.gajakesari.desc });
         }
     }
 
@@ -709,28 +780,43 @@ export const calculateYogas = (planets: any[], ascendant: any) => {
     if (mars && ascendant) {
         const house = (mars.signIndex - ascendant.signIndex + 12) % 12 + 1;
         if ([1, 2, 4, 7, 8, 12].includes(house)) {
-            doshas.push({ name: 'Manglik Dosha', description: 'Mars is in a sensitive position (1/2/4/7/8/12). May cause delay or difficulty in marriage.' });
+            doshas.push({ name: t.manglik.name, description: t.manglik.desc });
         }
     }
 
     // Advanced Yogas
     // Parivartana (Exchange of Signs)
-    // Assuming checkParivartana is imported or available in scope. 
-    // It is exported from this file, so accessible.
     const exchanges = checkParivartana(planets);
     exchanges.forEach(ex => {
+        // Map planet names to Tamil if needed, or leave as English names even in Tamil text?
+        // Ideally translate planet names too.
+        // Let's keep English legacy names for variables but use mapping for display if needed.
+        // For now, using English names in Tamil string is common or acceptable, "Sun மற்றும் Moon..."
+        // But better:
+        const taPlanets: Record<string, string> = {
+            'Sun': 'சூரியன்', 'Moon': 'சந்திரன்', 'Mars': 'செவ்வாய்', 'Mercury': 'புதன்',
+            'Jupiter': 'குரு', 'Venus': 'சுக்கிரன்', 'Saturn': 'சனி', 'Rahu': 'ராகு', 'Ketu': 'கேது'
+        };
+        const p1Name = language === 'ta' ? (taPlanets[ex.p1] || ex.p1) : ex.p1;
+        const p2Name = language === 'ta' ? (taPlanets[ex.p2] || ex.p2) : ex.p2;
+
         yogas.push({
-            name: 'Parivartana Yoga',
-            description: `${ex.p1} & ${ex.p2} exchange signs. Strengthening both planets.`
+            name: t.parivartana.name,
+            description: t.parivartana.desc(p1Name, p2Name)
         });
     });
 
     // Neecha Bhanga (Cancellation of Debilitation)
     planets.forEach((p: any) => {
         if (checkNeechaBhanga(p, planets, ascendant)) {
+            const taPlanets: Record<string, string> = {
+                'Sun': 'சூரியன்', 'Moon': 'சந்திரன்', 'Mars': 'செவ்வாய்', 'Mercury': 'புதன்',
+                'Jupiter': 'குரு', 'Venus': 'சுக்கிரன்', 'Saturn': 'சனி', 'Rahu': 'ராகு', 'Ketu': 'கேது'
+            };
+            const pName = language === 'ta' ? (taPlanets[p.name] || p.name) : p.name;
             yogas.push({
-                name: 'Neecha Bhanga Raja Yoga',
-                description: `${p.name} gets cancellation of debilitation, converting weakness into strength.`
+                name: t.neechaBhanga.name,
+                description: t.neechaBhanga.desc(pName)
             });
         }
     });
@@ -739,11 +825,11 @@ export const calculateYogas = (planets: any[], ascendant: any) => {
     if (jupiter && mars) {
         // Conjunction
         if (jupiter.signIndex === mars.signIndex) {
-            yogas.push({ name: 'Guru-Mangala Yoga', description: 'Jupiter and Mars conjunction. Good for wealth and property.' });
+            yogas.push({ name: t.guruMangala.name, description: t.guruMangala.descConj });
         }
         // Opposition (Aspect)
         else if (Math.abs(jupiter.signIndex - mars.signIndex) === 6) {
-            yogas.push({ name: 'Guru-Mangala Yoga', description: 'Jupiter and Mars mutual aspect. Good for energy and enterprise.' });
+            yogas.push({ name: t.guruMangala.name, description: t.guruMangala.descAspect });
         }
     }
 
@@ -751,7 +837,7 @@ export const calculateYogas = (planets: any[], ascendant: any) => {
     const sun = planets.find((p: any) => p.name === 'Sun');
     const mercury = planets.find((p: any) => p.name === 'Mercury');
     if (sun && mercury && sun.signIndex === mercury.signIndex) {
-        yogas.push({ name: 'Budha-Aditya Yoga', description: 'Sun and Mercury conjunction. Good for intelligence and communication.' });
+        yogas.push({ name: t.budhaAditya.name, description: t.budhaAditya.desc });
     }
 
     return { yogas, doshas };

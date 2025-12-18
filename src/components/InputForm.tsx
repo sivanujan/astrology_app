@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, MapPin, Search, Loader2, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Loader2, ChevronRight, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { calculatePlanetaryPositions } from '../utils/astrology';
 
@@ -19,6 +19,7 @@ const InputForm: React.FC = () => {
     const { user } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
+        gender: '',
         date: '',
         time: '',
         city: '',
@@ -31,6 +32,88 @@ const InputForm: React.FC = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    const [displayDate, setDisplayDate] = useState('');
+    const dateInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Initialize displayDate from formData.date logic
+    useEffect(() => {
+        if (formData.date) {
+            const [y, m, d] = formData.date.split('-');
+            if (y && m && d) {
+                setDisplayDate(`${d}/${m}/${y}`);
+            }
+        }
+    }, []);
+
+    const handleTextDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        const isDeleting = val.length < displayDate.length;
+
+        // Allow only numbers and slashes
+        if (!/^[\d/]*$/.test(val)) return;
+
+        // Strip non-digits to process
+        const numbers = val.replace(/\D/g, '');
+
+        // Prevent typing more than 8 digits
+        if (numbers.length > 8) return;
+
+        // Robust re-formatting logic
+        let res = '';
+        if (numbers.length > 0) res = numbers.substring(0, 2);
+        if (numbers.length > 2) res += '/' + numbers.substring(2, 4);
+        if (numbers.length > 4) res += '/' + numbers.substring(4, 8);
+
+        // If forward typing (not deleting), auto-append slash at boundaries
+        if (!isDeleting) {
+            if (numbers.length === 2 && !val.endsWith('/')) {
+                res += '/';
+            }
+            if (numbers.length === 4 && !val.endsWith('/')) {
+                res += '/';
+            }
+        }
+
+        setDisplayDate(res);
+
+        // If it matches DD/MM/YYYY, update main state
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(res)) {
+            const [d, m, y] = res.split('/');
+            // Basic validity check
+            const numD = parseInt(d);
+            const numM = parseInt(m);
+            const numY = parseInt(y);
+
+            if (numM > 0 && numM <= 12 && numD > 0 && numD <= 31 && numY > 1900 && numY < 2100) {
+                const isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                setFormData(prev => ({ ...prev, date: isoDate }));
+            }
+        }
+    };
+
+    const handleNativeDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setFormData(prev => ({ ...prev, date: val }));
+        if (val) {
+            const [y, m, d] = val.split('-');
+            setDisplayDate(`${d}/${m}/${y}`);
+        } else {
+            setDisplayDate('');
+        }
+    };
+
+    const triggerDatePicker = () => {
+        if (dateInputRef.current) {
+            // Try showPicker first (modern browsers)
+            if ('showPicker' in dateInputRef.current) {
+                // @ts-ignore
+                dateInputRef.current.showPicker();
+            } else {
+                dateInputRef.current.focus();
+            }
+        }
+    };
 
     // Debounce city search
     useEffect(() => {
@@ -152,19 +235,66 @@ const InputForm: React.FC = () => {
                         />
                     </div>
 
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
+                            <User className="w-4 h-4" /> {t.input.gender}
+                        </label>
+                        <div className="grid grid-cols-3 gap-4">
+                            {['male', 'female', 'other'].map((g) => (
+                                <button
+                                    key={g}
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, gender: g })}
+                                    className={`px-4 py-3 rounded-lg border transition-all text-sm font-medium ${formData.gender === g
+                                            ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-500/25'
+                                            : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-purple-500/50 hover:text-purple-400'
+                                        }`}
+                                >
+                                    {t.input[g as keyof typeof t.input]}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Date Input */}
-                        <div className="space-y-2">
+                        {/* Date Input - Custom DD/MM/YYYY Text + Hidden Picker */}
+                        <div className="space-y-2 relative">
                             <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
                                 <Calendar className="w-4 h-4" /> {t.input.dob}
                             </label>
-                            <input
-                                type="date"
-                                required
-                                value={formData.date}
-                                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white [color-scheme:dark]"
-                            />
+
+                            <div className="relative">
+                                {/* Visible Text Input */}
+                                <input
+                                    type="text"
+                                    required
+                                    value={displayDate}
+                                    onChange={handleTextDateChange}
+                                    placeholder="dd/mm/yyyy"
+                                    maxLength={10}
+                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
+                                />
+
+                                {/* Calendar Icon Trigger */}
+                                <button
+                                    type="button"
+                                    onClick={triggerDatePicker}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-400 transition-colors"
+                                >
+                                    <Calendar className="w-5 h-5" />
+                                </button>
+
+                                {/* Hidden Native Date Picker */}
+                                <input
+                                    ref={dateInputRef}
+                                    type="date"
+                                    tabIndex={-1}
+                                    className="absolute opacity-0 bottom-0 left-0 w-full h-full -z-10"
+                                    value={formData.date}
+                                    onChange={handleNativeDateChange}
+                                />
+                            </div>
                         </div>
 
                         {/* Time Input */}

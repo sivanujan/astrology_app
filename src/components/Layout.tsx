@@ -1,23 +1,26 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import PlanetaryBackground from './PlanetaryBackground';
 import Logo from '../assets/logo.png';
+import FeatureAccessPopup from './FeatureAccessPopup';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { language, setLanguage, t } = useLanguage();
     const { user } = useAuth();
+    const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+    const [showFeaturePopup, setShowFeaturePopup] = React.useState(false);
 
     const steps = [
         { path: '/', label: t.nav.birthDetails, icon: MapPin, protected: false },
         { path: '/chart', label: t.nav.chart, icon: Moon, protected: false },
+        { path: '/dasha', label: t.dasha.title, icon: Clock, protected: false },
         { path: '/analysis', label: t.nav.analysis, icon: Sun, protected: true },
-        { path: '/dasha', label: t.dasha.title, icon: Clock, protected: true },
         { path: '/predictions', label: t.nav.predictions, icon: Sparkles, protected: true },
 
         { path: '/daily-snapshot', label: "Daily Snapshot", icon: Sun, protected: true },
@@ -108,7 +111,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                             }`}
                                         onClick={() => {
                                             if (isLocked) {
-                                                navigate('/login');
+                                                setShowFeaturePopup(true);
                                             } else {
                                                 navigate(step.path);
                                             }
@@ -157,7 +160,70 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             <Languages className="w-4 h-4 text-purple-400" />
                             <span>{language === 'en' ? 'தமிழ்' : 'English'}</span>
                         </button>
+                        {/* Mobile Menu Button */}
+                        <button
+                            className="md:hidden p-2 text-slate-300 hover:text-white"
+                            onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        >
+                            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                        </button>
                     </div>
+
+                    {/* Mobile Menu Overlay */}
+                    <AnimatePresence>
+                        {isMenuOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="md:hidden border-t border-white/10 bg-slate-950/95 backdrop-blur-xl overflow-hidden"
+                            >
+                                <div className="flex flex-col p-4 space-y-4">
+                                    {steps.map((step, idx) => {
+                                        const Icon = step.icon;
+                                        const isActive = location.pathname === step.path;
+                                        const isLocked = step.protected && !user;
+
+                                        return (
+                                            <button
+                                                key={step.path}
+                                                onClick={() => {
+                                                    if (isLocked) {
+                                                        setShowFeaturePopup(true);
+                                                        setIsMenuOpen(false);
+                                                    } else {
+                                                        navigate(step.path);
+                                                        setIsMenuOpen(false);
+                                                    }
+                                                }}
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
+                                                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                                    : isLocked
+                                                        ? 'text-slate-600 cursor-not-allowed'
+                                                        : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                                                    }`}
+                                            >
+                                                {isLocked ? <Lock className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+                                                {step.label}
+                                            </button>
+                                        );
+                                    })}
+
+                                    {/* Mobile Language Toggle */}
+                                    <button
+                                        onClick={() => {
+                                            setLanguage(language === 'en' ? 'ta' : 'en');
+                                            setIsMenuOpen(false);
+                                        }}
+                                        className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors border border-white/5"
+                                    >
+                                        <Languages className="w-4 h-4 text-purple-400" />
+                                        <span>{language === 'en' ? 'Switch to Tamil (தமிழ்)' : 'Switch to English'}</span>
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </nav>
 
@@ -175,6 +241,12 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     </motion.div>
                 </AnimatePresence>
             </main>
+
+
+            <FeatureAccessPopup
+                isOpen={showFeaturePopup}
+                onClose={() => setShowFeaturePopup(false)}
+            />
         </div>
     );
 };

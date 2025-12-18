@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Sparkles, AlertCircle, CheckCircle, Send } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { isDisposableEmail } from '../utils/emailValidation';
+import { validatePassword } from '../utils/passwordValidation';
 
 const Register: React.FC = () => {
     const navigate = useNavigate();
@@ -30,8 +32,14 @@ const Register: React.FC = () => {
             return;
         }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters');
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            setError(t.auth[passwordValidation.errorKey as keyof typeof t.auth]);
+            return;
+        }
+
+        if (isDisposableEmail(email)) {
+            setError(t.auth.disposableEmail);
             return;
         }
 
@@ -41,7 +49,11 @@ const Register: React.FC = () => {
             await register(email, password, name);
             setShowVerificationModal(true);
         } catch (err: any) {
-            setError(err.message || 'Failed to register');
+            if (err.code === 'auth/email-already-in-use') {
+                setError(t.auth.emailInUse);
+            } else {
+                setError(err.message || 'Failed to register');
+            }
         } finally {
             setLoading(false);
         }
@@ -253,6 +265,8 @@ const Register: React.FC = () => {
                                 <h2 className="text-2xl font-bold text-white mb-2">{t.auth.verifyEmail}</h2>
                                 <p className="text-slate-300 mb-6">
                                     {t.auth.verifySubtitle} <span className="text-yellow-400">{email}</span>.
+                                    <br />
+                                    <span className="text-sm text-slate-400 mt-2 block">{t.auth.checkSpam}</span>
                                 </p>
 
                                 {resendSuccess && (
