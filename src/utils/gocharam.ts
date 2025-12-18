@@ -190,6 +190,112 @@ const calculateTaraBala = (dailyMoonLong: number, birthMoonLong: number, lang: '
 
 // --- MAIN PREDICTION ENGINE ---
 
+// --- DYNAMIC PREDICTION ENGINE ---
+
+const generateDailyPrediction = (
+    lang: 'en' | 'ta',
+    dasaLord: string,
+    bhuktiLord: string,
+    antaramLord: string,
+    dasaScore: number,
+    transitScore: number,
+    finalScore: number,
+    keyTransits: string[], // Already localized strings
+    tara: { score: number, keyFactor: string, starName: string, taraLabel: string },
+    fc: { career: number, finance: number, health: number, rel: number }
+): string => {
+
+    // 1. INTRO
+    const sentiment = finalScore > 70 ? 'positive' : finalScore < 40 ? 'negative' : 'neutral';
+
+    const intros = {
+        en: {
+            positive: ["Stars are aligned in your favor today.", "A promising day awaits you.", "Positive cosmic energy supports your actions."],
+            neutral: ["A balanced day with mixed influences.", "Planetary forces are moderate today.", "Steady progress is expected."],
+            negative: ["Cosmic currents are challenging today.", "Caution is advised as planets are tricky.", "Patience is your best ally today."]
+        },
+        ta: {
+            positive: ["இன்று கிரக நிலை உங்களுக்கு சாதகமாக உள்ளது.", "சிறப்பான பலன்களைத் தரும் நாள்.", "நேர்மறையான ஆற்றல் உங்களைச் சூழ்ந்துள்ளது."],
+            neutral: ["கலவையான பலன்கள் நிறைந்த நாள்.", "கிரகங்கள் சம நிலையில் உள்ளன.", "நிதானமான முன்னேற்றம் எதிர்பார்க்கலாம்."],
+            negative: ["இன்று கிரக நிலை சற்று சவாலாக உள்ளது.", "கவனமுடன் செயல்பட வேண்டிய நாள்.", "பொறுமை காப்பது மிக அவசியம்."]
+        }
+    };
+
+    const intro = intros[lang][sentiment][Math.floor(Math.random() * intros[lang][sentiment].length)];
+
+    // 2. DASA CONTEXT (Now includes Bhukti)
+    let dasaText = "";
+    const dasaBhukti = `${dasaLord}-${bhuktiLord}`; // e.g., Saturn-Venus
+
+    if (dasaScore > 70) {
+        dasaText = lang === 'ta'
+            ? `${dasaLord} தசை மற்றும் ${bhuktiLord} புத்தி உங்களுக்கு பலம் சேர்க்கின்றன.`
+            : `${dasaBhukti} period strengthens your purpose.`;
+    } else if (dasaScore < 40) {
+        dasaText = lang === 'ta'
+            ? `${dasaLord} தசை, ${bhuktiLord} புத்தி சற்று பலவீனமாக உள்ளதால் கவனம் தேவை.`
+            : `${dasaBhukti} influence is weak, implying caution.`;
+    } else {
+        dasaText = lang === 'ta'
+            ? `${dasaLord} தசை, ${bhuktiLord} புத்தி மத்திமமான பலன்களைத் தரும்.`
+            : `${dasaBhukti} offers moderate support.`;
+    }
+
+    // 3. TRANSIT HIGHLIGHT (Now active)
+    let transitText = "";
+    if (keyTransits.length > 0) {
+        // keyTransits[0] is usually the most significant ONE (e.g. Moon or Sun).
+        // Format: "Sun in 11 (Good)" -> "Sun in 11 boosts you."
+        // We will just append "Also, <first item>." to make strict sense of it.
+        const firstTransit = keyTransits[0]; // "Sun in House (Good)"
+        // Simple append because it's already localized well enough.
+        transitText = lang === 'ta'
+            ? `மேலும், ${firstTransit} சாதகமாக அமையலாம்.`
+            : `Additionally, ${firstTransit}.`;
+    }
+
+    // 4. LIFE AREA FOCUS
+    let focusText = "";
+    // Find lowest score area to warn, or highest to encourage
+    const areas = [
+        { name: 'career', val: fc.career, labelEn: 'Career', labelTa: 'தொழில்' },
+        { name: 'finance', val: fc.finance, labelEn: 'Finance', labelTa: 'நிதி' },
+        { name: 'health', val: fc.health, labelEn: 'Health', labelTa: 'ஆரோக்கியம்' },
+        { name: 'rel', val: fc.rel, labelEn: 'Relationships', labelTa: 'உறவுகள்' }
+    ];
+
+    // Sort by value ascending
+    areas.sort((a, b) => a.val - b.val);
+    const weakArea = areas[0];
+    const strongArea = areas[3];
+
+    if (finalScore < 50) {
+        // Warn about weak area
+        focusText = lang === 'ta'
+            ? `குறிப்பாக ${weakArea.labelTa} விஷயத்தில் விழிப்புடன் இருக்கவும்.`
+            : `Be especially vigilant regarding ${weakArea.labelEn}.`;
+    } else {
+        // Highlight strong area
+        focusText = lang === 'ta'
+            ? `${strongArea.labelTa} ரீதியாக நல்ல முன்னேற்றம் காணலாம்.`
+            : `You can expect good progress in ${strongArea.labelEn}.`;
+    }
+
+    // 5. STAR TEXT
+    let starText = "";
+    if (tara.score > 10) {
+        starText = lang === 'ta'
+            ? `${tara.starName} நட்சத்திரம் நன்மை தரும்.`
+            : `${tara.starName} brings favor.`;
+    } else if (tara.score < 0) {
+        starText = lang === 'ta'
+            ? `${tara.starName} நட்சத்திரம் என்பதால் தடங்கல்கள் வரலாம்.`
+            : `Obstacles possible due to ${tara.starName}.`;
+    }
+
+    return `${intro} ${dasaText} ${transitText} ${starText} ${focusText}`;
+};
+
 export const generate15DayForecast = (
     birthData: any,
     lang: Language = 'en'
@@ -334,7 +440,23 @@ export const generate15DayForecast = (
             bhuktiLord,
             starRating: rating,
             verdict: getStr(lang, `gocharam.status.${verdictKey}`), // Reuse/ensure keys exist
-            prediction: getStr(lang, `gocharam.predictions.mixed`), // Placeholders for now or dynamic
+            prediction: generateDailyPrediction(
+                lang,
+                dasaLord,
+                bhuktiLord,
+                antaramLord,
+                dasaScore,
+                transitScore,
+                finalScore,
+                keyTransits,
+                tara, // { score, keyFactor, starName, taraLabel }
+                {
+                    career: Math.min(100, Math.round(finalScore * 0.9 + (dasaScore > 60 ? 10 : 0))),
+                    finance: Math.min(100, Math.round(finalScore * 0.9 + (transitScore > 60 ? 10 : 0))),
+                    health: Math.min(100, Math.round(finalScore * 0.8 + 20)),
+                    rel: Math.min(100, Math.round(finalScore * 0.9))
+                }
+            ),
             keyFactors: keyTransits.slice(0, 6),
             extended: {
                 dasa: {
