@@ -210,6 +210,7 @@ export const translations = {
                 dasaStrong: "{dasa} (Dasa Lord) strongly placed.",
                 transitGood: "{planet} in {house} (Good)",
                 transitBad: "{planet} in {house} (Challenging)",
+                transitNeutral: "{planet} in {house} (Avg)",
                 transitMixed: "{planet} in {house}",
                 taraGood: "Star: {star} - {tara} (Favorable)",
                 taraBad: "Star: {star} - {tara} (Unfavorable)"
@@ -452,6 +453,7 @@ export const translations = {
                 dasaStrong: "{dasa} (தசை நாதன்) வலுவாக உள்ளார்.",
                 transitGood: "{planet} {house}-ல் (நன்று)",
                 transitBad: "{planet} {house}-ல் (சிரமம்)",
+                transitNeutral: "{planet} {house}-ல் (சராசரி)",
                 transitMixed: "{planet} {house}-ல்",
                 taraGood: "நட்சத்திரம்: {star} - {tara} (சாதகம்)",
                 taraBad: "நட்சத்திரம்: {star} - {tara} (சாதகமற்றது)"

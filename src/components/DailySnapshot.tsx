@@ -227,12 +227,17 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                                     <div className="flex justify-between items-start mb-3">
                                         <div>
                                             <div className="text-sm font-bold text-slate-200">{day.dateString}</div>
+                                            {isExtended && day.extended && (
+                                                <div className="text-[11px] font-bold text-purple-300 mt-0.5 flex items-center gap-1">
+                                                    <span>✨</span> {day.extended.nakshatra} <span className="text-slate-500 font-normal">- {day.extended.tara}</span>
+                                                </div>
+                                            )}
                                             {isExtended && day.extended ? (
                                                 <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-1">
-                                                    <div className="text-[9px] text-slate-400"><span className="text-slate-600 font-bold">D:</span> {day.extended.dasa.dasa}</div>
-                                                    <div className="text-[9px] text-slate-400"><span className="text-slate-600 font-bold">B:</span> {day.extended.dasa.bhukti}</div>
-                                                    <div className="text-[9px] text-slate-400"><span className="text-slate-600 font-bold">A:</span> {day.extended.dasa.antaram}</div>
-                                                    <div className="text-[9px] text-slate-400"><span className="text-slate-600 font-bold">S:</span> {day.extended.dasa.sookshma}</div>
+                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">D:</span> {day.extended.dasa.dasa}</div>
+                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">B:</span> {day.extended.dasa.bhukti}</div>
+                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">A:</span> {day.extended.dasa.antaram}</div>
+                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">S:</span> {day.extended.dasa.sookshma}</div>
                                                 </div>
                                             ) : (
                                                 <div className="text-xs text-slate-500 mt-0.5">{day.dasaLord} / {day.bhuktiLord}</div>

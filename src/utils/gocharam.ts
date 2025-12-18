@@ -27,6 +27,11 @@ export interface DayForecast {
             score: number;
             effect: string;
             beneficLevel: number; // 1-100
+            dasa: string;
+            bhukti: string;
+            antaram: string;
+            sookshma: string;
+            prana: string;
         };
         transit: {
             score: number;
@@ -44,6 +49,8 @@ export interface DayForecast {
         color: string;
         dos: string[];
         donts: string[];
+        nakshatra: string;
+        tara: string;
     };
 }
 
@@ -145,7 +152,7 @@ const calculateDeepDasha = (antaramPeriod: DashaPeriod, targetDate: Date): { soo
 
 
 // Helper for Tara Bala (Star Strength) with Name
-const calculateTaraBala = (dailyMoonLong: number, birthMoonLong: number, lang: 'en' | 'ta'): { score: number, keyFactor: string } => {
+const calculateTaraBala = (dailyMoonLong: number, birthMoonLong: number, lang: 'en' | 'ta'): { score: number, keyFactor: string, starName: string, taraLabel: string } => {
     // 13.3333 deg per Nakshatra
     const nakshatraSpan = 13.333333;
     const birthStarIndex = Math.floor(birthMoonLong / nakshatraSpan);
@@ -178,7 +185,7 @@ const calculateTaraBala = (dailyMoonLong: number, birthMoonLong: number, lang: '
         ? getStr(lang, "gocharam.factors.taraGood", { tara: localizedLabel, star: starName })
         : getStr(lang, "gocharam.factors.taraBad", { tara: localizedLabel, star: starName });
 
-    return { score, keyFactor };
+    return { score, keyFactor, starName, taraLabel: localizedLabel };
 };
 
 // --- MAIN PREDICTION ENGINE ---
@@ -275,14 +282,14 @@ export const generate15DayForecast = (
         if (tara.score < 0) transitScore -= 10;
         if (tara.score > 0) transitScore += 10;
 
-        keyTransits.unshift(tara.keyFactor); // Always show Tara
+        // keyTransits.unshift(tara.keyFactor); // Removed as it is now in header
 
         // Add specific transit notes for FAST MOVING planets (User Request)
         const interestingPlanets = ['Moon', 'Sun', 'Mars', 'Mercury', 'Venus'];
         let addedCount = 0;
 
         for (const pname of interestingPlanets) {
-            if (addedCount >= 4) break;
+            if (addedCount >= 6) break; // Increased limit
             const p = transitPlanets.find(tp => tp.name === pname);
             if (!p) continue;
 
@@ -294,8 +301,6 @@ export const generate15DayForecast = (
                 : pname;
 
             const rules = PLANET_TRANSIT_RULES[pname];
-            // Show Good OR Bad. Maybe Neutral too if user wants to see "where" they are?
-            // User just said "show fast moving planet".
             if (!rules) continue;
 
             if (rules.good.includes(h)) {
@@ -304,8 +309,11 @@ export const generate15DayForecast = (
             } else if (rules.bad.includes(h)) {
                 keyTransits.push(getStr(lang, "gocharam.factors.transitBad", { planet: pNameLocalized, house: h }));
                 addedCount++;
+            } else {
+                // Neutral
+                keyTransits.push(getStr(lang, "gocharam.factors.transitNeutral", { planet: pNameLocalized, house: h }));
+                addedCount++;
             }
-            // For now, ignoring Neutral to keep list clean, unless requested.
         }
 
         // 3. COMBINED SCORE
@@ -357,7 +365,9 @@ export const generate15DayForecast = (
                 luckyTime: "06:00 - 07:30", // Placeholder or implement Hora
                 color: "Red", // Placeholder or implement based on Star
                 dos: ["Focus on goals", "Pray to ancestors"],
-                donts: ["Avoid arguments", "No new loans"]
+                donts: ["Avoid arguments", "No new loans"],
+                nakshatra: tara.starName,
+                tara: tara.taraLabel
             }
         });
     }
