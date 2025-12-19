@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Send, Bot, User, AlertCircle, BrainCircuit } from 'lucide-react';
+import { useLocation } from 'react-router-dom'; // Import useLocation
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -14,6 +15,7 @@ interface AIPredictionsProps {
 
 const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const { t, language } = useLanguage();
+    const location = useLocation(); // Hook to get navigation state
     const [prediction, setPrediction] = useState<OrchestratorResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -22,6 +24,15 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const [responseLanguage, setResponseLanguage] = useState<'en' | 'ta'>('en');
     const chatEndRef = useRef<HTMLDivElement>(null);
     const { user } = useAuth(); // Auth context
+
+    // Check for initial message from navigation (e.g., from "Wrong Prediction" button)
+    useEffect(() => {
+        if (location.state && location.state.initialMessage) {
+            setQuestion(location.state.initialMessage);
+            // Optional: clear state so it doesn't persist on refresh? 
+            // window.history.replaceState({}, document.title)
+        }
+    }, [location]);
 
     // Firestore Integration
     useEffect(() => {

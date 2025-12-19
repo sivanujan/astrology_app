@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, RotateCw } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
@@ -14,7 +14,8 @@ import {
     predictDetailedMarriageTiming,
     predictMarriageType,
     predictCareerPath,
-    predictForeignTravel
+    predictForeignTravel,
+    predictCurrentLoveStatus // New Import
 } from '../utils/predictionRules';
 import { queryAstrologyOrchestrator, OrchestratorResponse, translateAnalysisReport } from '../utils/aiOrchestrator';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,12 +52,23 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
     if (!currentDasha) return <div className="text-center p-8 text-slate-400">{isTamil ? "தசை காலங்களை கணக்கிட முடியவில்லை." : "Unable to calculate Dasa periods."}</div>;
 
-    // --- Rule Based Answers ---
-    const jobPrediction = predictJobTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, language);
-    const foreignTravel = predictForeignTravel(planets, ascendant.signIndex, moon.signIndex, agScores, currentDasha, language);
-    const marriageTiming = predictDetailedMarriageTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, new Date(birthDate), 'male', dashaPeriods, language);
-    const marriageType = predictMarriageType(planets, ascendant.signIndex, agScores, currentDasha, language);
-    const careerPath = predictCareerPath(planets, ascendant.signIndex, agScores, currentDasha, language);
+    // --- Rule Based Answers (Enriched by AI) ---
+    const rawJob = predictJobTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, language);
+    const rawForeign = predictForeignTravel(planets, ascendant.signIndex, moon.signIndex, agScores, currentDasha, language);
+    const rawMarriageTime = predictDetailedMarriageTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, new Date(birthDate), 'male', dashaPeriods, language);
+    const rawMarriageType = predictMarriageType(planets, ascendant.signIndex, agScores, currentDasha, language);
+    const rawCareer = predictCareerPath(planets, ascendant.signIndex, agScores, currentDasha, language);
+    const rawLoveStatus = predictCurrentLoveStatus(planets, ascendant.signIndex, moon.signIndex, currentDasha, agScores, language); // New Prediction
+
+    // Apply AI Refinements if available
+    const jobPrediction = aiResponse?.life_guidance?.job_timing ? { ...rawJob, answer: aiResponse.life_guidance.job_timing.answer, reason: aiResponse.life_guidance.job_timing.reason } : rawJob;
+    const foreignTravel = aiResponse?.life_guidance?.foreign_travel ? { ...rawForeign, answer: aiResponse.life_guidance.foreign_travel.answer, reason: aiResponse.life_guidance.foreign_travel.reason } : rawForeign;
+    const marriageTiming = aiResponse?.life_guidance?.marriage_timing ? { ...rawMarriageTime, answer: aiResponse.life_guidance.marriage_timing.answer, reason: aiResponse.life_guidance.marriage_timing.reason } : rawMarriageTime;
+    const marriageType = aiResponse?.life_guidance?.marriage_type ? { ...rawMarriageType, answer: aiResponse.life_guidance.marriage_type.answer, reason: aiResponse.life_guidance.marriage_type.reason } : rawMarriageType;
+    const careerPath = aiResponse?.life_guidance?.career_path ? { ...rawCareer, answer: aiResponse.life_guidance.career_path.answer, reason: aiResponse.life_guidance.career_path.reason } : rawCareer;
+    // Note: AI support for loveStatus is not yet in OrchestratorResponse interface, using raw for now or if user expands schema later.
+    const loveStatus = rawLoveStatus;
+
 
     // Prepare data for AI
     const chartData = {
@@ -64,6 +76,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
         ascendant,
         subathuvamScores: agScores,
         currentDasa: currentDasha,
+        dashaPeriods, // Pass full periods for detailed prediction
         userDetails: {
             ...data.userDetails,
             uid: user?.uid // Inject UID for logging
@@ -260,135 +273,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </div>
             </motion.div>
 
-            {/* --- Lagna Summary (Moved Top) --- */}
-            {aiResponse?.bava_analysis_report && (
-                <div className="glass-panel p-6 border border-purple-800/30 bg-purple-900/10 mb-8">
-                    <h3 className="text-xl font-bold text-purple-300 mb-3 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-yellow-400" />
-                        {isTamil ? "லக்னா சுருக்கம்" : "Lagna Summary"}
-                    </h3>
-                    <p className="text-slate-200 leading-relaxed font-medium">
-                        {aiResponse.bava_analysis_report.lagna_summary}
-                    </p>
-                </div>
-            )}
-
-            {/* --- Key Life Answers (Grid) --- */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-
-                {/* 1. Job Timing */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.1 }}
-                    className="glass-panel p-6 border-l-4 border-blue-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                >
-                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                        <Briefcase className="w-24 h-24 text-blue-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
-                        <Briefcase className="w-5 h-5" />
-                        {jobPrediction.question}
-                    </h3>
-                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                        {jobPrediction.answer}
-                    </p>
-                    <div className="text-xs text-blue-400 italic border-t border-blue-900/30 pt-2">
-                        {isTamil ? "காரணம்:" : "Reasoning:"} {jobPrediction.reason}
-                    </div>
-                </motion.div>
-
-                {/* 2. Foreign Settlement (New - Top Right) */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.12 }}
-                    className="glass-panel p-6 border-l-4 border-indigo-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                >
-                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                        <Globe className="w-24 h-24 text-indigo-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-indigo-200 mb-2 flex items-center gap-2">
-                        <Globe className="w-5 h-5" />
-                        {foreignTravel.question}
-                    </h3>
-                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                        {foreignTravel.answer}
-                    </p>
-                    <div className="text-xs text-indigo-400 italic border-t border-indigo-900/30 pt-2">
-                        {isTamil ? "காரணம்:" : "Reasoning:"} {foreignTravel.reason}
-                    </div>
-                </motion.div>
-
-                {/* 3. Career Path */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.15 }}
-                    className="glass-panel p-6 border-l-4 border-cyan-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                >
-                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                        <Briefcase className="w-24 h-24 text-cyan-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-cyan-200 mb-2 flex items-center gap-2">
-                        <Briefcase className="w-5 h-5" />
-                        {careerPath.question}
-                    </h3>
-                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                        {careerPath.answer}
-                    </p>
-                    <div className="text-xs text-cyan-400 italic border-t border-cyan-900/30 pt-2">
-                        {isTamil ? "காரணம்:" : "Reasoning:"} {careerPath.reason}
-                    </div>
-                </motion.div>
-
-                {/* 4. Marriage Timing */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="glass-panel p-6 border-l-4 border-pink-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                >
-                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                        <Heart className="w-24 h-24 text-pink-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-pink-200 mb-2 flex items-center gap-2">
-                        <Heart className="w-5 h-5" />
-                        {marriageTiming.question}
-                    </h3>
-                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                        {marriageTiming.answer}
-                    </p>
-                    <div className="text-xs text-pink-400 italic border-t border-pink-900/30 pt-2">
-                        {isTamil ? "காரணம்:" : "Reasoning:"} {marriageTiming.reason}
-                    </div>
-                </motion.div>
-
-                {/* 5. Marriage Type */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="glass-panel p-6 border-l-4 border-purple-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                >
-                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                        <Sparkles className="w-24 h-24 text-purple-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-purple-200 mb-2 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5" />
-                        {marriageType.question}
-                    </h3>
-                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                        {marriageType.answer}
-                    </p>
-                    <div className="text-xs text-purple-400 italic border-t border-purple-900/30 pt-2">
-                        {isTamil ? "காரணம்:" : "Reasoning:"} {marriageType.reason}
-                    </div>
-                </motion.div>
-            </div>
-
-
-            {/* Existing House Analysis (Kept as per implicit request, assuming user meant only remove verdict) */}
+            {/* --- Loading State --- */}
             {isLoading && (
                 <div className="text-center p-12 glass-panel mt-8">
                     <Loader className="w-12 h-12 mx-auto mb-4 animate-spin text-purple-400" />
@@ -396,6 +281,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </div>
             )}
 
+            {/* --- Error State --- */}
             {error && (
                 <div className="text-center p-8 glass-panel border border-red-800/30 bg-red-900/10 mt-8">
                     <p className="text-red-400">{error}</p>
@@ -408,78 +294,282 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </div>
             )}
 
+            {/* --- AI Analysis (Lagna + Houses) --- */}
             {aiResponse?.bava_analysis_report && (
-                <div className="space-y-6 mt-8">
-                    {/* Lagna Summary - MOVED TO TOP */}
+                <div className="space-y-8 mb-12">
+                    {/* Lagna Summary */}
+                    <div className="glass-panel p-6 border border-purple-800/30 bg-purple-900/10">
+                        <h3 className="text-xl font-bold text-purple-300 mb-3 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-yellow-400" />
+                            {isTamil ? "லக்னா சுருக்கம்" : "Lagna Summary"}
+                        </h3>
+                        <p className="text-slate-200 leading-relaxed font-medium">
+                            {aiResponse.bava_analysis_report.lagna_summary}
+                        </p>
+                    </div>
 
-                    {/* House Predictions */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {aiResponse.bava_analysis_report.house_predictions.map((house, idx) => (
-                            <motion.div
-                                key={house.house_number}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.05 }}
-                                className={`glass-panel overflow-hidden border transition-colors duration-300 ${expandedId === idx
-                                    ? 'border-purple-500/50 bg-slate-900/80'
-                                    : 'border-slate-700/50 bg-slate-900/40 hover:bg-slate-800/50'
-                                    }`}
-                            >
-                                <button
-                                    onClick={() => toggleExpand(idx)}
-                                    className="w-full px-4 py-4 flex items-center justify-between text-left"
+                    {/* House Predictions Grid */}
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-200 mb-4 flex items-center gap-2">
+                            <Star className="w-5 h-5 text-purple-400" />
+                            {isTamil ? "பாவக பலன்கள் (12 வீடுகள்)" : "House-by-House Analysis"}
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {aiResponse.bava_analysis_report.house_predictions.map((house, idx) => (
+                                <motion.div
+                                    key={house.house_number}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                    className={`glass-panel overflow-hidden border transition-colors duration-300 ${expandedId === idx
+                                        ? 'border-purple-500/50 bg-slate-900/80'
+                                        : 'border-slate-700/50 bg-slate-900/40 hover:bg-slate-800/50'
+                                        }`}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${house.status === 'Strong' || house.status === 'Excellent'
-                                            ? 'bg-green-600/30 text-green-300'
-                                            : house.status === 'Weak'
-                                                ? 'bg-red-600/30 text-red-300'
-                                                : 'bg-yellow-600/30 text-yellow-300'
-                                            }`}>
-                                            {house.house_number}
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-semibold text-white">{house.title}</h3>
-                                            <span className={`text-xs ${house.status === 'Strong' || house.status === 'Excellent'
-                                                ? 'text-green-400'
+                                    <button
+                                        onClick={() => toggleExpand(idx)}
+                                        className="w-full px-4 py-4 flex items-center justify-between text-left"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${house.status === 'Strong' || house.status === 'Excellent'
+                                                ? 'bg-green-600/30 text-green-300'
                                                 : house.status === 'Weak'
-                                                    ? 'text-red-400'
-                                                    : 'text-yellow-400'
+                                                    ? 'bg-red-600/30 text-red-300'
+                                                    : 'bg-yellow-600/30 text-yellow-300'
                                                 }`}>
-                                                {house.status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {expandedId === idx ? (
-                                        <ChevronUp className="w-5 h-5 text-purple-400" />
-                                    ) : (
-                                        <ChevronDown className="w-5 h-5 text-slate-500" />
-                                    )}
-                                </button>
-
-                                <AnimatePresence>
-                                    {expandedId === idx && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.3 }}
-                                        >
-                                            <div className="px-4 pb-4 pt-2 border-t border-slate-800/50">
-                                                <p className="text-slate-300 text-sm leading-relaxed mb-3">{house.analysis}</p>
-                                                <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/30">
-                                                    <span className="text-xs font-bold text-purple-400">{isTamil ? "குருஜி விதி:" : "Guruji Rule:"}</span>
-                                                    <p className="text-xs text-slate-400 mt-1 italic">{house.guruji_rule_applied}</p>
-                                                </div>
+                                                {house.house_number}
                                             </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </motion.div>
-                        ))}
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-white">{house.title}</h3>
+                                                <span className={`text-xs ${house.status === 'Strong' || house.status === 'Excellent'
+                                                    ? 'text-green-400'
+                                                    : house.status === 'Weak'
+                                                        ? 'text-red-400'
+                                                        : 'text-yellow-400'
+                                                    }`}>
+                                                    {house.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {expandedId === idx ? (
+                                            <ChevronUp className="w-5 h-5 text-purple-400" />
+                                        ) : (
+                                            <ChevronDown className="w-5 h-5 text-slate-500" />
+                                        )}
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {expandedId === idx && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.3 }}
+                                            >
+                                                <div className="px-4 pb-4 pt-2 border-t border-slate-800/50">
+                                                    <p className="text-slate-300 text-sm leading-relaxed mb-3">{house.analysis}</p>
+                                                    <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/30">
+                                                        <span className="text-xs font-bold text-purple-400">{isTamil ? "குருஜி விதி:" : "Guruji Rule:"}</span>
+                                                        <p className="text-xs text-slate-400 mt-1 italic">{house.guruji_rule_applied}</p>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
+
+            {/* --- Key Life Answers (Rule Based) --- */}
+            <div>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-slate-200 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-blue-400" />
+                        {isTamil ? "வாழ்க்கை வழிகாட்டி (Questions)" : "Life Guidance (Questions)"}
+                    </h3>
+                    <button
+                        onClick={() => fetchAnalysis(true)}
+                        disabled={isLoading}
+                        className="text-xs flex items-center gap-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 px-3 py-1.5 rounded-full border border-blue-500/30 transition"
+                    >
+                        <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                        {isTamil ? "மீண்டும் ஆய்வு செய்" : "Check Again"}
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+
+                    {/* 1. Job Timing */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.1 }}
+                        className="glass-panel p-6 border-l-4 border-blue-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                    >
+                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                            <Briefcase className="w-24 h-24 text-blue-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
+                            <Briefcase className="w-5 h-5" />
+                            {jobPrediction.question}
+                        </h3>
+                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                            {jobPrediction.answer}
+                        </p>
+                        <div className="text-xs text-blue-400 italic border-t border-blue-900/30 pt-2 flex justify-between items-center">
+                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {jobPrediction.reason}</span>
+                            <button
+                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Job Timing prediction is wrong. ${jobPrediction.answer}` } })}
+                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                            >
+                                {isTamil ? "தவறா?" : "Wrong?"}
+                            </button>
+                        </div>
+                    </motion.div>
+
+                    {/* 2. Foreign Settlement (New - Top Right) */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.12 }}
+                        className="glass-panel p-6 border-l-4 border-indigo-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                    >
+                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                            <Globe className="w-24 h-24 text-indigo-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-indigo-200 mb-2 flex items-center gap-2">
+                            <Globe className="w-5 h-5" />
+                            {foreignTravel.question}
+                        </h3>
+                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                            {foreignTravel.answer}
+                        </p>
+                        <div className="text-xs text-indigo-400 italic border-t border-indigo-900/30 pt-2 flex justify-between items-center">
+                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {foreignTravel.reason}</span>
+                            <button
+                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Foreign Travel prediction is wrong. ${foreignTravel.answer}` } })}
+                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                            >
+                                {isTamil ? "தவறா?" : "Wrong?"}
+                            </button>
+                        </div>
+                    </motion.div>
+
+                    {/* 3. Career Path */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.15 }}
+                        className="glass-panel p-6 border-l-4 border-cyan-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                    >
+                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                            <Briefcase className="w-24 h-24 text-cyan-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-cyan-200 mb-2 flex items-center gap-2">
+                            <Briefcase className="w-5 h-5" />
+                            {careerPath.question}
+                        </h3>
+                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                            {careerPath.answer}
+                        </p>
+                        <div className="text-xs text-cyan-400 italic border-t border-cyan-900/30 pt-2 flex justify-between items-center">
+                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {careerPath.reason}</span>
+                            <button
+                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Career Path prediction is wrong. ${careerPath.answer}` } })}
+                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                            >
+                                {isTamil ? "தவறா?" : "Wrong?"}
+                            </button>
+                        </div>
+                    </motion.div>
+
+                    {/* 4. Current Love Status */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.18 }}
+                        className="glass-panel p-6 border-l-4 border-rose-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                    >
+                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                            <Heart className="w-24 h-24 text-rose-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
+                            <Heart className="w-5 h-5" />
+                            {loveStatus.question}
+                        </h3>
+                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                            {loveStatus.answer}
+                        </p>
+                        <div className="text-xs text-rose-400 italic border-t border-rose-900/30 pt-2 flex justify-between items-center">
+                            <span className="whitespace-pre-line">{isTamil ? "காரணம்:" : "Reasoning:"} {loveStatus.reason}</span>
+                            <button
+                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Current Love Status prediction is wrong. ${loveStatus.answer}` } })}
+                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                            >
+                                {isTamil ? "தவறா?" : "Wrong?"}
+                            </button>
+                        </div>
+                    </motion.div>
+
+                    {/* 5. Marriage Timing */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.2 }}
+                        className="glass-panel p-6 border-l-4 border-pink-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                    >
+                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                            <Heart className="w-24 h-24 text-pink-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-pink-200 mb-2 flex items-center gap-2">
+                            <Heart className="w-5 h-5" />
+                            {marriageTiming.question}
+                        </h3>
+                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                            {marriageTiming.answer}
+                        </p>
+                        <div className="text-xs text-pink-400 italic border-t border-pink-900/30 pt-2 flex justify-between items-center">
+                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageTiming.reason}</span>
+                            <button
+                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Timing prediction is wrong. ${marriageTiming.answer}. My Age is ${new Date().getFullYear() - new Date(birthDate).getFullYear()}` } })}
+                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                            >
+                                {isTamil ? "தவறா?" : "Wrong?"}
+                            </button>
+                        </div>
+                    </motion.div>
+
+                    {/* 5. Marriage Type */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.3 }}
+                        className="glass-panel p-6 border-l-4 border-purple-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                    >
+                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                            <Sparkles className="w-24 h-24 text-purple-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-purple-200 mb-2 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5" />
+                            {marriageType.question}
+                        </h3>
+                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                            {marriageType.answer}
+                        </p>
+                        <div className="text-xs text-purple-400 italic border-t border-purple-900/30 pt-2 flex justify-between items-center">
+                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageType.reason}</span>
+                            <button
+                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Type prediction is wrong. ${marriageType.answer}` } })}
+                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                            >
+                                {isTamil ? "தவறா?" : "Wrong?"}
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
 
             {/* Ask AI Button */}
             <motion.div

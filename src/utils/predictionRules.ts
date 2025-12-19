@@ -739,7 +739,7 @@ export const predictDetailedMarriageTiming = (
 
     const rahu = getPlanetPosition(planets, 'Rahu');
     const ketu = getPlanetPosition(planets, 'Ketu');
-    // Updated Key Planets for Marriage: 2, 7, 11 AND 3 (Attempts) + Venus
+    // Key Planets for Marriage
     const keyPlanets = [lord2, lord7, lord11, lord3, venus];
 
     if (rahu && [house2Sign, house7Sign, house8Sign].includes(rahu.signIndex)) keyPlanets.push('Rahu');
@@ -748,37 +748,41 @@ export const predictDetailedMarriageTiming = (
     const isKeyPlanet = (planetName: string) => keyPlanets.includes(planetName);
 
     // --- Precision Engine Execution ---
-    let answer = "";
-    let reason = "";
-    let isFavorable = false;
-    let predictionDetails: string[] = [];
-
-    // Store years for summary
-    const favorableYears = new Set<number>();
-
     const now = new Date();
+    const currentAge = now.getFullYear() - birthDate.getFullYear();
+    const age21Date = new Date(birthDate.getFullYear() + 21, birthDate.getMonth(), birthDate.getDate());
 
-    // 1. Scan Future Periods (Step 1: Dasa/Bhukti Filter)
+    const pastFavorableYears = new Set<number>();
+    const futureFavorableYears = new Set<number>();
+    const pastDetails: string[] = [];
+    const futureDetails: string[] = [];
+
+    // Store ALL potential periods
     if (allDashaPeriods.length > 0) {
         for (const maha of allDashaPeriods) {
-            if (maha.endDate < now) continue;
+            // Skip periods completely before Age 21
+            if (maha.endDate < age21Date) continue;
 
             if (maha.subPeriods) {
                 for (const bhukti of maha.subPeriods) {
-                    if (bhukti.endDate < now) continue;
+                    if (bhukti.endDate < age21Date) continue;
 
                     // Age Check
                     const bhuktiMidDate = new Date((bhukti.startDate.getTime() + bhukti.endDate.getTime()) / 2);
                     const ageAtBhukti = bhuktiMidDate.getFullYear() - birthDate.getFullYear();
+                    // Double check age
                     if (ageAtBhukti < 21) continue;
 
-                    // Step 1: Check if Bhukti Lord is connected to 3, 7, 11 (Key Planet)
+                    // Step 1: Check if Bhukti Lord is connected to 3, 7, 11 OR is Venus
                     if (isKeyPlanet(bhukti.planet)) {
 
                         // Step 2: Jupiter Filter (Year Check)
                         // Scan for favorable Jupiter periods within this Bhukti
+                        // Note: For PAST periods, we should ideally check historical transits.
+                        // However, assuming `getJupiterFavorablePeriods` can handle past dates roughly or strict check.
+                        // Our helper uses `calculatePlanetaryPositions` which handles past dates!
                         const jupiterWindows = getJupiterFavorablePeriods(
-                            bhukti.startDate < now ? now : bhukti.startDate, // Start from now if Bhukti active
+                            bhukti.startDate,
                             bhukti.endDate,
                             ascendantSign,
                             moonSign,
@@ -787,11 +791,10 @@ export const predictDetailedMarriageTiming = (
 
                         if (jupiterWindows.length > 0) {
                             for (const jWindow of jupiterWindows) {
-                                // Add Year to Set
-                                favorableYears.add(jWindow.start.getFullYear());
-                                favorableYears.add(jWindow.end.getFullYear());
+                                const year = jWindow.start.getFullYear();
+                                const isPast = jWindow.end < now;
 
-                                // Step 3: Sun Filter (Month Check)
+                                // Step 3: Sun Filter (Month Check) within valid Jupiter window
                                 const sunWindows = getSunFavorablePeriods(
                                     jWindow.start,
                                     jWindow.end,
@@ -800,19 +803,25 @@ export const predictDetailedMarriageTiming = (
                                 );
 
                                 if (sunWindows.length > 0) {
-                                    // Found precise dates!
                                     sunWindows.forEach(sw => {
-                                        // Format: "May 2026 - Jun 2026"
+                                        // Format details
                                         const startStr = sw.start.toLocaleDateString(language, { month: 'short', year: 'numeric' });
                                         const endStr = sw.end.toLocaleDateString(language, { month: 'short', year: 'numeric' });
 
                                         const detail = isTamil
-                                            ? `**${sw.start.getFullYear()}**: ${startStr} முதல் ${endStr} வரை (புத்தி: ${bhukti.planet})`
-                                            : `**${sw.start.getFullYear()}**: ${startStr} to ${endStr} (Bhukti: ${bhukti.planet})`;
+                                            ? `**${sw.start.getFullYear()}**: ${startStr} - ${endStr} (புத்தி: ${bhukti.planet})`
+                                            : `**${sw.start.getFullYear()}**: ${startStr} - ${endStr} (Bhukti: ${bhukti.planet})`;
 
-                                        // Avoid duplicates if possible, or just push
-                                        if (predictionDetails.length < 3) { // Limit to top 3
-                                            predictionDetails.push(detail);
+                                        if (isPast) {
+                                            pastFavorableYears.add(year);
+                                            // Keep simplified list for past
+                                            if (!pastDetails.includes(detail)) pastDetails.push(detail);
+                                        } else {
+                                            futureFavorableYears.add(year);
+                                            // Limit future suggestions to reasonable count
+                                            if (futureDetails.length < 5 && !futureDetails.includes(detail)) {
+                                                futureDetails.push(detail);
+                                            }
                                         }
                                     });
                                 }
@@ -825,32 +834,68 @@ export const predictDetailedMarriageTiming = (
     }
 
     // --- Construct Answer ---
-    const sortedYears = Array.from(favorableYears).sort((a, b) => a - b).slice(0, 2); // Next 2 likely years
+    let answer = "";
+    let reason = "";
+    let isFavorable = false;
 
-    if (sortedYears.length > 0) {
-        if (isTamil) {
-            answer = `திருமணம் நடக்க அதிக வாய்ப்புள்ள ஆண்டுகள்: **${sortedYears.join(", ")}**\n\n`;
-            answer += `குறிப்பிட்ட காலங்கள்:\n` + predictionDetails.join("\n");
-        } else {
-            answer = `Most Likely Marriage Years: **${sortedYears.join(", ")}**\n\n`;
-            answer += `Specific Favorable Periods:\n` + predictionDetails.join("\n");
-        }
+    // Filter Logic:
+    // 1. If User Age > 40, prioritize Past Dates diagnosis + Next Immediate Future.
+    // 2. If User Age < 30, prioritize Future Dates.
+
+    const sortedFutureYears = Array.from(futureFavorableYears).sort((a, b) => a - b);
+    const sortedPastYears = Array.from(pastFavorableYears).sort((a, b) => b - a); // Descending (recent past first)
+
+    // Filter far future dates (e.g. > current_year + 10)
+    const realisticFutureYears = sortedFutureYears.filter(y => y <= now.getFullYear() + 10);
+    const farFutureYears = sortedFutureYears.filter(y => y > now.getFullYear() + 10);
+
+    const hasStrongFuture = realisticFutureYears.length > 0;
+    const hasStrongPast = sortedPastYears.length > 0;
+
+    if (hasStrongFuture) {
+        const topYears = realisticFutureYears.slice(0, 3).join(", ");
+        answer = isTamil
+            ? `திருமணம் நடக்க வாய்ப்புள்ள ஆண்டுகள்: **${topYears}**\n\n`
+            : `Most Likely Marriage Years: **${topYears}**\n\n`;
+
+        // Add details corresponding to these years
+        const relevantDetails = futureDetails.filter(d => realisticFutureYears.some(y => d.includes(y.toString()))).slice(0, 3);
+        answer += isTamil ? `குறிப்பிட்ட காலங்கள்:\n${relevantDetails.join("\n")}` : `Specific Favorable Periods:\n${relevantDetails.join("\n")}`;
+
         isFavorable = true;
     } else {
-        answer = isTamil
-            ? "அடுத்த சில ஆண்டுகளில் திருமணத்திற்கு மிகச் சிறந்த அமைப்பு இல்லை. (தசை அல்லது குரு பலம் குறைவு)."
-            : "No very strong marriage window found in the next few years (Dasa or Jupiter strength low).";
-        isFavorable = false;
+        // No immediate future. Check Past.
+        if (hasStrongPast) {
+            // User likely missed the periods or is already married (but asking "when").
+            // Or delay due to heavy Paabathuvam.
+            const pastTop = sortedPastYears.slice(0, 3).join(", ");
+            if (currentAge > 35) {
+                answer = isTamil
+                    ? `ஜாதகப்படி **${pastTop}** ஆகிய ஆண்டுகளில் வலுவான திருமண யோகம் இருந்தது. \n\nதற்போது குறிப்பிடத்தகுந்த யோகம் அருகில் இல்லை. (பரிகாரம் தேவை).`
+                    : `According to the chart, strong marriage yogas occurred in **${pastTop}**. \n\nCurrently, there are no immediate strong indications in the near future.`;
+            } else {
+                // Young but no near future?
+                answer = isTamil
+                    ? `அடுத்த 5-7 ஆண்டுகளில் வலுவான யோகம் இல்லை. (${now.getFullYear() + 7}-க்கு பிறகு வாய்ப்பு).`
+                    : `No strong yoga found in the immediate 5-7 years timeline.`;
+            }
+            if (farFutureYears.length > 0) {
+                answer += isTamil ? `\n\nஅடுத்த சாத்தியம்: ${farFutureYears[0]}` : `\n\nNext possibility: ${farFutureYears[0]}`;
+            }
+            isFavorable = false;
+        } else {
+            // No past, no future?? Strange chart or strict filter.
+            answer = isTamil
+                ? "ஜாதகத்தில் திருமண யோகம் தாமதமாக உள்ளது. பரிகாரங்களை மேற்கொள்ளவும்."
+                : "Marriage indications are delayed/weak in this chart. Remedies recommended.";
+            isFavorable = false;
+        }
     }
 
     if (isTamil) {
-        reason = `விதி: 3, 7, 11 அதிபதிகளின் தசை/புத்தியில், குரு மற்றும் சூரியன் பலம் பெறும் காலங்கள்.\n` +
-            `- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n` +
-            `- தற்போதைய தசை: ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
+        reason = `விதி: 3, 7, 11 அதிபதிகளின் தசை/புத்தியில், குரு மற்றும் சூரியன் பலம் பெறும் காலங்கள்.\n- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n- தற்போதைய தசை: ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
     } else {
-        reason = `Rule: Marriage happens during Dasa/Bhukti of 3, 7, 11 Lords, combining with favorable Jupiter (Year) and Sun (Month) transits.\n` +
-            `- Key Planets Checked: ${keyPlanets.join(', ')}\n` +
-            `- Current Status: Running ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
+        reason = `Rule: Marriage happens during Dasa/Bhukti of 3, 7, 11 Lords, combining with favorable Jupiter (Year) and Sun (Month) transits.\n- Key Planets Checked: ${keyPlanets.join(', ')}\n- Current Status: Running ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
     }
 
     return {
@@ -1328,6 +1373,148 @@ export const predictForeignTravel = (
         question,
         answer,
         reason: isTamil ? `**காரணங்கள்:**\n- ${reasonText}` : `**Reasons:**\n- ${reasonText}`,
+        isFavorable
+    };
+};
+
+// 6. Predict Current Love Status
+export const predictCurrentLoveStatus = (
+    planets: any[],
+    ascendantSign: number,
+    moonSign: number,
+    currentDasa: { maha: DashaPeriod, bhukti?: DashaPeriod },
+    agScores: Record<string, SubathuvamResult>,
+    language: 'en' | 'ta' = 'en'
+): PredictionResult => {
+    const isTamil = language === 'ta';
+    const question = isTamil ? "நான் இப்போது காதலில் உள்ளேனா?" : "Am I currently in love / Is love favorable?";
+
+    // --- Part 1: Birth Chart Analysis (Love Potential) ---
+    let chartScore = 0;
+    const house5Sign = (ascendantSign + 4) % 12;
+    const house7Sign = (ascendantSign + 6) % 12;
+    const house9Sign = (ascendantSign + 8) % 12;
+
+    const lord5 = SIGN_LORDS[house5Sign];
+    const lord7 = SIGN_LORDS[house7Sign];
+    const lord9 = SIGN_LORDS[house9Sign];
+
+    const pVenus = getPlanetPosition(planets, 'Venus');
+    const pMars = getPlanetPosition(planets, 'Mars');
+    const p5Lord = getPlanetPosition(planets, lord5);
+    const p7Lord = getPlanetPosition(planets, lord7);
+    const p9Lord = getPlanetPosition(planets, lord9);
+    const pJupiter = getPlanetPosition(planets, 'Jupiter');
+    const pRahu = getPlanetPosition(planets, 'Rahu');
+    const pKetu = getPlanetPosition(planets, 'Ketu');
+
+    // 1. 5th-7th Lord Connection
+    let has5_7_Connection = false;
+    if (p5Lord && p7Lord) {
+        // Conjunction
+        if (p5Lord.signIndex === p7Lord.signIndex) has5_7_Connection = true;
+        // Exchange (Parivartana)
+        if (p5Lord.signIndex === house7Sign && p7Lord.signIndex === house5Sign) has5_7_Connection = true;
+        // Mutual Aspect (7th aspect)
+        if (Math.abs(p5Lord.signIndex - p7Lord.signIndex) === 6) has5_7_Connection = true;
+    }
+    if (has5_7_Connection) chartScore += 2; // Weight: 2 (Primary)
+
+    // 2. Venus Strength (Check Subathuvam)
+    if (agScores['Venus'] && agScores['Venus'].totalScore >= 50) chartScore += 1;
+
+    // 3. Venus-Mars Connection (Passion)
+    if (pVenus && pMars) {
+        if (pVenus.signIndex === pMars.signIndex || Math.abs(pVenus.signIndex - pMars.signIndex) === 6) {
+            chartScore += 1;
+        }
+    }
+
+    // 4. Rahu/Ketu Influence (Unconventional)
+    // Rahu in 5th or 7th?
+    if (pRahu && (pRahu.signIndex === house5Sign || pRahu.signIndex === house7Sign)) chartScore += 1;
+
+    // 5. Jupiter Aspect on 7th House (Legitimacy)
+    // Jupiter aspects 5, 7, 9 positions from itself
+    if (pJupiter) {
+        const jupiterAspects = [
+            (pJupiter.signIndex + 4) % 12, // 5th aspect
+            (pJupiter.signIndex + 6) % 12, // 7th aspect
+            (pJupiter.signIndex + 8) % 12  // 9th aspect
+        ];
+        if (jupiterAspects.includes(house7Sign)) chartScore += 1;
+    }
+
+    // 6. 9th House Connection (Parental Approval usually aids serious love)
+    // If 9th Lord connects with 5th or 7th
+    if (p9Lord && (p9Lord.signIndex === house5Sign || p9Lord.signIndex === house7Sign)) chartScore += 1;
+
+
+    // --- Part 2: Dasa Bhukti Analysis (Current Status) ---
+    let dasaScore = 0;
+    const mahaPlanet = currentDasa.maha.planet;
+    const bhuktiPlanet = currentDasa.bhukti?.planet || "";
+
+    const lovePlanets = ['Venus', 'Mars', 'Rahu', 'Moon', 'Mercury'];
+
+    // 1. Is Maha Dasa a love planet?
+    if (lovePlanets.includes(mahaPlanet)) dasaScore += 1;
+    if (mahaPlanet === 'Venus') dasaScore += 1; // Bonus for Venus
+
+    // 2. Is Bhukti a love planet?
+    if (lovePlanets.includes(bhuktiPlanet)) dasaScore += 2; // Bhukti is more active now
+    if (bhuktiPlanet === 'Venus') dasaScore += 1;
+
+    // 3. Is Dasa/Bhukti planet the 5th or 7thLord?
+    if (mahaPlanet === lord5 || mahaPlanet === lord7) dasaScore += 2;
+    if (bhuktiPlanet === lord5 || bhuktiPlanet === lord7) dasaScore += 2;
+
+    // --- Final Determination ---
+    // Decision Tree logic
+    let answer = "";
+    let reason = "";
+    let isFavorable = false;
+
+    // Thresholds
+    const isChartStrong = chartScore >= 3;
+    const isDasaActive = dasaScore >= 3;
+
+    if (isChartStrong && isDasaActive) {
+        answer = isTamil
+            ? "ஆம்! தற்போது நீங்கள் காதலில் இருக்கவோ அல்லது காதல் வயப்படவோ அதிக வாய்ப்புள்ளது. (சாதகமான தசை/புத்தி)."
+            : "YES! High probability you are currently in love or will fall in love soon. (Favorable Dasa/Bhukti).";
+        isFavorable = true;
+    } else if (isChartStrong && !isDasaActive) {
+        answer = isTamil
+            ? "காதல் வாய்ப்பு ஜாதகத்தில் உள்ளது, ஆனால் தற்போது காலம் முழுமையாக கனியவில்லை. ( காத்திருங்கள்)."
+            : "Love potential exists in chart, but current timing is not fully active. (Waiting phase).";
+        isFavorable = false;
+    } else if (!isChartStrong && isDasaActive) {
+        answer = isTamil
+            ? "தற்காலிகமான ஈர்ப்பு ஏற்படலாம். ஆனால் ஆழமான காதலாக மாறுவது கடினம்."
+            : "Temporary attraction is possible. But difficult to turn into deep, lasting love.";
+        isFavorable = false;
+    } else {
+        answer = isTamil
+            ? "தற்போது காதலில் ஈடுபாடு குறைவு. கவனம் வேறு திசையில் இருக்கலாம்."
+            : "Currently prediction shows low interest in love. Focus might be on Career/Family.";
+        isFavorable = false;
+    }
+
+    if (isTamil) {
+        reason = `விதி: ஜாதகத்தில் 5-7 தொடர்பு + தற்போதைய தசை/புத்தி ஆதரவு.\n` +
+            `- ஜாதக வலிமை: ${chartScore >= 3 ? "வலுவானது" : "சராசரி"} (${chartScore}/7)\n` +
+            `- தசை நிலை: ${isDasaActive ? "சாதகம்" : "சாதகமில்லை"} (தசை: ${mahaPlanet}, புத்தி: ${bhuktiPlanet})`;
+    } else {
+        reason = `Rule: 5th-7th Connection in Chart + Favorable Dasa/Bhukti.\n` +
+            `- Chart Strength: ${chartScore >= 3 ? "Strong" : "Average"} (${chartScore}/7 Indicators)\n` +
+            `- Dasa Status: ${isDasaActive ? "Active" : "Inactive"} (Running ${mahaPlanet} Dasa, ${bhuktiPlanet} Bhukti)`;
+    }
+
+    return {
+        question,
+        answer,
+        reason,
         isFavorable
     };
 };

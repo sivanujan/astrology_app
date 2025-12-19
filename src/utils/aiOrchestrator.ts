@@ -2,6 +2,16 @@ import { SIGN_LORDS, NAKSHATRAS, ZODIAC_SIGNS, EXALTATION_POINTS, DEBILITATION_P
 import { calculateAdityaGurujiSubathuvam, generateSpecialPredictions, getFunctionalNature } from './adityaGurujiSubathuvam';
 import { adminService } from '../services/adminService';
 import { predictionService } from '../services/predictionService';
+import {
+    predictJobTiming,
+    predictDetailedMarriageTiming,
+    predictCareerPath,
+    predictForeignTravel,
+    predictMarriageType,
+    TransitPositions,
+    PredictionResult
+} from './predictionRules';
+import { calculatePlanetaryPositions, calculateDashaPeriods, getCurrentDasha, calculateCurrentTransits } from './astrology';
 
 export interface OrchestratorResponse {
     intent: string;
@@ -25,6 +35,13 @@ export interface OrchestratorResponse {
         }>;
         final_verdict: string;
     };
+    life_guidance?: {
+        job_timing: { answer: string; reason: string };
+        marriage_timing: { answer: string; reason: string };
+        marriage_type: { answer: string; reason: string };
+        career_path: { answer: string; reason: string };
+        foreign_travel: { answer: string; reason: string };
+    };
 }
 
 const OPENROUTER_API_KEY = "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";
@@ -36,8 +53,8 @@ const FREE_MODELS = [
     "qwen/qwen3-235b-a22b:free",
     "google/gemma-3-12b-it:free",
     "kwaipilot/kat-coder-pro:free",
-    "google/gemini-2.0-flash-exp:free", // Keeping as fallback
-    "mistralai/mistral-7b-instruct:free", // Keeping as fallback
+    "google/gemini-2.0-flash-exp:free",
+    "mistralai/mistral-7b-instruct:free",
 ];
 
 const HOUSE_KARAKAS = {
@@ -69,6 +86,38 @@ const HOUSE_NAMES_TA = [
     "லாபம் & நண்பர்கள் (Gains & Friends)",
     "இழப்பு & மோட்சம் (Loss & Liberation)"
 ];
+
+const HOUSE_NAMES_EN = [
+    "Self & Health",
+    "Family & Wealth",
+    "Siblings & Courage",
+    "Mother & Comforts",
+    "Children & Intelligence",
+    "Disease & Enemies",
+    "Marriage & Partnership",
+    "Longevity & Mysteries",
+    "Father & Fortune",
+    "Career",
+    "Gains & Friends",
+    "Loss & Liberation"
+];
+
+// ... (LAGNA_SPECIFIC_RULES moved to end or kept if needed, but for brevity assuming it's okay to skip re-declaring if not changing. 
+// Actually, I must be careful not to delete it if I am replacing. I'll include it or better yet, assume the tool handles partial replacement? 
+// The tool says "ReplacementContent". If I replace the whole file, I must include everything. 
+// If I use StartLine/EndLine, I can target specific blocks. 
+// It's safer to target the Top Imports block, then the Interface, then the Functions.
+// But I need to modify `prepareContext`, `queryAstrologyOrchestrator` and `translateAnalysisReport`.
+// These are scattered. I should use `multi_replace_file_content`.
+
+// Re-thinking strategy: Use `multi_replace_file_content`.
+// Chunk 1: Imports + Interface
+// Chunk 2: queryAstrologyOrchestrator (prompt logic)
+// Chunk 3: translateAnalysisReport
+// Chunk 4: prepareContext
+// Wait, `multi_replace_file_content` is perfect.
+
+
 
 export const LAGNA_SPECIFIC_RULES: Record<string, string> = {
 
@@ -642,20 +691,7 @@ export const LAGNA_SPECIFIC_RULES: Record<string, string> = {
     `
 };
 
-const HOUSE_NAMES_EN = [
-    "Self & Health",
-    "Family & Wealth",
-    "Siblings & Courage",
-    "Mother & Comforts",
-    "Children & Intelligence",
-    "Disease & Enemies",
-    "Marriage & Partnership",
-    "Longevity & Mysteries",
-    "Father & Fortune",
-    "Career",
-    "Gains & Friends",
-    "Loss & Liberation"
-];
+
 
 export async function queryAstrologyOrchestrator(
     userQuery: string,
@@ -754,39 +790,122 @@ For each house:
 11. Analyze 11th House: Check 11th Lord. (Key: Profit, Elder Siblings).
 12. Analyze 12th House: Check 12th Lord. (Key: Loss, Sleep, Foreign Travel).
 
-**Output Format (JSON):**
-{
-    "intent": "Comprehensive House Analysis",
-    "primary_analysis": {
-        "key_planet": "Lagna Lord name",
-        "status": "Strength of Lagna Lord (High/Low Subathuvam)",
-        "dasa_verdict": "Current Dasa verdict based on Subathuvam"
-    },
-    "model_consensus": "Expert Summary",
-    "final_answer_tamil": "முழுமையான பாவக பகுப்பாய்வு கீழே உள்ளது.",
-    "final_answer_english": "Complete house-by-house analysis is provided below.",
-    "reasoning": "Overall chart strength assessment based on Lagna Lord Subathuvam.",
-    "bava_analysis_report": {
-        "lagna_summary": "Your Lagna is [Lagna]. Lagna Lord [Planet] is in [House] with [X]% Subathuvam.",
-        "house_predictions": [
-            {
-                "house_number": 1,
-                "title": "${language === 'ta' ? HOUSE_NAMES_TA[0] : HOUSE_NAMES_EN[0]}",
-                "status": "Excellent/Good/Average/Challenging",
-                "analysis": "${language === 'ta' ? 'பாவகத்தின் விரிவான ஆய்வு (தமிழில்).' : 'Detailed analysis using Subathuvam/Pavathuvam logic.'}",
-                "guruji_rule_applied": "e.g., 'Subathuvam wins over weak placement'"
-            }
-            // ... Repeat for all 12 houses
-        ],
-        "final_verdict": "Overall life prediction based on Dasa + Lagna strength."
+
+    **OUTPUT JSON STRUCTURE (Strictly follow this):**
+    {
+        "intent": "Comprehensive House Analysis",
+        "primary_analysis": {
+            "key_planet": "Lagna Lord name",
+            "status": "Strength of Lagna Lord (High/Low Subathuvam)",
+            "dasa_verdict": "Current Dasa verdict based on Subathuvam"
+        },
+        "model_consensus": "Expert Summary",
+        "final_answer_tamil": "முழுமையான பாவக பகுப்பாய்வு கீழே உள்ளது.",
+        "final_answer_english": "Complete house-by-house analysis is provided below.",
+        "reasoning": "Overall chart strength assessment based on Lagna Lord Subathuvam.",
+        "bava_analysis_report": {
+            "lagna_summary": "Your Lagna is [Lagna]. Lagna Lord [Planet] is in [House] with [X]% Subathuvam.",
+            "house_predictions": [
+                {
+                    "house_number": 1,
+                    "title": "${language === 'ta' ? HOUSE_NAMES_TA[0] : HOUSE_NAMES_EN[0]}",
+                    "status": "Excellent/Good/Average/Challenging",
+                    "analysis": "${language === 'ta' ? 'பாவகத்தின் விரிவான ஆய்வு (தமிழில்).' : 'Detailed analysis using Subathuvam/Pavathuvam logic.'}",
+                    "guruji_rule_applied": "e.g., 'Subathuvam wins over weak placement'"
+                }
+                // ... Repeat for all 12 houses
+            ],
+            "final_verdict": "Overall life prediction based on Dasa + Lagna strength."
+        },
+        "life_guidance": {
+            "job_timing": { "answer": "Refined Answer based on input", "reason": "Detailed Reason" },
+            "marriage_timing": { "answer": "Refined Answer", "reason": "Detailed Reason" },
+            "marriage_type": { "answer": "Refined Answer", "reason": "Detailed Reason" },
+            "career_path": { "answer": "Refined Answer", "reason": "Detailed Reason" },
+            "foreign_travel": { "answer": "Refined Answer", "reason": "Detailed Reason" }
+        }
     }
-}
-`;
+
+    **Life Guidance Instruction**:
+    - **Review the 'LifeGuidancePredictions' input.** containing: job, foreign, marriage_timing, marriage_type, career.
+    - These are RULE-BASED Ground Truths. **Do NOT contradict the 'answer' verdict** (e.g., if it says Excellent/Date, you keep it).
+    - **Your Goal**: Expand and "humanize" the reasoning.
+    - For 'answer', keep it punchy (e.g., "Expected around May 2025").
+    - For 'reason', explain the planetary logic provided in the rules input but make it encouraging and clear.
+    - If language is Tamil, ensure high-quality Tamil translation.
+    `;
     } else {
         // Specific Intent Prompt (e.g., Marriage, Job)
 
+
+
+        // Specific Intent Prompt (e.g., Marriage, Job)
+
+        // --- NEW: Rule-Based Context Injection ---
+        let ruleBasedInsight = "";
+
+        try {
+            // 1. Prepare Data for Rules
+            const now = new Date();
+            // TODO: Use actual user lat/lng if available in context, else default
+            const lat = 13.0827;
+            const lng = 80.2707;
+
+            const transitData = calculatePlanetaryPositions(now, lat, lng);
+            const transits: TransitPositions = {
+                jupiterSignIndex: transitData.planets.find(p => p.name === 'Jupiter')?.signIndex || 0,
+                saturnSignIndex: transitData.planets.find(p => p.name === 'Saturn')?.signIndex || 0,
+                rahuSignIndex: transitData.planets.find(p => p.name === 'Rahu')?.signIndex || 0,
+                ketuSignIndex: transitData.planets.find(p => p.name === 'Ketu')?.signIndex || 0,
+                sunSignIndex: transitData.planets.find(p => p.name === 'Sun')?.signIndex || 0,
+                moonSignIndex: transitData.planets.find(p => p.name === 'Moon')?.signIndex || 0,
+                marsSignIndex: transitData.planets.find(p => p.name === 'Mars')?.signIndex || 0,
+                mercurySignIndex: transitData.planets.find(p => p.name === 'Mercury')?.signIndex || 0,
+                venusSignIndex: transitData.planets.find(p => p.name === 'Venus')?.signIndex || 0,
+            };
+
+            const planets = chartData.planets;
+            const ascendantSign = chartData.ascendant.signIndex;
+            const moon = planets.find((p: any) => p.name === 'Moon');
+
+            if (moon) {
+                const periods = calculateDashaPeriods(new Date(chartData.userParams.dob), moon.longitude);
+                // NOTE: chartData.userParams.dob might need parsing if it's string. Assuming Date or convertible.
+                const currentDasa = getCurrentDasha(periods, now);
+                const subathuvamScores = calculateAdityaGurujiSubathuvam(planets);
+
+                if (currentDasa && currentDasa.maha) {
+                    let prediction: PredictionResult | null = null;
+
+                    // Match Intent to Rules
+                    const lowerIntent = intent.toLowerCase();
+                    if (lowerIntent.includes('job') || lowerIntent.includes('career') || lowerIntent.includes('profession')) {
+                        // Run Job Timing AND Career Path
+                        const jobTiming = predictJobTiming({ maha: currentDasa.maha, bhukti: currentDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, language);
+                        const careerPath = predictCareerPath(planets, ascendantSign, subathuvamScores, { maha: currentDasa.maha, bhukti: currentDasa.bhukti }, language);
+                        ruleBasedInsight = `\n**Algorithmic Calculation Results (Ground Truth):**\n1. Job Timing: ${jobTiming.answer}\n   Reason: ${jobTiming.reason}\n2. Suitable Career Path: ${careerPath.answer}\n   Reason: ${careerPath.reason}`;
+                    }
+                    else if (lowerIntent.includes('marriage') || lowerIntent.includes('wedding') || lowerIntent.includes('spouse')) {
+                        prediction = predictDetailedMarriageTiming({ maha: currentDasa.maha, bhukti: currentDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, new Date(chartData.userParams.dob), 'male', periods, language);
+                        ruleBasedInsight = `\n**Algorithmic Calculation Results (Ground Truth):**\nMarriage Prediction: ${prediction.answer}\nReason: ${prediction.reason}`;
+                    }
+                    else if (lowerIntent.includes('abroad') || lowerIntent.includes('foreign') || lowerIntent.includes('travel')) {
+                        prediction = predictForeignTravel(planets, ascendantSign, moon.signIndex, subathuvamScores, { maha: currentDasa.maha, bhukti: currentDasa.bhukti }, language);
+                        ruleBasedInsight = `\n**Algorithmic Calculation Results (Ground Truth):**\nForeign Settlement: ${prediction.answer}\nReason: ${prediction.reason}`;
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error calculating rule-based insight for AI:", err);
+            // Fallback - continue without rule context
+        }
+
         // Check for specific Lagna Rule
         let intentPrompt = "";
+
+        if (ruleBasedInsight) {
+            intentPrompt += `\n\n${ruleBasedInsight}\n\n**INSTRUCTION**: The above 'Algorithmic Calculation Results' are derived from strict astrological formulas (Aditya Guruji System). USE THEM as the foundation of your answer. You can expand, explain, and soften the delivery, but DO NOT contradict the core calculated verdict unless you find a very specific canceling Yoga in the chart. Use the 'Reason' provided to explain the 'Why' to the user.`;
+        }
 
         // Safely access chartData.ascendant.sign_en
         if (chartData && chartData.ascendant && chartData.ascendant.sign_en) {
@@ -816,42 +935,56 @@ For each house:
             }
         }
 
-        // Safe name access
-        const userName = (chartData.userDetails && chartData.userDetails.name) || "User";
-
         systemPrompt = `
 Role & Persona:
-You are an expert Vedic Astrologer modeled after the teachings of Aditya Guruji. You do not give generic answers. You analyze the specific Subathuvam (Beneficence), Pavathuvam (Maleficence), and Sookshma (Intricacy) strengths of the planets provided in the input to generate a precise prediction.
+You are an expert Vedic Astrologer following the "Aditya Guruji" system. You provide deep, rule-based predictions, not generic advice.
+You MUST process the chart in this specific 6-step logical order for every analysis:
 
-Input Data (Context):
+*** THE 6 PILLARS OF PREDICTION (GURUJI RULES) ***
+
+1. RULE 1: LAGNA & LAGNA LORD (Foundation)
+   - The strength of the horoscope depends 100% on the Lagna Lord.
+   - Check: Is Lagna Lord in Kendra (1,4,7,10) or Kona (1,5,9)?
+   - If Lagna Lord is weak (6,8,12 or Neecha) without cancellation, result is "Struggle".
+   - If Lagna Lord is strong, the user can enjoy all Yogas.
+   - *Action*: Start every answer by assessing the Lagna Lord's strength.
+
+2. RULE 2: SUBATHUVAM (Beneficence) - The Quality Check
+   - This measures specific quality. A "Bad" planet becomes "Good" if it has Subathuvam.
+   - Jupiter Aspect (Any distance: 5,7,9 houses) = 100% Subathuvam (Top Tier).
+   - Venus Association/Aspect = 75% Subathuvam.
+   - Mercury/Moon Association = 50% Subathuvam.
+   - *Action*: If a planet (e.g., Saturn) determines Career/Marriage, check its Subathuvam score. If high, predict success even if it's a Malefic planet.
+
+3. RULE 3: PAABATHUVAM (Maleficence) - The Negativity Check
+   - Why do struggles happen? Check for Paabathuvam.
+   - Caused by: Association/Aspect of Saturn, Mars, Rahu, Ketu.
+   - *Action*: If a planet has high Paabathuvam and LOW Subathuvam, predict "Delay", "Stress", or "Denial".
+
+4. RULE 4: SOOTCHAMA (Intricate Strength) - Hidden Power
+   - Look for hidden strengths not visible in Rasi.
+   - **Parivarthana** (Exchange of Houses): Gives massive strength.
+   - **Vargottama** (Same sign in Rasi & Navamsa): High strength.
+   - *Action*: Mention this if a planet seems weak but has these hidden strengths.
+
+5. RULE 5: FUNCTIONAL STRENGTH (Dasha/Bhukti) - Timing
+   - "A strong planet is useless if its time never comes."
+   - *Action*: ONLY predict results for the planets currently active in Dasha or Bhukti.
+   - **User's Current Dasa**: ${(context as any).CurrentDasa?.lord || "Unknown"}
+   - **User's Current Bhukti**: ${(context as any).CurrentDasa?.bhukti || "Unknown"}
+   - *Instruction*: Structure your answer around how *this specific* Dasa/Bhukti impacts the question.
+
+6. RULE 6: DISPLACEMENT (Moveable Signs) - Travel
+   - Check Lords of 8, 12.
+   - If they are in Moveable Signs (Aries, Cancer, Libra, Capricorn), predict: "Travel", "Change of Place", or "Foreign Settlement".
+
+---
+
+**Input Data (Context):**
 ${JSON.stringify(context, null, 2)}
 
-Prediction Logic (The "Guruji" Rules):
-1. Lagna First: Check Lagna Lord's strength. Use 'status_dignity' (Uchcha/Neecha/Aatchi). If Weak (Neecha/6/8/12) without cancellation, prediction is cautious.
-2. Subathuvam vs Pavathuvam: 
-   - COMPARE 'subathuvam_score' vs 'pavathuvam_score' for each planet.
-   - Subathuvam (Beneficence) comes from Jupiter/Venus/Merc aspect or connection.
-   - Pavathuvam (Maleficence) comes from Saturn/Mars/Rahu aspect or 6/8/12 placement.
-   - **GOLDEN RULE**: Check 'subathuvam_score' in the 'KeyPlanets' list.
-     - IF SCORE >= 50: The planet is **PURE GOOD**. Ignore any "Pavathuvam" warning. It will give GOOD results.
-     - IF SCORE < 50: The planet might be malefic. Check Pavathuvam.
-     - **Saturn with >50 Score is NOT Malefic**. It is a Functional Benefic. Do not predict "delays" or "obstacles" for a Subathuva Saturn.
-3. Dasa Judgment (CRITICAL):
-   - **READ 'DasaSchedule' from input**.
-   - **EXCEPTION / OVERRIDE**: If the user's question explicitly says "I am in [Planet] Dasa" or "Current is [Planet] Dasa", **IGNORE** the calculated schedule and use the USER'S stated Dasa. The User is always right about their timeline.
-   - Verify: Is the current Dasa Lord a Functional Benefic? Does it have high Subathuvam?
-4. Transit (Gocharam): Use transit results (like Ashtama Shani) as secondary.
-5. Marriage/Career: Use the calculated aspects directly directly (e.g., "7th aspect of Saturn") to judge outcomes.
-
-CRITICAL INSTRUCTION:
-DO NOT CALCULATE DASA PERIODS YOURSELF. USE THE 'CurrentDasa' PROVIDED IN THE CONTEXT DATA. 
-The context contains the EXACT current Dasa, Bhukti, and Antaram. Trust this data implicitly.
-If context says "Saturn Dasa", then the prediction MUST be based on Saturn Dasa.
-DO NOT HALLUCINATE OR RE-CALCULATE DATES.
-
-6. **DYNAMIC SYSTEM RULES (Admin Configured)**:
-   The following rules are high-priority overrides added by the Administrator. You MUST follow them:
-   ${dynamicRulesMap
+**Admin Overrides (Dynamic Rules):**
+${dynamicRulesMap
                 ? Object.entries(dynamicRulesMap)
                     .filter(([key]) => !['Simha', 'Kanni', 'Thula', 'Rishaba', 'Meena', 'Makara', 'Mesha', 'Mithuna', 'Kataka', 'Dhanusu', 'Kumbha', 'Vrischika'].includes(key))
                     .map(([key, content]) => `   - **RULE [${key}]**: ${content}`)
@@ -859,40 +992,29 @@ DO NOT HALLUCINATE OR RE-CALCULATE DATES.
                 : "   (No dynamic rules active)"
             }
 
-${(context as any).CurrentDasa && (context as any).CurrentDasa.lord
-                ? `The user is currently running **${(context as any).CurrentDasa.lord} Dasa** and **${(context as any).CurrentDasa.bhukti} Bhukti**. 
-CONFIRM THIS IN YOUR RESPONSE.`
-                : `Refer to the provided 'CurrentDasa' field for timing.`}
-
-
 ${intentPrompt}
 
-MANDATORY GREETING RULE:
-You MUST start your response by addressing the user by their name: "${userName}".
-Example: "Hello ${userName}," or "Vanakkam ${userName}," (if in Tamil).
-
-Task:
-Generate a detailed "Life Prediction Report" for the user answering their specific question: "${userQuery}"
-
-Output Requirements:
-- Provide the answer in BOTH Tamil and English.
-- If the user asks in Tamil, prioritize the Tamil response.
-- Do NOT give generic advice. Use the specific planetary strengths provided.
+MANDATORY OUTPUT FORMAT:
+- If Tamil is requested, answer COMPLETELY in Tamil.
+- Structure your answer using the 6 Rules logic implicitly.
+- Don't list the rules, APPLY them.
+- Start with: "Hello ${userName},"
 
 Output Format (JSON):
-{
-    "intent": "${intent}",
-    "primary_analysis": {
-        "key_planet": "Name of planet relevant to question",
-        "status": "Subathuva (Score%) or Pavathuva",
-        "dasa_verdict": "Favorable/Unfavorable"
-    },
-    "model_consensus": "Brief summary of the analysis",
-    "final_answer_tamil": "Answer in Tamil",
-    "final_answer_english": "Answer in English",
-    "reasoning": "Explanation of why this answer was chosen based on rules."
-}
-`;
+
+        {
+            "intent": "${intent}",
+                "primary_analysis": {
+                "key_planet": "Name of planet relevant to question",
+                    "status": "Subathuva (Score%) or Pavathuva",
+                        "dasa_verdict": "Favorable/Unfavorable"
+            },
+            "model_consensus": "Brief summary of the analysis",
+                "final_answer_tamil": "Answer in Tamil",
+                    "final_answer_english": "Answer in English",
+                        "reasoning": "Explanation of why this answer was chosen based on rules."
+        }
+        `;
     }
 
     // 4. Try Models with Fallback
@@ -906,11 +1028,11 @@ Output Format (JSON):
 
     for (const model of FREE_MODELS) {
         try {
-            console.log(`Attempting with model: ${model}`);
+            console.log(`Attempting with model: ${model} `);
             const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${effectiveKey}`,
+                    "Authorization": `Bearer ${effectiveKey} `,
                     "Content-Type": "application/json",
                     "HTTP-Referer": window.location.origin, // Required by OpenRouter
                     "X-Title": "Vedic AI Astrologer"
@@ -928,12 +1050,12 @@ Output Format (JSON):
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.warn(`Model ${model} failed: ${response.status} - ${errorText}`);
+                console.warn(`Model ${model} failed: ${response.status} - ${errorText} `);
 
                 // Handle Rate Limit specifically
                 if (response.status === 429) {
-                    console.warn(`Rate limit reached for ${model}. Trying next model...`);
-                    lastError = new Error(`Rate Limit (429) on ${model}`);
+                    console.warn(`Rate limit reached for ${model}.Trying next model...`);
+                    lastError = new Error(`Rate Limit(429) on ${model} `);
                     continue; // Try next model instead of giving up immediately
                 }
 
@@ -949,7 +1071,7 @@ Output Format (JSON):
                     continue;
                 }
 
-                lastError = new Error(`OpenRouter API Error: ${response.status} - ${errorText}`);
+                lastError = new Error(`OpenRouter API Error: ${response.status} - ${errorText} `);
                 continue; // Try next model for other errors
             }
 
@@ -1332,6 +1454,16 @@ export async function translateAnalysisReport(englishResponse: OrchestratorRespo
             textsToTranslate.push(house.guruji_rule_applied);
         });
 
+        // Life Guidance
+        if (englishResponse.life_guidance) {
+            const g = englishResponse.life_guidance;
+            textsToTranslate.push(g.job_timing.answer); textsToTranslate.push(g.job_timing.reason);
+            textsToTranslate.push(g.marriage_timing.answer); textsToTranslate.push(g.marriage_timing.reason);
+            textsToTranslate.push(g.marriage_type.answer); textsToTranslate.push(g.marriage_type.reason);
+            textsToTranslate.push(g.career_path.answer); textsToTranslate.push(g.career_path.reason);
+            textsToTranslate.push(g.foreign_travel.answer); textsToTranslate.push(g.foreign_travel.reason);
+        }
+
         // 2. Call API (Single Batch Request)
         console.log(`[Translation] Batch translating ${textsToTranslate.length} fields via Google Cloud Translation API...`);
         const translatedTextsRaw = await translateStrings(textsToTranslate, 'ta');
@@ -1380,7 +1512,14 @@ export async function translateAnalysisReport(englishResponse: OrchestratorRespo
                 lagna_summary: translatedLagnaSummary,
                 final_verdict: translatedFinalVerdict,
                 house_predictions: translatedHouses
-            }
+            },
+            life_guidance: englishResponse.life_guidance ? {
+                job_timing: { answer: translatedTexts[tIndex++] || englishResponse.life_guidance.job_timing.answer, reason: translatedTexts[tIndex++] || englishResponse.life_guidance.job_timing.reason },
+                marriage_timing: { answer: translatedTexts[tIndex++] || englishResponse.life_guidance.marriage_timing.answer, reason: translatedTexts[tIndex++] || englishResponse.life_guidance.marriage_timing.reason },
+                marriage_type: { answer: translatedTexts[tIndex++] || englishResponse.life_guidance.marriage_type.answer, reason: translatedTexts[tIndex++] || englishResponse.life_guidance.marriage_type.reason },
+                career_path: { answer: translatedTexts[tIndex++] || englishResponse.life_guidance.career_path.answer, reason: translatedTexts[tIndex++] || englishResponse.life_guidance.career_path.reason },
+                foreign_travel: { answer: translatedTexts[tIndex++] || englishResponse.life_guidance.foreign_travel.answer, reason: translatedTexts[tIndex++] || englishResponse.life_guidance.foreign_travel.reason },
+            } : undefined
         };
 
 
@@ -1390,10 +1529,23 @@ export async function translateAnalysisReport(englishResponse: OrchestratorRespo
     }
 }
 
-const prepareContext = (data: any, intent: string, isComprehensive: boolean = false, language: string = 'en', dynamicRules: Record<string, string> = {}) => {
-    const { planets, ascendant, currentDasa } = data;
+const prepareContext = (data: any, intent: string, isComprehensive: boolean = false, language: 'en' | 'ta' = 'en', dynamicRules: Record<string, string> = {}) => {
+    const { planets, ascendant, currentDasa, dashaPeriods } = data;
     // Calculate subathuvam scores if not provided
     const subathuvamScores = data.subathuvamScores || calculateAdityaGurujiSubathuvam(planets);
+
+    // Prepare Prediction Inputs
+    const currentDasaObj = currentDasa || getCurrentDasha(dashaPeriods || []);
+    const transits = calculateCurrentTransits();
+
+    // Calculate Rule-Based Predictions (Ground Truth)
+    const rule_predictions = {
+        job: predictJobTiming(currentDasaObj, transits, ascendant.signIndex, planets.find((p: any) => p.name === 'Moon')?.signIndex || 0, planets, language),
+        foreign: predictForeignTravel(planets, ascendant.signIndex, planets.find((p: any) => p.name === 'Moon')?.signIndex || 0, subathuvamScores, currentDasaObj, language),
+        marriage_timing: predictDetailedMarriageTiming(currentDasaObj, transits, ascendant.signIndex, planets.find((p: any) => p.name === 'Moon')?.signIndex || 0, planets, data.birthDate || new Date(), data.userDetails?.gender || 'male', dashaPeriods || [], language),
+        marriage_type: predictMarriageType(planets, ascendant.signIndex, subathuvamScores, currentDasaObj, language),
+        career: predictCareerPath(planets, ascendant.signIndex, subathuvamScores, currentDasaObj, language)
+    };
 
     const ascSignIndex = ascendant.signIndex;
     const moon = planets.find((p: any) => p.name === 'Moon');
@@ -1503,6 +1655,7 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
         OutputFormatGuide: {
             HouseTitles: language === 'ta' ? HOUSE_NAMES_TA : HOUSE_NAMES_EN
         },
+        LifeGuidancePredictions: rule_predictions,
         MoonPhaseInfo: (() => {
             if (!moon) return { status: "Unknown", is_waxing: false };
             const sun = planets.find((p: any) => p.name === 'Sun');

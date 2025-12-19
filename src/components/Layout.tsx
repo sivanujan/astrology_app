@@ -23,7 +23,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         { path: '/analysis', label: t.nav.analysis, icon: Sun, protected: true },
         { path: '/predictions', label: t.nav.predictions, icon: Sparkles, protected: true },
 
-        { path: '/daily-snapshot', label: "Daily Snapshot", icon: Sun, protected: true },
+        { path: '/daily-snapshot', label: "Next 15 Days Forecast", icon: Sun, protected: true },
     ];
 
     const currentStepIndex = steps.findIndex(s => s.path === location.pathname);
@@ -95,7 +95,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             </div>
                         </div>
 
-                        <div className="hidden md:flex items-center gap-2 lg:gap-4">
+                        <div className="hidden md:flex items-center gap-1 lg:gap-2">
                             {steps.map((step, idx) => {
                                 const Icon = step.icon;
                                 const isActive = location.pathname === step.path;
