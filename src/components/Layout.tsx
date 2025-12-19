@@ -90,7 +90,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                            <div className="w-48 h-auto flex items-center justify-start">
+                            <div className="w-32 md:w-48 h-auto flex items-center justify-start">
                                 <img src={Logo} alt="Astro Siva Logo" className="w-full h-full object-contain" />
                             </div>
                         </div>
@@ -124,42 +124,46 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             })}
                         </div>
 
-                        {/* Auth Buttons */}
-                        <div className="flex items-center gap-3 mr-4">
-                            {user ? (
-                                <button
-                                    onClick={() => navigate('/dashboard')}
-                                    className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap"
-                                >
-                                    <LayoutDashboard className="w-4 h-4" />
-                                    <span className="hidden lg:inline">{t.nav.dashboard}</span>
-                                </button>
-                            ) : (
-                                <>
+                        {/* Desktop Auth & Language */}
+                        <div className="hidden md:flex items-center gap-3">
+                            {/* Auth Buttons */}
+                            <div className="flex items-center gap-3 mr-4">
+                                {user ? (
                                     <button
-                                        onClick={() => navigate('/login')}
-                                        className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                                        onClick={() => navigate('/dashboard')}
+                                        className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap"
                                     >
-                                        {t.nav.login}
+                                        <LayoutDashboard className="w-4 h-4" />
+                                        <span className="hidden lg:inline">{t.nav.dashboard}</span>
                                     </button>
-                                    <button
-                                        onClick={() => navigate('/register')}
-                                        className="whitespace-nowrap px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 rounded-lg hover:from-yellow-400 hover:to-orange-500 transition-colors shadow-lg shadow-yellow-500/20"
-                                    >
-                                        {t.nav.signup}
-                                    </button>
-                                </>
-                            )}
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => navigate('/login')}
+                                            className="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                                        >
+                                            {t.nav.login}
+                                        </button>
+                                        <button
+                                            onClick={() => navigate('/register')}
+                                            className="whitespace-nowrap px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 rounded-lg hover:from-yellow-400 hover:to-orange-500 transition-colors shadow-lg shadow-yellow-500/20"
+                                        >
+                                            {t.nav.signup}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Language Toggle */}
+                            <button
+                                onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 transition-colors text-sm font-medium"
+                            >
+                                <Languages className="w-4 h-4 text-purple-400" />
+                                <span className="hidden md:inline">{language === 'en' ? 'தமிழ்' : 'English'}</span>
+                            </button>
                         </div>
 
-                        {/* Language Toggle */}
-                        <button
-                            onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 transition-colors text-sm font-medium"
-                        >
-                            <Languages className="w-4 h-4 text-purple-400" />
-                            <span>{language === 'en' ? 'தமிழ்' : 'English'}</span>
-                        </button>
                         {/* Mobile Menu Button */}
                         <button
                             className="md:hidden p-2 text-slate-300 hover:text-white"
@@ -179,6 +183,43 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                 className="md:hidden border-t border-white/10 bg-slate-950/95 backdrop-blur-xl overflow-hidden"
                             >
                                 <div className="flex flex-col p-4 space-y-4">
+                                    {/* Mobile Auth Buttons */}
+                                    <div className="flex flex-col gap-2 pb-4 border-b border-white/10">
+                                        {user ? (
+                                            <button
+                                                onClick={() => {
+                                                    navigate('/dashboard');
+                                                    setIsMenuOpen(false);
+                                                }}
+                                                className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 w-full"
+                                            >
+                                                <LayoutDashboard className="w-4 h-4" />
+                                                <span>{t.nav.dashboard}</span>
+                                            </button>
+                                        ) : (
+                                            <div className="flex gap-2 w-full">
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/login');
+                                                        setIsMenuOpen(false);
+                                                    }}
+                                                    className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-300 bg-slate-800/50 rounded-lg hover:text-white transition-colors text-center"
+                                                >
+                                                    {t.nav.login}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/register');
+                                                        setIsMenuOpen(false);
+                                                    }}
+                                                    className="flex-1 px-4 py-2.5 text-sm font-medium bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 rounded-lg hover:from-yellow-400 hover:to-orange-500 transition-colors shadow-lg shadow-yellow-500/20 text-center"
+                                                >
+                                                    {t.nav.signup}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {steps.map((step, idx) => {
                                         const Icon = step.icon;
                                         const isActive = location.pathname === step.path;

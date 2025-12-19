@@ -22,4 +22,11 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// Helper for 'Unauthorized Domain' error
+if (typeof window !== 'undefined' && window.location.hostname.match(/\d+\.\d+\.\d+\.\d+/)) {
+    console.warn(`[Firebase Auth] You are accessing via IP (${window.location.hostname}). If login fails with "Unauthorized Domain":
+    1. Go to Firebase Console -> Authentication -> Settings -> Authorized Domains.
+    2. Add this IP address: ${window.location.hostname}`);
+}
+
 export default app;

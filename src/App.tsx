@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
 import { ChartProvider, useChartData } from './contexts/ChartContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -16,79 +17,121 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import SEO from './components/SEO';
+import InstallPWA from './components/InstallPWA';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
 
-  // Robust hydration check: If context is empty but storage has data, restore it immediately
-  // This prevents the "Redirect to /" flash when reloading on protected pages
-  React.useEffect(() => {
-    if (!chartData) {
-      try {
-        const saved = localStorage.getItem('astrology_chart_data');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setChartData(parsed);
-        }
-      } catch (e) {
-        console.error("Hydration failed", e);
-      }
-    }
-  }, [chartData, setChartData]);
-
-  // Helper check for routing
+  // ... (existing hydration logic)
   const hasData = chartData || localStorage.getItem('astrology_chart_data');
 
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<InputForm />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/" element={
+        <>
+          <SEO title="Free Horoscope & Astrology Predictions" description="Generate your complete Vedic Astrology chart and get instant predictions about career, marriage, and health." />
+          <InputForm />
+        </>
+      } />
+      <Route path="/login" element={
+        <>
+          <SEO title="Login" />
+          <Login />
+        </>
+      } />
+      <Route path="/register" element={
+        <>
+          <SEO title="Create Account" />
+          <Register />
+        </>
+      } />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/admin/login" element={
+        <>
+          <SEO title="Admin Login" />
+          <AdminLogin />
+        </>
+      } />
+      <Route path="/admin/dashboard" element={
+        <>
+          <SEO title="Admin Dashboard" />
+          <AdminDashboard />
+        </>
+      } />
 
       {/* Semi-Protected / Public but needs data */}
       <Route
         path="/chart"
-        element={hasData ? <SouthIndianChart data={chartData} /> : <Navigate to="/" />}
+        element={hasData ? (
+          <>
+            <SEO title="Your Birth Chart (Rasi & Navamsa)" />
+            <SouthIndianChart data={chartData} />
+          </>
+        ) : <Navigate to="/" />}
       />
 
       {/* Protected Routes */}
       <Route path="/dashboard" element={
         <ProtectedRoute>
+          <SEO title="Dashboard - Your Astrology Profile" />
           <Dashboard />
         </ProtectedRoute>
       } />
 
       <Route path="/analysis" element={
         <ProtectedRoute>
-          {hasData ? <ChartAnalysis data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="Detailed Chart Analysis" />
+              <ChartAnalysis data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/dasha" element={
-        hasData ? <DashaPeriods data={chartData} /> : <Navigate to="/" />
+        hasData ? (
+          <>
+            <SEO title="Dasa Bhukti Periods - Timeline" />
+            <DashaPeriods data={chartData} />
+          </>
+        ) : <Navigate to="/" />
       } />
 
       <Route path="/predictions" element={
         <ProtectedRoute>
-          {hasData ? <AIPredictions data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="AI Predictions - Chat & Guidance" />
+              <AIPredictions data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/predictions-faq" element={
         <ProtectedRoute>
-          {hasData ? <GurujiPredictions data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="Life Guidance & Remedies" />
+              <GurujiPredictions data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/daily-snapshot" element={
         <ProtectedRoute>
-          {hasData ? <DailySnapshot data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="Daily Horoscope Snapshot" />
+              <DailySnapshot data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
     </Routes>
@@ -97,15 +140,18 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <ChartProvider>
-          <Layout>
-            <AppRoutes />
-          </Layout>
-        </ChartProvider>
-      </AuthProvider>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <AuthProvider>
+          <ChartProvider>
+            <Layout>
+              <AppRoutes />
+              <InstallPWA />
+            </Layout>
+          </ChartProvider>
+        </AuthProvider>
+      </Router>
+    </HelmetProvider>
   );
 }
 
