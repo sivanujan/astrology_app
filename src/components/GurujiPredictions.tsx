@@ -35,6 +35,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [aiResponse, setAiResponse] = useState<OrchestratorResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [progress, setProgress] = useState(0); // Progress counter state
     const [error, setError] = useState('');
     const isFetchingRef = useRef(false);
 
@@ -95,7 +96,19 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
         isFetchingRef.current = true;
         setIsLoading(true);
+        setProgress(0); // Reset progress
         setError('');
+
+        // Simulate progress - slower increment
+        const progressInterval = setInterval(() => {
+            setProgress(prev => {
+                if (prev >= 90) {
+                    clearInterval(progressInterval);
+                    return 90; // Stop at 90% until actual completion
+                }
+                return Math.min(90, Math.round(prev + Math.random() * 3)); // Slower random increment, rounded
+            });
+        }, 500); // Slower interval (500ms instead of 300ms)
 
         try {
             const chartId = generateChartId({ name: data.userDetails.name }, birthDate, language);
@@ -119,6 +132,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
                     if (isValidCache) {
                         setAiResponse(cached.data);
+                        setProgress(100); // Instant complete for cache
                         setIsLoading(false);
                         isFetchingRef.current = false;
                         return;
@@ -210,8 +224,11 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             // Only set AI response if we don't have one (keep partial/old data if useful?)
             // setAiResponse(null); 
         } finally {
-            setIsLoading(false);
-            isFetchingRef.current = false;
+            setProgress(100); // Complete progress
+            setTimeout(() => {
+                setIsLoading(false);
+                isFetchingRef.current = false;
+            }, 300); // Small delay to show 100%
         }
     };
 
@@ -276,23 +293,52 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </div>
             </motion.div>
 
-            {/* --- Loading State --- */}
+            {/* --- Loading State with Progress --- */}
             {isLoading && (
                 <div className="text-center p-12 glass-panel mt-8">
                     <Loader className="w-12 h-12 mx-auto mb-4 animate-spin text-purple-400" />
-                    <p className="text-slate-300">{isTamil ? "பகுப்பாய்வு செய்யப்படுகிறது..." : "Analyzing your chart..."}</p>
+
+                    {/* Progress Bar */}
+                    <div className="w-full max-w-md mx-auto mb-4">
+                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                            ></div>
+                        </div>
+                        <p className="text-purple-300 font-bold text-lg mt-2">{progress}%</p>
+                    </div>
+
+                    <p className="text-slate-300 mb-2">
+                        {isTamil ? "பகுப்பாய்வு செய்யப்படுகிறது..." : "Analyzing your chart..."}
+                    </p>
+                    <p className="text-slate-400 text-sm">
+                        {isTamil ? "இது சில நொடிகள் எடுக்கும், தயவுசெய்து காத்திருக்கவும்" : "This may take a few moments, please wait"}
+                    </p>
                 </div>
             )}
 
-            {/* --- Error State --- */}
+            {/* --- Error State with Friendly Message --- */}
             {error && (
                 <div className="text-center p-8 glass-panel border border-red-800/30 bg-red-900/10 mt-8">
-                    <p className="text-red-400">{error}</p>
+                    <div className="mb-4">
+                        <svg className="w-16 h-16 mx-auto text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <p className="text-red-300 font-medium mb-2">
+                        {isTamil ? "தொழில்நுட்ப சிக்கல்" : "Technical Issue"}
+                    </p>
+                    <p className="text-red-400 text-sm mb-4">
+                        {isTamil
+                            ? "உங்கள் ஜாதகத்தைப் பகுப்பாய்வு செய்வதில் சிக்கல் ஏற்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்."
+                            : "We encountered an issue analyzing your chart. Please try again."}
+                    </p>
                     <button
                         onClick={() => fetchAnalysis(true)}
-                        className="mt-4 px-4 py-2 bg-purple-600 rounded-lg text-white font-medium hover:bg-purple-700 transition"
+                        className="mt-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-white font-medium hover:from-purple-700 hover:to-pink-700 transition shadow-lg"
                     >
-                        {isTamil ? "மீண்டும் முயற்சி" : "Retry"}
+                        {isTamil ? "🔄 மீண்டும் முயற்சி" : "🔄 Try Again"}
                     </button>
                 </div>
             )}
@@ -448,24 +494,33 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                         </div>
                     </div>
 
-                    {/* Pillar Breakdown */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-                        <div className="bg-slate-800/50 p-2 rounded text-center">
-                            <div className="text-xs text-slate-400">Dharma</div>
-                            <div className="text-emerald-400 font-bold">{lifeQuality.pillarScores.dharma}/15</div>
-                        </div>
-                        <div className="bg-slate-800/50 p-2 rounded text-center">
-                            <div className="text-xs text-slate-400">Artha</div>
-                            <div className="text-yellow-400 font-bold">{lifeQuality.pillarScores.artha}/15</div>
-                        </div>
-                        <div className="bg-slate-800/50 p-2 rounded text-center">
-                            <div className="text-xs text-slate-400">Kama</div>
-                            <div className="text-pink-400 font-bold">{lifeQuality.pillarScores.kama}/10</div>
-                        </div>
-                        <div className="bg-slate-800/50 p-2 rounded text-center">
-                            <div className="text-xs text-slate-400">Moksha</div>
-                            <div className="text-purple-400 font-bold">{lifeQuality.pillarScores.moksha}/10</div>
-                        </div>
+                    {/* 8 Category Breakdown */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        {Object.entries(lifeQuality.categories).map(([key, cat]: [string, any]) => {
+                            const score = cat.score;
+                            let colorClass = '';
+                            if (score >= 81) colorClass = 'text-emerald-400 border-emerald-500';
+                            else if (score >= 61) colorClass = 'text-blue-400 border-blue-500';
+                            else if (score >= 41) colorClass = 'text-orange-400 border-orange-500';
+                            else colorClass = 'text-red-400 border-red-500';
+
+                            return (
+                                <div key={key} className={`bg-slate-800/50 p-3 rounded border-l-2 ${colorClass}`}>
+                                    <div className="flex items-center gap-1 mb-1">
+                                        <span className="text-base">{cat.icon}</span>
+                                        <div className="text-xs text-slate-400 leading-tight">{cat.name}</div>
+                                    </div>
+                                    <div className={`text-lg font-bold ${colorClass.split(' ')[0]}`}>{score}<span className="text-xs text-slate-500">/100</span></div>
+                                    {/* Progress bar */}
+                                    <div className="w-full bg-slate-700/50 rounded-full h-1 mt-1">
+                                        <div
+                                            className={`h-1 rounded-full ${colorClass.includes('emerald') ? 'bg-emerald-500' : colorClass.includes('blue') ? 'bg-blue-500' : colorClass.includes('orange') ? 'bg-orange-500' : 'bg-red-500'}`}
+                                            style={{ width: `${score}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
 
                     {/* Detailed Reasoning */}
