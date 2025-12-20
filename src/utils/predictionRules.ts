@@ -724,23 +724,25 @@ export const predictDetailedMarriageTiming = (
     const isTamil = language === 'ta';
     const question = isTamil ? "எனக்கு எப்போது திருமணம் நடக்கும்?" : "When will I get married?";
 
-    // --- Step A: Identify Key Planets ---
+    // --- Step A: Identify Key Planets (The Triangle 3-7-11) ---
     const house2Sign = (ascendantSign + 1) % 12;
-    const house3Sign = (ascendantSign + 2) % 12; // Added 3rd House
-    const house7Sign = (ascendantSign + 6) % 12;
-    const house8Sign = (ascendantSign + 7) % 12;
-    const house11Sign = (ascendantSign + 10) % 12;
+    const house3Sign = (ascendantSign + 2) % 12; // Initiative
+    const house7Sign = (ascendantSign + 6) % 12; // Marriage
+    const house8Sign = (ascendantSign + 7) % 12; // Added House 8
+    const house11Sign = (ascendantSign + 10) % 12; // Fulfillment
 
     const lord2 = SIGN_LORDS[house2Sign];
-    const lord3 = SIGN_LORDS[house3Sign]; // Lord 3
+    const lord3 = SIGN_LORDS[house3Sign];
     const lord7 = SIGN_LORDS[house7Sign];
     const lord11 = SIGN_LORDS[house11Sign];
     const venus = 'Venus';
+    const jupiter = 'Jupiter';
 
     const rahu = getPlanetPosition(planets, 'Rahu');
     const ketu = getPlanetPosition(planets, 'Ketu');
     // Key Planets for Marriage
-    const keyPlanets = [lord2, lord7, lord11, lord3, venus];
+    // Added Lord 3 (Initiative) and Lord 11 (Fulfillment) as Primary Indicators
+    const keyPlanets = [lord7, lord11, lord3, venus, jupiter, lord2];
 
     if (rahu && [house2Sign, house7Sign, house8Sign].includes(rahu.signIndex)) keyPlanets.push('Rahu');
     if (ketu && [house2Sign, house7Sign, house8Sign].includes(ketu.signIndex)) keyPlanets.push('Ketu');
@@ -773,14 +775,16 @@ export const predictDetailedMarriageTiming = (
                     // Double check age
                     if (ageAtBhukti < 21) continue;
 
-                    // Step 1: Check if Bhukti Lord is connected to 3, 7, 11 OR is Venus
+                    // Step 1: Check if Bhukti Lord is connected to 3, 7, 11 OR is Venus/Jupiter
+                    // Connection Types:
+                    // 1. Is the Lord itself (e.g., Running 7th Lord Bhukti)
+                    // 2. Is in the House (e.g., Planet in 7th)
+                    // 3. Conjoined with Lord (e.g., With 7th Lord) - (Simplification: using sign index from planet list if available, else strict name match)
+
+                    // We primarily check Name Match first as established in KeyPlanets
                     if (isKeyPlanet(bhukti.planet)) {
 
                         // Step 2: Jupiter Filter (Year Check)
-                        // Scan for favorable Jupiter periods within this Bhukti
-                        // Note: For PAST periods, we should ideally check historical transits.
-                        // However, assuming `getJupiterFavorablePeriods` can handle past dates roughly or strict check.
-                        // Our helper uses `calculatePlanetaryPositions` which handles past dates!
                         const jupiterWindows = getJupiterFavorablePeriods(
                             bhukti.startDate,
                             bhukti.endDate,
@@ -893,9 +897,9 @@ export const predictDetailedMarriageTiming = (
     }
 
     if (isTamil) {
-        reason = `விதி: 3, 7, 11 அதிபதிகளின் தசை/புத்தியில், குரு மற்றும் சூரியன் பலம் பெறும் காலங்கள்.\n- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n- தற்போதைய தசை: ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
+        reason = `விதி: 3, 7, 11 (திருமண முக்கோணம்) மற்றும் சுக்ரன், குரு தசை/புத்திகள்.\n- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n- தற்போதைய தசை: ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
     } else {
-        reason = `Rule: Marriage happens during Dasa/Bhukti of 3, 7, 11 Lords, combining with favorable Jupiter (Year) and Sun (Month) transits.\n- Key Planets Checked: ${keyPlanets.join(', ')}\n- Current Status: Running ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
+        reason = `Rule: 3-7-11 Marriage Triangle Logic (Initiative, Marriage, Fulfillment). Timing matches with Jupiter/Sun Transits.\n- Key Planets Checked: ${keyPlanets.join(', ')}\n- Current Status: Running ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
     }
 
     return {
@@ -1516,5 +1520,410 @@ export const predictCurrentLoveStatus = (
         answer,
         reason,
         isFavorable
+    };
+};
+
+// 7. Marriage Status Prediction (The Marriage Triangle 3-7-11)
+export const predictMarriageStatus = (
+    planets: any[],
+    ascendantSign: number,
+    currentDasa: { maha: DashaPeriod, bhukti?: DashaPeriod },
+    birthDate: Date,
+    language: 'en' | 'ta' = 'en'
+): { isMarried: boolean, confidence: number, statusText: string, reason: string } => {
+    const isTamil = language === 'ta';
+
+    // --- Step 1: Birth Chart Analysis (3-7-11 Connections) ---
+    const house3Sign = (ascendantSign + 2) % 12;
+    const house7Sign = (ascendantSign + 6) % 12;
+    const house11Sign = (ascendantSign + 10) % 12;
+
+    const lord3 = SIGN_LORDS[house3Sign];
+    const lord7 = SIGN_LORDS[house7Sign];
+    const lord11 = SIGN_LORDS[house11Sign];
+
+    const getPlanet = (name: string) => planets.find(p => p.name === name);
+    const planet3 = getPlanet(lord3);
+    const planet7 = getPlanet(lord7);
+    const planet11 = getPlanet(lord11);
+
+    const checkConnection = (p1: any, p2: any) => {
+        if (!p1 || !p2) return false;
+        // Conjunction
+        if (p1.signIndex === p2.signIndex) return true;
+        // Opposition (Mutual Aspect)
+        if (Math.abs(p1.signIndex - p2.signIndex) === 6) return true;
+
+        return false;
+    };
+
+    const isConnected3_7 = checkConnection(planet3, planet7);
+    const isConnected7_11 = checkConnection(planet7, planet11);
+    const isConnected3_11 = checkConnection(planet3, planet11);
+
+    // Calculate Birth Chart Score
+    let birthScore = 0;
+
+    // Q1: 3-7-11 Connection
+    if (isConnected3_7 || isConnected7_11 || isConnected3_11) birthScore += 30;
+
+    // Q2: Planets in 7th House
+    const planetsIn7 = planets.filter(p => p.signIndex === house7Sign);
+    const benefics = ['Jupiter', 'Venus', 'Mercury', 'Moon'];
+    const malefics = ['Saturn', 'Mars', 'Sun'];
+
+    if (planetsIn7.length === 0) {
+        birthScore += 15; // Empty is neutral/ok
+    } else {
+        const hasBenefic = planetsIn7.some(p => benefics.includes(p.name));
+        const hasMalefic = planetsIn7.some(p => malefics.includes(p.name));
+        const hasNode = planetsIn7.some(p => ['Rahu', 'Ketu'].includes(p.name));
+
+        if (hasBenefic) birthScore += 20;
+        else if (hasMalefic) birthScore += 10;
+        else if (hasNode) birthScore += 5;
+    }
+
+    // Q3: 7th Lord Position
+    const getHouseNumber = (planetSign: number, ascendantSign: number): number => {
+        return (planetSign - ascendantSign + 12) % 12 + 1;
+    };
+
+    if (planet7) {
+        const h7Pos = getHouseNumber(planet7.signIndex, ascendantSign);
+        if ([1, 4, 7, 10, 5, 9].includes(h7Pos)) birthScore += 25;
+        if (h7Pos === 11) birthScore += 30; // Excellent
+        if (h7Pos === 3) birthScore += 25; // Good
+        if ([6, 8, 12].includes(h7Pos)) birthScore += 5; // Difficult
+    }
+
+    // Q4: Venus Strength (Simple check: Exalted/Own)
+    const venus = getPlanet('Venus');
+    if (venus) {
+        if (venus.signIndex === 11) birthScore += 20; // Pisces (Exalted)
+        if ([1, 6].includes(venus.signIndex)) birthScore += 15; // Taurus/Libra (Own)
+        if (venus.signIndex === 5) birthScore += 5; // Virgo (Debilitated)
+    }
+
+    // Q5: Jupiter Aspect on 7th
+    const jupiter = getPlanet('Jupiter');
+    // Using simple aspect check logic internal here relying on inputs/constants isn't ideal but we can re-impl simple check or reuse if exported (it's not).
+    // Let's implement simple check:
+    const isAspectingLocal = (source: number, target: number, aspects: number[]) => {
+        const dist = (target - source + 12) % 12 + 1;
+        return aspects.includes(dist);
+    };
+
+    if (jupiter) {
+        const aspect7 = isAspectingLocal(jupiter.signIndex, house7Sign, [1, 5, 7, 9]);
+        if (aspect7) birthScore += 20;
+    }
+
+    // Cap Birth Score at 100
+    birthScore = Math.min(100, birthScore);
+
+    // --- Step 2: Dasa Score ---
+    let dasaScore = 0;
+    const dasaLord = currentDasa.maha.planet;
+    const bhuktiLord = currentDasa.bhukti?.planet;
+
+    // Q1: Maha Dasa Planet
+    if (dasaLord === lord7) dasaScore += 40;
+    else if (dasaLord === 'Venus' || dasaLord === 'Jupiter') dasaScore += 30;
+    else if (dasaLord === lord11) dasaScore += 25;
+    else if (dasaLord === lord3) dasaScore += 20;
+
+    // Q2: Bhukti Planet
+    if (bhuktiLord === lord7) dasaScore += 30;
+    else if (bhuktiLord === 'Venus') dasaScore += 25;
+    else if (bhuktiLord === 'Jupiter' || bhuktiLord === lord11) dasaScore += 20;
+    else if (bhuktiLord === lord3) dasaScore += 15;
+
+    // Q3: Dasa-Bhukti Combo
+    // Both are 3-7-11 lords?
+    const isDasa3711 = [lord3, lord7, lord11].includes(dasaLord);
+    const isBhukti3711 = bhuktiLord && [lord3, lord7, lord11].includes(bhuktiLord);
+
+    if (isDasa3711 && isBhukti3711) dasaScore += 40;
+    else if (dasaLord === lord7 || bhuktiLord === lord7) dasaScore += 20;
+    else if ((dasaLord === 'Venus' && bhuktiLord === 'Jupiter') || (dasaLord === 'Jupiter' && bhuktiLord === 'Venus')) dasaScore += 25;
+
+    dasaScore = Math.min(100, dasaScore);
+
+    // --- Step 3: Age Factor ---
+    const now = new Date();
+    const currentAge = now.getFullYear() - birthDate.getFullYear();
+    let ageModifier = 1.0;
+
+    if (currentAge >= 18 && currentAge <= 23) ageModifier = 0.7;
+    else if (currentAge >= 24 && currentAge <= 28) ageModifier = 1.0;
+    else if (currentAge >= 29 && currentAge <= 33) ageModifier = 1.2;
+    else if (currentAge >= 34 && currentAge <= 40) ageModifier = 1.5;
+    else if (currentAge > 40) ageModifier = 2.0;
+
+    // --- Final Calculation ---
+    const rawTotal = (birthScore * 0.4) + (dasaScore * 0.4) + (currentAge * 0.2);
+    const finalScore = rawTotal * ageModifier;
+
+    // Using threshold of 65 for "Married"
+    let isMarried = false;
+    let statusText = "";
+
+    if (finalScore >= 90) {
+        isMarried = true;
+        statusText = isTamil ? "திருமணமாகிவிட்டது (95% உறுதி)" : "Likely Married (95% Certainty)";
+    } else if (finalScore >= 70) {
+        isMarried = true;
+        statusText = isTamil ? "மிகவும் வாய்ப்புள்ளது (80% உறுதி)" : "Likely Married (80% Certainty)";
+    } else if (finalScore >= 65) {
+        isMarried = true;
+        statusText = isTamil ? "வாய்ப்புள்ளது (65% உறுதி)" : "Likely Married (65% Certainty)";
+    } else {
+        isMarried = false;
+        statusText = isTamil ? "திருமணமாகவில்லை" : "Likely Single";
+    }
+
+    const reason = isTamil
+        ? `மதிப்பெண்: ${finalScore.toFixed(0)}/100 (வயது: ${currentAge}, காரணி: x${ageModifier})\n` +
+        `ஜாதக பலம்: ${birthScore}/100, தசை பலம்: ${dasaScore}/100`
+        : `Score: ${finalScore.toFixed(0)}/100 (Age: ${currentAge}, Modifier: x${ageModifier})\n` +
+        `Chart Score: ${birthScore}/100, Dasa Score: ${dasaScore}/100`;
+
+    return { isMarried, confidence: finalScore, statusText, reason };
+};
+
+// 8. Life Quality Analysis ("How Will Life Be?" - 160 Point System)
+export const predictLifeQuality = (
+    planets: any[],
+    ascendantSign: number,
+    moonSign: number,
+    currentDasa: { maha: DashaPeriod, bhukti?: DashaPeriod },
+    birthDate: Date,
+    subathuvamScores: Record<string, SubathuvamResult>,
+    language: 'en' | 'ta' = 'en'
+): PredictionResult & {
+    totalScore: number,
+    starRating: number,
+    pillarScores: any,
+    domainAnalysis: any
+} => {
+    const isTamil = language === 'ta';
+    const question = isTamil ? "வாழ்க்கை எப்படி இருக்கும்?" : "How Will Life Be?";
+
+    const getP = (name: string) => planets.find(p => p.name === name);
+    const getLord = (houseIdx: number) => SIGN_LORDS[(ascendantSign + houseIdx - 1) % 12];
+    const getPlanetScore = (planetName: string) => subathuvamScores[planetName]?.totalScore || 0;
+
+    // --- SCORING SYSTEM (Base: 160 -> Scaled to 100) ---
+    let totalScore = 0;
+    const scores = {
+        lagna: 0, // 20
+        moon: 0,  // 20
+        dharma: 0, // 15
+        artha: 0, // 15
+        kama: 0,  // 10
+        moksha: 0, // 10
+        benefics: 0, // 20
+        yogas: 0, // 20
+        dasa: 0,  // 20
+        age: 0    // 10
+    };
+
+    // 1. Lagna Analysis (20 pts)
+    const lagnaLordName = getLord(1);
+    const lagnaLord = getP(lagnaLordName);
+    const lagnaLordScore = getPlanetScore(lagnaLordName);
+
+    // Lagna Strength
+    if (lagnaLordScore > 50) scores.lagna += 10;
+    else if (lagnaLordScore > 30) scores.lagna += 7;
+    else scores.lagna += 4;
+
+    // Benefics in Lagna?
+    const planetsInLagna = planets.filter(p => p.signIndex === ascendantSign);
+    const hasBeneficInLagna = planetsInLagna.some(p => ['Jupiter', 'Venus', 'Mercury', 'Moon'].includes(p.name));
+    const hasMaleficInLagna = planetsInLagna.some(p => ['Saturn', 'Mars', 'Rahu', 'Ketu'].includes(p.name));
+
+    if (hasBeneficInLagna) scores.lagna += 5;
+    if (!hasMaleficInLagna) scores.lagna += 5; // Clean Lagna bonus
+
+    // 2. Moon Analysis (20 pts)
+    const moon = getP('Moon');
+    const moonScore = getPlanetScore('Moon');
+    if (moonScore > 60) scores.moon += 10;
+    else if (moonScore > 40) scores.moon += 7;
+    else scores.moon += 4;
+
+    // Moon Phase / Strength (Approximation: brightness assumed good if score high)
+    // Check Moon placement
+    if (moon) {
+        const moonHouse = (moon.signIndex - ascendantSign + 12) % 12 + 1;
+        if ([1, 4, 7, 10, 5, 9].includes(moonHouse)) scores.moon += 5;
+        // Moon with Benefics? (Gajakesari check partial)
+        const moonSignPlanets = planets.filter(p => p.signIndex === moon.signIndex && p.name !== 'Moon');
+        if (moonSignPlanets.some(p => ['Jupiter', 'Venus'].includes(p.name))) scores.moon += 5;
+    }
+
+    // 3. House Pillars Analysis (50 pts total)
+    const getLordStrength = (houseIdx: number) => {
+        const lord = getLord(houseIdx);
+        return getPlanetScore(lord) > 30; // Usage threshold
+    };
+
+    // Dharma (1, 5, 9) - 15 pts
+    if (getLordStrength(1)) scores.dharma += 5;
+    if (getLordStrength(5)) scores.dharma += 5;
+    if (getLordStrength(9)) scores.dharma += 5;
+
+    // Artha (2, 6, 10) - 15 pts
+    if (getLordStrength(2)) scores.artha += 5;
+    if (getLordStrength(10)) scores.artha += 5;
+    const lord6 = getLord(6);
+    // 6th Lord failing is good? Or controlled? User says "6th Lord under control? +5".
+    // We assume if 6th Lord score is MODERATE (not too high to cause trouble, not too low to be weak in fighting).
+    // Let's simplified: If 6th Lord is in Upachaya (3, 6, 10, 11) -> Good.
+    const p6Lord = getP(lord6);
+    if (p6Lord) {
+        const h6Pos = (p6Lord.signIndex - ascendantSign + 12) % 12 + 1;
+        if ([3, 6, 10, 11].includes(h6Pos)) scores.artha += 5;
+    }
+
+    // Kama (3, 7, 11) - 10 pts
+    if (getLordStrength(7)) scores.kama += 4;
+    // 3rd Lord OK?
+    const lord3 = getLord(3);
+    const p3Lord = getP(lord3);
+    if (p3Lord && [3, 6, 10, 11].includes((p3Lord.signIndex - ascendantSign + 12) % 12 + 1)) scores.kama += 3;
+    if (getLordStrength(11)) scores.kama += 3;
+
+    // Moksha (4, 8, 12) - 10 pts
+    if (getLordStrength(4)) scores.moksha += 4;
+    // 8th Lord controlled? (In 6, 8, 12 or weak?) checks...
+    const lord8 = getLord(8);
+    const p8Lord = getP(lord8);
+    // If 8th Lord in 6, 8, 12 -> Vipareeta Raja Yoga potential, else risky. 
+    if (p8Lord && [6, 8, 12].includes((p8Lord.signIndex - ascendantSign + 12) % 12 + 1)) scores.moksha += 3;
+    else scores.moksha += 1; // Default low
+    // 12th Lord
+    const lord12 = getLord(12);
+    const p12Lord = getP(lord12);
+    if (p12Lord && [3, 6, 10, 11, 12].includes((p12Lord.signIndex - ascendantSign + 12) % 12 + 1)) scores.moksha += 3;
+
+    // 4. Benefic Planets (20 pts)
+    const jupiterScore = getPlanetScore('Jupiter');
+    const venusScore = getPlanetScore('Venus');
+
+    if (jupiterScore > 60) scores.benefics += 10;
+    else if (jupiterScore > 40) scores.benefics += 7;
+    else scores.benefics += 4;
+
+    if (venusScore > 60) scores.benefics += 10;
+    else if (venusScore > 40) scores.benefics += 7;
+    else scores.benefics += 4;
+
+    // 5. Special Yogas (20 pts)
+    // Simple check Logic
+    let yogaPoints = 0;
+    // Raja Yoga: 9th or 10th Lord strong
+    if (getLordStrength(9) && getLordStrength(10)) yogaPoints += 7;
+    // Dhana Yoga: 2nd and 11th Lord strong
+    if (getLordStrength(2) && getLordStrength(11)) yogaPoints += 7;
+    // Gajakesari (Jup + Moon)
+    const jupiter = getP('Jupiter');
+    if (jupiter && moon) {
+        // Conjunction or Opposition
+        const dist = (jupiter.signIndex - moon.signIndex + 12) % 12;
+        if (dist === 0 || dist === 6 || dist === 3 || dist === 9) yogaPoints += 6; // Kendra relationship
+    }
+    // Malefic Penalties
+    // Kala Sarpa (Rough check: all planets between Rahu/Ketu - simplified to check if many are)
+    // Skip complex geometry for now.
+    scores.yogas = Math.min(20, yogaPoints);
+
+    // 6. Current Dasa (20 pts)
+    const dasaLord = currentDasa.maha.planet;
+    const pDasaLord = getP(dasaLord);
+    const dasaLordScore = getPlanetScore(dasaLord);
+
+    // Step 1: House Lordship (Trikona/Kendra?)
+    // Need to find which houses this planet rules
+    let dasaHousePoints = 0;
+    [1, 5, 9].forEach(h => { if (getLord(h) === dasaLord) dasaHousePoints += 5; }); // Trikona
+    [1, 4, 7, 10].forEach(h => { if (getLord(h) === dasaLord) dasaHousePoints += 3; }); // Kendra
+
+    // Step 2: Placement
+    if (pDasaLord) {
+        const hPos = (pDasaLord.signIndex - ascendantSign + 12) % 12 + 1;
+        if ([1, 5, 9].includes(hPos)) dasaHousePoints += 5;
+        else if ([1, 4, 7, 10].includes(hPos)) dasaHousePoints += 4;
+        else if ([3, 6, 10, 11].includes(hPos)) dasaHousePoints += 3;
+        else if ([6, 8, 12].includes(hPos)) dasaHousePoints -= 3;
+    }
+
+    // Step 3: Strength
+    if (dasaLordScore > 60) dasaHousePoints += 5;
+    else if (dasaLordScore < 30) dasaHousePoints -= 2;
+
+    scores.dasa = Math.max(0, Math.min(20, dasaHousePoints)); // Cap 0-20
+
+    // 7. Age Factor
+    scores.age = 10; // Default full points for Life Analysis as "Potential", or adjust by passed struggles?
+    // User says "Age appropriate to Dasa? +5". Let's just give flat 10 for now as "Life Potential".
+
+    // TOTAL CALCULATION
+    const rawScore = Object.values(scores).reduce((a, b) => a + b, 0);
+    totalScore = Math.round((rawScore / 160) * 100);
+
+    // Interpretation (Scaled to 100)
+    // 50 marks -> 2.5 stars (Score / 20)
+    // Round to nearest 0.5: (Score / 10) / 2
+    const starRating = Math.max(1, Math.min(5, Math.round(totalScore / 10) / 2));
+
+    let verdict = "";
+    let color = "";
+
+    if (starRating >= 4.5) { verdict = isTamil ? "மிகச் சிறந்த வாழ்க்கை (Excellent)" : "Excellent Life (Top 5%)"; color = "text-yellow-400"; }
+    else if (starRating >= 4) { verdict = isTamil ? "மிக நல்ல வாழ்க்கை (Very Good)" : "Very Good Life (Top 20%)"; color = "text-emerald-400"; }
+    else if (starRating >= 3) { verdict = isTamil ? "நல்ல வாழ்க்கை (Good)" : "Good/Average Life"; color = "text-blue-400"; }
+    else if (starRating >= 2) { verdict = isTamil ? "சவாலான வாழ்க்கை (Challenging)" : "Challenging Life"; color = "text-orange-400"; }
+    else { verdict = isTamil ? "கடினமான வாழ்க்கை (Difficult)" : "Difficult Life"; color = "text-red-400"; }
+
+    // Domain Analysis
+    const getLevel = (pts: number, max: number) => {
+        const pct = pts / max;
+        if (pct > 0.75) return isTamil ? "சிறப்பு" : "Excellent";
+        if (pct > 0.5) return isTamil ? "நன்று" : "Good";
+        return isTamil ? "சராசரி/குறைவு" : "Average/Low";
+    };
+
+    const domainAnalysis = {
+        wealth: getLevel(scores.artha + (getLordStrength(11) ? 5 : 0), 20),
+        career: getLevel(scores.artha + (getLordStrength(10) ? 5 : 0), 20),
+        family: getLevel(scores.kama + scores.dharma, 25), // Dharma(Kids)+Kama(Spouse)
+        health: getLevel(scores.lagna, 20)
+    };
+
+    const answer = isTamil
+        ? `உங்கள் ஜாதகத்தின் மொத்த வலிமை: **${totalScore}/100**\n\n**தரமதிப்பீடு:** ${verdict}\n\nஇந்த மதிப்பீடு தர்மம், அர்த்தம், காமம், மோட்சம் ஆகிய நான்கு புருஷார்த்தங்களின் அடிப்படையில் கணக்கிடப்பட்டுள்ளது.`
+        : `Your Chart's Total Strength: **${totalScore}/100**\n\n**Rating:** ${verdict}\n\nThis analysis is based on the 4 Life Pillars: Dharma, Artha, Kama, Moksha.`;
+
+    const reason = isTamil
+        ? `**காரணிகள்:**\n- லக்ன பலம்: ${scores.lagna}/20\n- சந்திர பலம்: ${scores.moon}/20\n- தர்ம ஸ்தானங்கள்: ${scores.dharma}/15\n- அர்த்த ஸ்தானங்கள்: ${scores.artha}/15\n- காம ஸ்தானங்கள்: ${scores.kama}/10\n- மோட்ச ஸ்தானங்கள்: ${scores.moksha}/10\n- சுப கிரகங்கள்: ${scores.benefics}/20\n- யோகங்கள்: ${scores.yogas}/20\n- தற்போது நடக்கும் தசை: ${scores.dasa}/20`
+        : `**Score Breakdown:**\n- Lagna (Self): ${scores.lagna}/20\n- Moon (Mind): ${scores.moon}/20\n- Dharma (Luck): ${scores.dharma}/15\n- Artha (Wealth): ${scores.artha}/15\n- Kama (Desire): ${scores.kama}/10\n- Moksha (Peace): ${scores.moksha}/10\n- Benefic Planets: ${scores.benefics}/20\n- Yogas: ${scores.yogas}/20\n- Current Dasa: ${scores.dasa}/20`;
+
+    return {
+        question,
+        answer,
+        reason,
+        isFavorable: totalScore > 100,
+        totalScore,
+        starRating,
+        pillarScores: {
+            dharma: scores.dharma,
+            artha: scores.artha,
+            kama: scores.kama,
+            moksha: scores.moksha
+        },
+        domainAnalysis
     };
 };

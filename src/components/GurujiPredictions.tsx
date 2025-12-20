@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, StarHalf, RotateCw } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
@@ -15,7 +15,9 @@ import {
     predictMarriageType,
     predictCareerPath,
     predictForeignTravel,
-    predictCurrentLoveStatus // New Import
+    predictCurrentLoveStatus,
+    predictMarriageStatus, // New Import
+    predictLifeQuality // New Import
 } from '../utils/predictionRules';
 import { queryAstrologyOrchestrator, OrchestratorResponse, translateAnalysisReport } from '../utils/aiOrchestrator';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,7 +70,8 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const careerPath = aiResponse?.life_guidance?.career_path ? { ...rawCareer, answer: aiResponse.life_guidance.career_path.answer, reason: aiResponse.life_guidance.career_path.reason } : rawCareer;
     // Note: AI support for loveStatus is not yet in OrchestratorResponse interface, using raw for now or if user expands schema later.
     const loveStatus = rawLoveStatus;
-
+    const marriageStatus = predictMarriageStatus(planets, ascendant.signIndex, currentDasha, new Date(birthDate), language);
+    const lifeQuality = predictLifeQuality(planets, ascendant.signIndex, moon.signIndex, currentDasha, new Date(birthDate), agScores, language);
 
     // Prepare data for AI
     const chartData = {
@@ -399,6 +402,82 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                         {isTamil ? "மீண்டும் ஆய்வு செய்" : "Check Again"}
                     </button>
                 </div>
+
+                {/* 0. NEW: Life Quality Analysis (The First Card) */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="glass-panel p-6 border-l-4 border-yellow-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition mb-6"
+                >
+                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                        <Star className="w-32 h-32 text-yellow-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-yellow-200 mb-2 flex items-center gap-2">
+                        <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
+                        {lifeQuality.question}
+                    </h3>
+
+                    {/* Score & Verdict Header */}
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="text-4xl font-bold text-white">
+                            {lifeQuality.totalScore}<span className="text-lg text-slate-400 font-normal">/100</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <div className="flex text-yellow-400">
+                                {[...Array(5)].map((_, i) => {
+                                    const rating = lifeQuality.starRating;
+                                    const isFull = i < Math.floor(rating);
+                                    const isHalf = i === Math.floor(rating) && rating % 1 !== 0;
+
+                                    return (
+                                        <div key={i} className="relative w-4 h-4">
+                                            {/* Base empty star */}
+                                            <Star className="w-4 h-4 text-yellow-400 opacity-30 absolute top-0 left-0" />
+
+                                            {/* Full or Half Overlay */}
+                                            {isFull && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
+                                            {isHalf && <StarHalf className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <span className={`text-sm font-bold ${lifeQuality.totalScore >= 60 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                                {lifeQuality.answer.split('\n\n')[1]?.replace('**Rating:** ', '').replace('**தரமதிப்பீடு:** ', '')}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Pillar Breakdown */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                        <div className="bg-slate-800/50 p-2 rounded text-center">
+                            <div className="text-xs text-slate-400">Dharma</div>
+                            <div className="text-emerald-400 font-bold">{lifeQuality.pillarScores.dharma}/15</div>
+                        </div>
+                        <div className="bg-slate-800/50 p-2 rounded text-center">
+                            <div className="text-xs text-slate-400">Artha</div>
+                            <div className="text-yellow-400 font-bold">{lifeQuality.pillarScores.artha}/15</div>
+                        </div>
+                        <div className="bg-slate-800/50 p-2 rounded text-center">
+                            <div className="text-xs text-slate-400">Kama</div>
+                            <div className="text-pink-400 font-bold">{lifeQuality.pillarScores.kama}/10</div>
+                        </div>
+                        <div className="bg-slate-800/50 p-2 rounded text-center">
+                            <div className="text-xs text-slate-400">Moksha</div>
+                            <div className="text-purple-400 font-bold">{lifeQuality.pillarScores.moksha}/10</div>
+                        </div>
+                    </div>
+
+                    {/* Detailed Reasoning */}
+                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line text-sm">
+                        {lifeQuality.answer.split('\n\n').slice(2).join('\n\n')}
+                    </p>
+
+                    <div className="text-xs text-yellow-400/80 italic border-t border-yellow-900/30 pt-2">
+                        <pre className="whitespace-pre-wrap mt-1 font-sans opacity-80">{lifeQuality.reason}</pre>
+                    </div>
+                </motion.div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
 
                     {/* 1. Job Timing */}
