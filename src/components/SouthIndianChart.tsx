@@ -9,7 +9,9 @@ import ChartGrid from './ChartGrid';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, CheckCircle, AlertCircle, Share2 } from 'lucide-react';
+import ShareModal from './ShareModal';
+import { ShareData } from '../utils/shareUtils';
 
 interface SouthIndianChartProps {
     data: any;
@@ -20,6 +22,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
     const { user } = useAuth();
     const [saving, setSaving] = React.useState(false);
     const [saveStatus, setSaveStatus] = React.useState<'idle' | 'success' | 'error' | 'exists'>('idle');
+    const [showShareModal, setShowShareModal] = React.useState(false);
 
     const handleSaveChart = async () => {
         if (!user || !data) return;
@@ -84,20 +87,46 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                 </p>
             </motion.div>
 
+            {/* Share Modal */}
+            <ShareModal
+                isOpen={showShareModal}
+                onClose={() => setShowShareModal(false)}
+                shareData={{
+                    name: data.userDetails.name,
+                    lagna: TAMIL_RASI_NAMES[data.ascendant.signIndex],
+                    moonSign: TAMIL_RASI_NAMES[data.planets.find((p: any) => p.name === 'Moon')?.signIndex || 0],
+                    birthDate: new Date(data.userDetails.date).toLocaleDateString(),
+                    birthTime: data.userDetails.time,
+                    birthPlace: data.userDetails.city
+                }}
+            />
+
             {user && (
-                <div className="flex justify-end mb-4 px-4">
+                <div className="flex justify-end gap-3 mb-4 px-4">
+                    {/* Share Button */}
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowShareModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition shadow-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/30"
+                    >
+                        <Share2 className="w-4 h-4" />
+                        Share Chart
+                    </motion.button>
+
+                    {/* Save Button */}
                     <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleSaveChart}
                         disabled={saving || saveStatus === 'success'}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition shadow-lg ${saveStatus === 'success'
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : saveStatus === 'error'
-                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                    : saveStatus === 'exists'
-                                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                                        : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                            : saveStatus === 'error'
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                : saveStatus === 'exists'
+                                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                    : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
                             }`}
                     >
                         {saveStatus === 'success' ? (
@@ -125,7 +154,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start justify-items-center">
+            <div id="chart-container" className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start justify-items-center">
                 {/* Rasi Chart */}
                 <ChartGrid
                     title="Rasi Chart (D1)"

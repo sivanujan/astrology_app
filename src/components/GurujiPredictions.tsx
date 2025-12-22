@@ -23,6 +23,7 @@ import { queryAstrologyOrchestrator, OrchestratorResponse, translateAnalysisRepo
 import { useAuth } from '../contexts/AuthContext';
 import { predictionService, generateChartId } from '../services/predictionService';
 import { generatePDF } from '../utils/pdfGenerator';
+import DasaAnalysis from './DasaAnalysis';
 
 interface GurujiPredictionsProps {
     data: any;
@@ -704,6 +705,40 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                     </motion.div>
                 </div>
             </div>
+
+            {/* Comprehensive Dasa Analysis */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mt-12"
+            >
+                <DasaAnalysis
+                    chart={{
+                        planets,
+                        ascendant,
+                        birthDate
+                    }}
+                    currentDasa={{
+                        maha: {
+                            planet: currentDasha?.maha?.planet || 'Unknown',
+                            startDate: currentDasha?.maha?.startDate || '',
+                            endDate: currentDasha?.maha?.endDate || ''
+                        },
+                        bhukti: {
+                            planet: currentDasha?.bhukti?.planet || 'Unknown',
+                            startDate: currentDasha?.bhukti?.startDate || '',
+                            endDate: currentDasha?.bhukti?.endDate || ''
+                        },
+                        antaram: currentDasha?.antaram ? {
+                            planet: currentDasha.antaram.planet,
+                            startDate: currentDasha.antaram.startDate || '',
+                            endDate: currentDasha.antaram.endDate || ''
+                        } : undefined
+                    }}
+                    agScores={agScores}
+                />
+            </motion.div>
 
             {/* Ask AI Button */}
             <motion.div

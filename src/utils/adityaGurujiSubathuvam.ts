@@ -142,9 +142,9 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
 
         results[planet.name] = {
             planet: planet.name,
-            rasiScore,
-            navamsaScore,
-            totalScore,
+            rasiScore: Math.round(rasiScore),
+            navamsaScore: Math.round(navamsaScore),
+            totalScore: Math.round(totalScore),
             isSubathuva,
             details
         };
@@ -319,12 +319,29 @@ export interface FunctionalStatus {
     roles: string[]; // e.g., ["Lord of 1", "Lord of 5"]
 }
 
-export const getFunctionalNature = (ascendantSignIndex: number): Record<string, FunctionalStatus> => {
+export const getFunctionalNature = (ascendantSignIndex: number, language: 'en' | 'ta' = 'en'): Record<string, FunctionalStatus> => {
     const results: Record<string, FunctionalStatus> = {};
+
+    // Translation helper
+    const translateNature = (nature: string): string => {
+        if (language !== 'ta') return nature;
+        const translations: Record<string, string> = {
+            'Yogakaraka': 'யோககாரகன்',
+            'Benefic': 'சுபன்',
+            'Malefic': 'பாபன்',
+            'Maraka': 'மாரகன்',
+            'Neutral': 'நடுநிலை'
+        };
+        return translations[nature] || nature;
+    };
+
+    const translateRole = (house: number): string => {
+        return language === 'ta' ? `${house} வீட்டின் அதிபதி` : `Lord of ${house}`;
+    };
 
     Object.entries(OWN_SIGNS).forEach(([planet, signs]) => {
         const houses = signs.map(sign => (sign - ascendantSignIndex + 12) % 12 + 1);
-        const roles = houses.map(h => `Lord of ${h}`);
+        const roles = houses.map(h => translateRole(h));
 
         let nature = "Neutral";
 
@@ -350,7 +367,7 @@ export const getFunctionalNature = (ascendantSignIndex: number): Record<string, 
 
         results[planet] = {
             planet,
-            nature,
+            nature: translateNature(nature),
             roles
         };
     });

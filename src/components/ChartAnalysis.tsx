@@ -233,7 +233,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                         </thead>
                         <tbody className="divide-y divide-slate-800">
                             {planets.map((planet: any) => {
-                                const scores = calculateSubathuvamPavathuvam(planets);
+                                const scores = calculateSubathuvamPavathuvam(planets, language);
                                 const pScores = scores[planet.name];
                                 if (!pScores) return null;
 
@@ -298,7 +298,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                             </thead>
                             <tbody className="divide-y divide-slate-800">
                                 {Array.from({ length: 12 }, (_, i) => i + 1).map((houseNum) => {
-                                    const houseScores = calculateHouseSubathuvamPavathuvam(ascendant.signIndex, planets);
+                                    const houseScores = calculateHouseSubathuvamPavathuvam(ascendant.signIndex, planets, language);
                                     const hScores = houseScores[houseNum];
                                     if (!hScores) return null;
 
@@ -481,7 +481,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">
                                     {planets.map((planet: any) => {
-                                        const functionalNature = getFunctionalNature(data.ascendant.signIndex);
+                                        const functionalNature = getFunctionalNature(data.ascendant.signIndex, language);
                                         const status = functionalNature[planet.name];
                                         if (!status) return null;
 
@@ -510,27 +510,58 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
 
                     {/* Special Predictions */}
                     <div>
-                        <h4 className="text-md font-semibold text-slate-300 mb-4">Special Predictions (Subathuvam Filtered)</h4>
+                        <h4 className="text-md font-semibold text-slate-300 mb-4">{language === 'ta' ? 'சிறப்பு கணிப்புகள் (சுபத்துவம் வடிகட்டப்பட்டது)' : 'Special Predictions (Subathuvam Filtered)'}</h4>
                         <div className="space-y-4">
                             {(() => {
                                 const agScores = calculateAdityaGurujiSubathuvam(planets);
                                 const predictions = generateSpecialPredictions(planets, data.ascendant.signIndex, agScores);
 
                                 if (predictions.length === 0) {
-                                    return <div className="text-slate-500 italic p-4">No special placements detected for this chart.</div>;
+                                    return <div className="text-slate-500 italic p-4">{language === 'ta' ? 'இந்த ஜாதகத்தில் சிறப்பு நிலைகள் இல்லை' : 'No special placements detected for this chart.'}</div>;
                                 }
 
-                                return predictions.map((pred, idx) => (
-                                    <div key={idx} className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="font-bold text-purple-400">{pred.planet}</span>
-                                            <span className="text-xs text-slate-500 uppercase tracking-wider">{pred.type}</span>
+                                return predictions.map((pred, idx) => {
+                                    // Tamil translation helpers
+                                    const translatePlanet = (planet: string) => {
+                                        if (language !== 'ta') return planet;
+                                        const names: Record<string, string> = {
+                                            'Sun': 'சூரியன்', 'Moon': 'சந்திரன்', 'Mars': 'செவ்வாய்',
+                                            'Mercury': 'புதன்', 'Jupiter': 'குரு', 'Venus': 'சுக்ரன்',
+                                            'Saturn': 'சனி', 'Rahu': 'ராகு', 'Ketu': 'கேது'
+                                        };
+                                        return names[planet] || planet;
+                                    };
+
+                                    const translateType = (type: string) => {
+                                        if (language !== 'ta') return type;
+                                        const types: Record<string, string> = {
+                                            'Digbala (10th)': 'திக்பல (10வது)',
+                                            'Progeny (Child Birth)': 'சந்ததி (குழந்தை பிறப்பு)',
+                                            '8th House Subathuva': '8வது வீடு சுபத்துவம்',
+                                            '8th House Affliction': '8வது வீடு துன்பம்',
+                                            'Foreign Settlement': 'வெளிநாட்டு குடியேற்றம்',
+                                            '6th House Subathuva': '6வது வீடு சுபத்துவம்',
+                                            'Profession (Medical/Tech)': 'தொழில் (மருத்துவம்/தொழில்நுட்பம்)',
+                                            'Lagna Lord in Dusthana': 'லக்னாதிபதி துஸ்தான ங்களில்',
+                                            'Afflicted Full Moon': 'பாதிக்கப்பட்ட பௌர்ணமி',
+                                            'Breakup/Conflict Indicator': 'பிரிவு/மோதல் குறிகாட்டி',
+                                            'Retrograde Benefic (Vakram)': 'வக்கிர சுப கிரகம்'
+                                        };
+                                        return types[type] || type;
+                                    };
+
+                                    return (
+                                        <div key={idx} className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="font-bold text-purple-400">{translatePlanet(pred.planet)}</span>
+                                                <span className="text-xs text-slate-500 uppercase tracking-wider">{translateType(pred.type)}</span>
+                                            </div>
+                                            <p className="text-slate-300 text-sm leading-relaxed">
+                                                {pred.prediction}
+                                            </p>
                                         </div>
-                                        <p className="text-slate-300 text-sm leading-relaxed">
-                                            {pred.prediction}
-                                        </p>
-                                    </div>
-                                ));
+                                    );
+                                });
                             })()}
                         </div>
                     </div>

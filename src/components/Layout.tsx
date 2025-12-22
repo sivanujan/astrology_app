@@ -131,7 +131,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                 {user ? (
                                     <button
                                         onClick={() => navigate('/dashboard')}
-                                        className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap"
+                                        className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap ml-6"
                                     >
                                         <LayoutDashboard className="w-4 h-4" />
                                         <span className="hidden lg:inline">{t.nav.dashboard}</span>

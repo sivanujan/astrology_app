@@ -998,7 +998,7 @@ MANDATORY OUTPUT FORMAT:
 - If Tamil is requested, answer COMPLETELY in Tamil.
 - Structure your answer using the 6 Rules logic implicitly.
 - Don't list the rules, APPLY them.
-- Start with: "Hello ${userName},"
+- Start with a friendly greeting.
 
 Output Format (JSON):
 
@@ -1637,7 +1637,7 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
         Star: moon ? getNakshatra(moon.longitude) : "Unknown",
         CurrentDasa: currentDasa ? {
             lord: currentDasa.maha.planet,
-            functional_nature: getFunctionalNature(ascSignIndex)[currentDasa.maha.planet]?.nature || "Neutral",
+            functional_nature: getFunctionalNature(ascSignIndex, language)[currentDasa.maha.planet]?.nature || "Neutral",
             bhukti: currentDasa.bhukti?.planet,
             antaram: currentDasa.antaram?.planet,
             start_date: currentDasa.maha.startDate ? new Date(currentDasa.maha.startDate).toLocaleDateString() : "Unknown",
@@ -1646,7 +1646,7 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
             timeline_summary: "See 'dasa_schedule' below for full timeline."
         } : "Unknown",
         DasaSchedule: getReadableDashaSchedule(data.dashaPeriods),
-        FunctionalMalefics: getFunctionalNature(ascSignIndex),
+        FunctionalMalefics: getFunctionalNature(ascSignIndex, language),
         SpecialRulesAnalysis: advancedRules,
         HouseLords: houseLords,
         CalculatedAspects: calculatedAspects,

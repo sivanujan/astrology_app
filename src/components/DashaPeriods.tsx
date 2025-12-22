@@ -5,6 +5,8 @@ import { calculateDashaPeriods, getCurrentDasha, DashaPeriod, PLANET_COLORS } fr
 import { useLanguage } from '../contexts/LanguageContext';
 import { TAMIL_PLANET_NAMES } from '../utils/translations';
 import { format } from 'date-fns';
+import DasaAnalysis from './DasaAnalysis';
+import { calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
 
 interface DashaPeriodsProps {
     data: any;
@@ -117,6 +119,42 @@ const DashaPeriods: React.FC<DashaPeriodsProps> = ({ data }) => {
                 <div className="text-center p-8 glass-panel text-slate-400">
                     <p>Current date is outside the calculated 120-year Dasha period.</p>
                 </div>
+            )}
+
+            {/* Comprehensive Dasa Analysis */}
+            {currentDasha && data.planets && data.ascendant && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-8"
+                >
+                    <DasaAnalysis
+                        chart={{
+                            planets: data.planets,
+                            ascendant: data.ascendant,
+                            birthDate: data.birthDate
+                        }}
+                        currentDasa={{
+                            maha: {
+                                planet: currentDasha.maha?.planet || 'Unknown',
+                                startDate: currentDasha.maha?.startDate || '',
+                                endDate: currentDasha.maha?.endDate || ''
+                            },
+                            bhukti: currentDasha.bhukti ? {
+                                planet: currentDasha.bhukti.planet,
+                                startDate: currentDasha.bhukti.startDate || '',
+                                endDate: currentDasha.bhukti.endDate || ''
+                            } : undefined,
+                            antaram: currentDasha.antaram ? {
+                                planet: currentDasha.antaram.planet,
+                                startDate: currentDasha.antaram.startDate || '',
+                                endDate: currentDasha.antaram.endDate || ''
+                            } : undefined
+                        }}
+                        agScores={calculateAdityaGurujiSubathuvam(data.planets)}
+                    />
+                </motion.div>
             )}
 
             {/* Timeline Accordion */}

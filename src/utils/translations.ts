@@ -58,7 +58,10 @@ export const translations = {
             gender: "Gender",
             male: "Male",
             female: "Female",
-            other: "Other"
+            other: "Other",
+            unknownTime: "I don't know my birth time",
+            estimatedLagna: "Estimated Lagna",
+            confidence: "confidence"
         },
         chart: {
             title: "South Indian Chart",
@@ -301,7 +304,10 @@ export const translations = {
             gender: "பாலினம்",
             male: "ஆண்",
             female: "பெண்",
-            other: "பிற"
+            other: "பிற",
+            unknownTime: "எனது பிறந்த நேரம் தெரியாது",
+            estimatedLagna: "மதிப்பீட்டு லக்னம்",
+            confidence: "நம்பிக்கை"
         },
         chart: {
             title: "இராசி கட்டம்",

@@ -140,13 +140,13 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
             // 1. Calculate Subathuvam/Pavathuvam
             const { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } = await import('../utils/subathuvam');
-            const subathuvamScores = calculateSubathuvamPavathuvam(data.planets);
+            const subathuvamScores = calculateSubathuvamPavathuvam(data.planets, language);
             // Assuming ascendant Sign Index is available. If not, derive from data.ascendant.
             // data.ascendant usually has 'signIndex' or we can find it.
             // Fallback: If no ascendant index, skip House Subathuvam.
             let houseScores = {};
             if (data.ascendant && typeof data.ascendant.signIndex === 'number') {
-                houseScores = calculateHouseSubathuvamPavathuvam(data.ascendant.signIndex, data.planets);
+                houseScores = calculateHouseSubathuvamPavathuvam(data.ascendant.signIndex, data.planets, language);
             }
 
             enrichedData = {
@@ -206,7 +206,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             >
                 <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400 flex items-center justify-center gap-3">
                     <BrainCircuit className="w-8 h-8 text-purple-400" />
-                    {t.predictions.title} (AI Orchestrator)
+                    {t.predictions.title}
                 </h2>
                 <p className="text-slate-400">{t.predictions.subtitle}</p>
             </motion.div>

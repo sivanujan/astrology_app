@@ -272,7 +272,9 @@ export const predictDetailedMarriageTimingDeprecated = (
     let reason = "";
     let isFavorable = false;
 
-    const currentAge = new Date().getFullYear() - birthDate.getFullYear();
+    // Convert birthDate to Date object if it's not already (handles Firestore Timestamp)
+    const birthDateObj = birthDate instanceof Date ? birthDate : new Date(birthDate);
+    const currentAge = new Date().getFullYear() - birthDateObj.getFullYear();
     const favorableMonths = getSunTransitMonths(ascendantSign).join(", ");
 
     if (isMarriagePeriod && isGuruBala) {
@@ -297,7 +299,7 @@ export const predictDetailedMarriageTimingDeprecated = (
 
                         // Age Check: Skip if age < 21 (approx)
                         const bhuktiMidDate = new Date((bhukti.startDate.getTime() + bhukti.endDate.getTime()) / 2);
-                        const ageAtBhukti = bhuktiMidDate.getFullYear() - birthDate.getFullYear();
+                        const ageAtBhukti = bhuktiMidDate.getFullYear() - birthDateObj.getFullYear();
                         if (ageAtBhukti < 21) continue;
 
                         // Check Bhukti Level
@@ -751,8 +753,10 @@ export const predictDetailedMarriageTiming = (
 
     // --- Precision Engine Execution ---
     const now = new Date();
-    const currentAge = now.getFullYear() - birthDate.getFullYear();
-    const age21Date = new Date(birthDate.getFullYear() + 21, birthDate.getMonth(), birthDate.getDate());
+    // Convert birthDate to Date object if it's not already
+    const birthDateObj = birthDate instanceof Date ? birthDate : new Date(birthDate);
+    const currentAge = now.getFullYear() - birthDateObj.getFullYear();
+    const age21Date = new Date(birthDateObj.getFullYear() + 21, birthDateObj.getMonth(), birthDateObj.getDate());
 
     const pastFavorableYears = new Set<number>();
     const futureFavorableYears = new Set<number>();
@@ -771,7 +775,7 @@ export const predictDetailedMarriageTiming = (
 
                     // Age Check
                     const bhuktiMidDate = new Date((bhukti.startDate.getTime() + bhukti.endDate.getTime()) / 2);
-                    const ageAtBhukti = bhuktiMidDate.getFullYear() - birthDate.getFullYear();
+                    const ageAtBhukti = bhuktiMidDate.getFullYear() - birthDateObj.getFullYear();
                     // Double check age
                     if (ageAtBhukti < 21) continue;
 
@@ -1652,7 +1656,9 @@ export const predictMarriageStatus = (
 
     // --- Step 3: Age Factor ---
     const now = new Date();
-    const currentAge = now.getFullYear() - birthDate.getFullYear();
+    // Convert birthDate to Date object if it's not already
+    const birthDateObj = birthDate instanceof Date ? birthDate : new Date(birthDate);
+    const currentAge = now.getFullYear() - birthDateObj.getFullYear();
     let ageModifier = 1.0;
 
     if (currentAge >= 18 && currentAge <= 23) ageModifier = 0.7;

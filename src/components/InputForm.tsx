@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Calendar, Clock, MapPin, Search, Loader2, ChevronRight, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { calculatePlanetaryPositions } from '../utils/astrology';
+// import LagnaIdentificationWizard from './LagnaIdentificationWizard';
+// import { IdentificationResult } from '../utils/lagnaIdentification';
 
 import { useChartData } from '../contexts/ChartContext';
 import { saveGuestBirthData } from '../hooks/useSaveGuestData';
@@ -35,6 +37,12 @@ const InputForm: React.FC = () => {
 
     const [displayDate, setDisplayDate] = useState('');
     const dateInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Lagna identification state - DISABLED FOR NOW
+    // const [unknownBirthTime, setUnknownBirthTime] = useState(false);
+    // const [showLagnaWizard, setShowLagnaWizard] = useState(false);
+    // const [identifiedLagna, setIdentifiedLagna] = useState<IdentificationResult | null>(null);
+    // const [estimatedTime, setEstimatedTime] = useState<string>('');
 
     // Initialize displayDate from formData.date logic
     useEffect(() => {
@@ -206,172 +214,230 @@ const InputForm: React.FC = () => {
         navigate('/chart');
     };
 
+    // DISABLED: Lagna identification handler
+    // const handleLagnaIdentificationComplete = (result: IdentificationResult, time?: string) => {
+    //     setIdentifiedLagna(result);
+    //     if (time) {
+    //         setEstimatedTime(time);
+    //         setFormData(prev => ({ ...prev, time }));
+    //     }
+    //     setShowLagnaWizard(false);
+    // };
+
     return (
-        <div className="max-w-2xl mx-auto">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="glass-panel p-8 md:p-12"
-            >
-                <div className="text-center mb-10">
-                    <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 mb-4">
-                        {t.input.title}
-                    </h1>
-                    <p className="text-slate-400 text-lg">
-                        {t.input.subtitle}
-                    </p>
-                </div>
+        <>
+            {/* Lagna Identification Wizard */}
+            {/* {showLagnaWizard && formData.date && formData.lat && formData.lng && (
+                <LagnaIdentificationWizard
+                    onClose={() => {
+                        setShowLagnaWizard(false);
+                        setUnknownBirthTime(false);
+                    }}
+                    onComplete={handleLagnaIdentificationComplete}
+                    birthDate={new Date(formData.date)}
+                    birthPlace={{ latitude: formData.lat, longitude: formData.lng }}
+                />
+            )} */}
 
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300 ml-1">{t.input.name}</label>
-                        <input
-                            type="text"
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
-                            placeholder="e.g. Arjuna"
-                        />
+            <div className="max-w-2xl mx-auto">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="glass-panel p-8 md:p-12"
+                >
+                    <div className="text-center mb-10">
+                        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 mb-4">
+                            {t.input.title}
+                        </h1>
+                        <p className="text-slate-400 text-lg">
+                            {t.input.subtitle}
+                        </p>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
-                            <User className="w-4 h-4" /> {t.input.gender}
-                        </label>
-                        <div className="grid grid-cols-3 gap-4">
-                            {['male', 'female', 'other'].map((g) => (
-                                <button
-                                    key={g}
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, gender: g })}
-                                    className={`px-4 py-3 rounded-lg border transition-all text-sm font-medium ${formData.gender === g
-                                            ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-500/25'
-                                            : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-purple-500/50 hover:text-purple-400'
-                                        }`}
-                                >
-                                    {t.input[g as keyof typeof t.input]}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Date Input */}
-                        {/* Date Input - Custom DD/MM/YYYY Text + Hidden Picker */}
-                        <div className="space-y-2 relative">
-                            <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> {t.input.dob}
-                            </label>
-
-                            <div className="relative">
-                                {/* Visible Text Input */}
-                                <input
-                                    type="text"
-                                    required
-                                    value={displayDate}
-                                    onChange={handleTextDateChange}
-                                    placeholder="dd/mm/yyyy"
-                                    maxLength={10}
-                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
-                                />
-
-                                {/* Calendar Icon Trigger */}
-                                <button
-                                    type="button"
-                                    onClick={triggerDatePicker}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-400 transition-colors"
-                                >
-                                    <Calendar className="w-5 h-5" />
-                                </button>
-
-                                {/* Hidden Native Date Picker */}
-                                <input
-                                    ref={dateInputRef}
-                                    type="date"
-                                    tabIndex={-1}
-                                    className="absolute opacity-0 bottom-0 left-0 w-full h-full -z-10"
-                                    value={formData.date}
-                                    onChange={handleNativeDateChange}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Time Input */}
+                    <form onSubmit={handleSubmit} className="space-y-8">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
-                                <Clock className="w-4 h-4" /> {t.input.tob}
-                            </label>
-                            <input
-                                type="time"
-                                required
-                                value={formData.time}
-                                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white [color-scheme:dark]"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2 relative">
-                        <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
-                            <MapPin className="w-4 h-4" /> {t.input.pob}
-                        </label>
-                        <div className="relative">
+                            <label className="text-sm font-medium text-slate-300 ml-1">{t.input.name}</label>
                             <input
                                 type="text"
                                 required
-                                value={citySearch}
-                                onChange={(e) => setCitySearch(e.target.value)}
-                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
-                                placeholder={t.input.searchPlaceholder}
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
+                                placeholder="e.g. Arjuna"
                             />
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                            {isSearching && (
-                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 animate-spin" />
-                            )}
                         </div>
 
-                        {/* Dropdown Results */}
-                        {showDropdown && cityResults.length > 0 && (
-                            <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                                {cityResults.map((city) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
+                                <User className="w-4 h-4" /> {t.input.gender}
+                            </label>
+                            <div className="grid grid-cols-3 gap-4">
+                                {['male', 'female', 'other'].map((g) => (
                                     <button
-                                        key={city.id}
+                                        key={g}
                                         type="button"
-                                        onClick={() => handleCitySelect(city)}
-                                        className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors flex items-center justify-between group"
+                                        onClick={() => setFormData({ ...formData, gender: g })}
+                                        className={`px-4 py-3 rounded-lg border transition-all text-sm font-medium ${formData.gender === g
+                                            ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-500/25'
+                                            : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-purple-500/50 hover:text-purple-400'
+                                            }`}
                                     >
-                                        <div>
-                                            <span className="block text-white font-medium">{city.name}</span>
-                                            <span className="text-xs text-slate-400">{city.admin1}, {city.country}</span>
-                                        </div>
-                                        <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-purple-400 transition-colors" />
+                                        {t.input[g as keyof typeof t.input]}
                                     </button>
                                 ))}
                             </div>
-                        )}
-                    </div>
+                        </div>
 
-                    <button
-                        type="submit"
-                        disabled={isGenerating}
-                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-4 rounded-lg shadow-lg shadow-purple-500/25 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                                {t.input.generating}
-                            </>
-                        ) : (
-                            <>
-                                {t.input.generateBtn}
-                                <SparklesIcon />
-                            </>
-                        )}
-                    </button>
-                </form>
-            </motion.div>
-        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Date Input */}
+                            {/* Date Input - Custom DD/MM/YYYY Text + Hidden Picker */}
+                            <div className="space-y-2 relative">
+                                <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
+                                    <Calendar className="w-4 h-4" /> {t.input.dob}
+                                </label>
+
+                                <div className="relative">
+                                    {/* Visible Text Input */}
+                                    <input
+                                        type="text"
+                                        required
+                                        value={displayDate}
+                                        onChange={handleTextDateChange}
+                                        placeholder="dd/mm/yyyy"
+                                        maxLength={10}
+                                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
+                                    />
+
+                                    {/* Calendar Icon Trigger */}
+                                    <button
+                                        type="button"
+                                        onClick={triggerDatePicker}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-400 transition-colors"
+                                    >
+                                        <Calendar className="w-5 h-5" />
+                                    </button>
+
+                                    {/* Hidden Native Date Picker */}
+                                    <input
+                                        ref={dateInputRef}
+                                        type="date"
+                                        tabIndex={-1}
+                                        className="absolute opacity-0 bottom-0 left-0 w-full h-full -z-10"
+                                        value={formData.date}
+                                        onChange={handleNativeDateChange}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Time Input */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
+                                    <Clock className="w-4 h-4" /> {t.input.tob}
+                                </label>
+                                <input
+                                    type="time"
+                                    required
+                                    value={formData.time}
+                                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white [color-scheme:dark]"
+                                />
+
+                                {/* DISABLED: I don't know my birth time checkbox */}
+                                {/* <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-slate-300 transition-colors mt-2">
+                                <input
+                                    type="checkbox"
+                                    checked={unknownBirthTime}
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setUnknownBirthTime(checked);
+                                        if (checked) {
+                                            setShowLagnaWizard(true);
+                                        } else {
+                                            setIdentifiedLagna(null);
+                                            setEstimatedTime('');
+                                            setFormData(prev => ({ ...prev, time: '' }));
+                                        }
+                                    }}
+                                    className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-purple-600 focus:ring-purple-500"
+                                />
+                                <HelpCircle className="w-4 h-4" />
+                                <span>{t.input.unknownTime || "I don't know my birth time"}</span>
+                            </label>
+                            
+                            {unknownBirthTime && identifiedLagna && (
+                                <div className="mt-2 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg text-sm">
+                                    <p className="text-purple-300">
+                                        {t.input.estimatedLagna || 'Estimated Lagna'}: <strong className="text-white">{identifiedLagna.primary.lagna}</strong>
+                                    </p>
+                                    <p className="text-slate-400 text-xs mt-1">
+                                        {identifiedLagna.primary.confidence}% {t.input.confidence || 'confidence'}
+                                    </p>
+                                </div>
+                            )} */}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 relative">
+                            <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
+                                <MapPin className="w-4 h-4" /> {t.input.pob}
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    required
+                                    value={citySearch}
+                                    onChange={(e) => setCitySearch(e.target.value)}
+                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
+                                    placeholder={t.input.searchPlaceholder}
+                                />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                {isSearching && (
+                                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 animate-spin" />
+                                )}
+                            </div>
+
+                            {/* Dropdown Results */}
+                            {showDropdown && cityResults.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                    {cityResults.map((city) => (
+                                        <button
+                                            key={city.id}
+                                            type="button"
+                                            onClick={() => handleCitySelect(city)}
+                                            className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors flex items-center justify-between group"
+                                        >
+                                            <div>
+                                                <span className="block text-white font-medium">{city.name}</span>
+                                                <span className="text-xs text-slate-400">{city.admin1}, {city.country}</span>
+                                            </div>
+                                            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-purple-400 transition-colors" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={isGenerating}
+                            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-4 rounded-lg shadow-lg shadow-purple-500/25 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    {t.input.generating}
+                                </>
+                            ) : (
+                                <>
+                                    {t.input.generateBtn}
+                                    <SparklesIcon />
+                                </>
+                            )}
+                        </button>
+                    </form>
+                </motion.div>
+            </div>
+        </>
     );
 };
 
