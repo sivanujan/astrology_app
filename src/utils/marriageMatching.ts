@@ -147,19 +147,42 @@ export async function analyzeMarriageCompatibility(
     const girlDasaPeriods = calculateDashaPeriods(girlBirthDate, girlMoon.longitude);
 
     // Get current Dasa using existing function
-    const currentBoyDasa = getCurrentDasha(boyDasaPeriods);
-    const currentGirlDasa = getCurrentDasha(girlDasaPeriods);
+    let currentBoyDasa = getCurrentDasha(boyDasaPeriods);
+    let currentGirlDasa = getCurrentDasha(girlDasaPeriods);
 
     console.log('=== DASA DEBUG ===');
     console.log('Boy Moon longitude:', boyMoon.longitude);
     console.log('Boy Dasa Periods count:', boyDasaPeriods.length);
     console.log('Current Boy Dasa:', currentBoyDasa);
+
+    // FALLBACK: If getCurrentDasha returns null, use first period as approximation
+    if (!currentBoyDasa && boyDasaPeriods.length > 0) {
+        console.warn('Boy Dasa is null, using first period as fallback');
+        const firstPeriod = boyDasaPeriods[0];
+        currentBoyDasa = {
+            maha: firstPeriod,
+            bhukti: firstPeriod.subPeriods?.[0] || undefined,
+            antaram: undefined
+        };
+    }
+
     console.log('Boy Maha:', currentBoyDasa?.maha?.planet);
     console.log('Boy Bhukti:', currentBoyDasa?.bhukti?.planet);
     console.log('---');
     console.log('Girl Moon longitude:', girlMoon.longitude);
     console.log('Girl Dasa Periods count:', girlDasaPeriods.length);
     console.log('Current Girl Dasa:', currentGirlDasa);
+
+    if (!currentGirlDasa && girlDasaPeriods.length > 0) {
+        console.warn('Girl Dasa is null, using first period as fallback');
+        const firstPeriod = girlDasaPeriods[0];
+        currentGirlDasa = {
+            maha: firstPeriod,
+            bhukti: firstPeriod.subPeriods?.[0] || undefined,
+            antaram: undefined
+        };
+    }
+
     console.log('Girl Maha:', currentGirlDasa?.maha?.planet);
     console.log('Girl Bhukti:', currentGirlDasa?.bhukti?.planet);
     console.log('==================');
