@@ -1,5 +1,6 @@
 import { ChartData } from './astrology';
 import { analyzeChartNature, getPlanetsAspectingHouse, isBenefic, isMalefic } from './vedicAspects';
+import { calculateAdityaGurujiSubathuvam } from './adityaGurujiSubathuvam';
 
 /**
  * Guruji-specific marriage matching rules and auto-reject criteria
@@ -430,9 +431,6 @@ function analyzeSettlementTendency(
     birthPlace?: string,
     currentPlace?: string
 ): SettlementAnalysis {
-    // Import Subathuvam calculation
-    const { calculateAdityaGurujiSubathuvam } = require('./adityaGurujiSubathuvam');
-
     // Step 1: Calculate Subathuvam for all planets
     const subathuvamResults = calculateAdityaGurujiSubathuvam(chart.planets);
 

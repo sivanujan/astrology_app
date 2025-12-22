@@ -112,9 +112,16 @@ export async function analyzeMarriageCompatibility(
     // STEP 2: Critical 5 Houses Analysis (with auto-reject)
     const house5Check = check5thHouseMatch(boyChart, girlChart);
     const house8BoyCheck = check8thHouseSafety(boyChart, girlChart, 'boy');
-    const house8GirlCheck = check8thHouseSafety(girlChart, boyChart, 'girl'); // Corrected: girlChart for girl, boyChart for boy
+    const house8GirlCheck = check8thHouseSafety(girlChart, boyChart, 'girl');
     const house2Check = check2ndHouseWealth(boyChart, girlChart);
-    const house12Check = check12thHouseSettlement(boyChart, girlChart);
+    const house12Check = check12thHouseSettlement(
+        boyChart,
+        girlChart,
+        boy.birthPlace,
+        boy.currentPlace,
+        girl.birthPlace,
+        girl.currentPlace
+    );
 
     // STEP 3: Dasa-Bhukti Analysis (Current + 10-year forecast)
     const boyBirthDate = new Date(`${boy.date}T${boy.time}`);
@@ -129,6 +136,13 @@ export async function analyzeMarriageCompatibility(
     }
 
     // Calculate Dasa periods using existing function
+    console.log('=== BIRTH DATE DEBUG ===');
+    console.log('Boy date string:', boy.date, boy.time);
+    console.log('Boy birth date object:', boyBirthDate);
+    console.log('Girl date string:', girl.date, girl.time);
+    console.log('Girl birth date object:', girlBirthDate);
+    console.log('Current date:', new Date());
+
     const boyDasaPeriods = calculateDashaPeriods(boyBirthDate, boyMoon.longitude);
     const girlDasaPeriods = calculateDashaPeriods(girlBirthDate, girlMoon.longitude);
 
@@ -136,8 +150,19 @@ export async function analyzeMarriageCompatibility(
     const currentBoyDasa = getCurrentDasha(boyDasaPeriods);
     const currentGirlDasa = getCurrentDasha(girlDasaPeriods);
 
+    console.log('=== DASA DEBUG ===');
+    console.log('Boy Moon longitude:', boyMoon.longitude);
+    console.log('Boy Dasa Periods count:', boyDasaPeriods.length);
     console.log('Current Boy Dasa:', currentBoyDasa);
+    console.log('Boy Maha:', currentBoyDasa?.maha?.planet);
+    console.log('Boy Bhukti:', currentBoyDasa?.bhukti?.planet);
+    console.log('---');
+    console.log('Girl Moon longitude:', girlMoon.longitude);
+    console.log('Girl Dasa Periods count:', girlDasaPeriods.length);
     console.log('Current Girl Dasa:', currentGirlDasa);
+    console.log('Girl Maha:', currentGirlDasa?.maha?.planet);
+    console.log('Girl Bhukti:', currentGirlDasa?.bhukti?.planet);
+    console.log('==================');
 
     // Get 10-year forecast
     const tenYearForecast = generate10YearForecast(boyChart, girlChart, boyBirthDate, girlBirthDate);
