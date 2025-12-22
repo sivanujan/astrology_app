@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,8 +22,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         { path: '/dasha', label: t.dasha.title, icon: Clock, protected: false },
         { path: '/analysis', label: t.nav.analysis, icon: Sun, protected: true },
         { path: '/predictions', label: t.nav.predictions, icon: Sparkles, protected: true },
-
         { path: '/daily-snapshot', label: "Next 15 Days Forecast", icon: Sun, protected: true },
+        { path: '/marriage-matching', label: language === 'ta' ? 'திருமண பொருத்தம்' : 'Marriage Matching', icon: Heart, protected: false },
     ];
 
     const currentStepIndex = steps.findIndex(s => s.path === location.pathname);

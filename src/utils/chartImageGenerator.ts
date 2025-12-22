@@ -1,7 +1,7 @@
-// Chart Image Generator
+// Chart Image Generator (using dom-to-image-more)
 // Converts chart HTML to downloadable image with watermark
 
-import html2canvas from 'html2canvas';
+import domtoimage from 'dom-to-image-more';
 
 export interface ChartImageOptions {
     watermarkText?: string;
@@ -32,77 +32,43 @@ export async function downloadChartAsImage(
             return false;
         }
 
-        // Create canvas from element
-        const canvas = await html2canvas(element, {
-            backgroundColor,
-            scale: 2, // Higher resolution
-            logging: false,
-            useCORS: true,
-            allowTaint: false,
-            foreignObjectRendering: false,
-            onclone: (clonedDoc, clonedElement) => {
-                // Aggressively copy ALL computed styles to inline to convert oklch to RGB
-                const allElements = clonedElement.querySelectorAll('*');
-                const originalElements = element.querySelectorAll('*');
-
-                // Process the root element too
-                const elementsToProcess = [clonedElement, ...Array.from(allElements)];
-                const originalElementsArray = [element, ...Array.from(originalElements)];
-
-                elementsToProcess.forEach((clonedEl: any, index) => {
-                    const originalEl = originalElementsArray[index];
-                    if (!originalEl) return;
-
-                    try {
-                        const computed = window.getComputedStyle(originalEl);
-
-                        // Copy all color-related properties
-                        const colorProps = [
-                            'color',
-                            'backgroundColor',
-                            'borderColor',
-                            'borderTopColor',
-                            'borderRightColor',
-                            'borderBottomColor',
-                            'borderLeftColor',
-                            'outlineColor',
-                            'textDecorationColor',
-                            'caretColor',
-                            'columnRuleColor'
-                        ];
-
-                        colorProps.forEach(prop => {
-                            try {
-                                const value = computed.getPropertyValue(prop);
-                                if (value && value !== 'rgba(0, 0, 0, 0)' && value !== 'transparent') {
-                                    clonedEl.style[prop] = value;
-                                }
-                            } catch (e) {
-                                // Skip if error
-                            }
-                        });
-                    } catch (e) {
-                        // Skip element if error
-                        console.warn('Error processing element:', e);
-                    }
-                });
+        // Convert to blob using dom-to-image
+        const blob = await domtoimage.toBlob(element, {
+            bgcolor: backgroundColor,
+            quality: quality,
+            cacheBust: true,
+            style: {
+                margin: '0',
+                padding: '20px'
             }
         });
 
-        // Add watermark
+        // Create a canvas to add watermark
+        const img = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height + 60; // Extra space for watermark
+
         const ctx = canvas.getContext('2d');
-        if (ctx) {
-            addWatermark(ctx, canvas.width, canvas.height, watermarkText, includeTimestamp);
+        if (!ctx) {
+            console.error('Failed to get canvas context');
+            return false;
         }
 
+        // Draw the chart image
+        ctx.drawImage(img, 0, 0);
+
+        // Add watermark
+        addWatermark(ctx, canvas.width, canvas.height, watermarkText, includeTimestamp);
+
         // Convert to blob and download
-        canvas.toBlob((blob) => {
-            if (!blob) {
-                console.error('Failed to create blob from canvas');
+        canvas.toBlob((finalBlob) => {
+            if (!finalBlob) {
+                console.error('Failed to create final blob');
                 return;
             }
 
-            const url = URL.createObjectURL(blob);
+            const url = URL.createObjectURL(finalBlob);
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
@@ -168,7 +134,7 @@ export async function shareChartAsImage(
     shareText: string,
     options: ChartImageOptions = {}
 ): Promise<boolean> {
-    if (!navigator.share || !navigator.canShare) {
+    if (!navigator.share) {
         return false;
     }
 
@@ -176,28 +142,14 @@ export async function shareChartAsImage(
         const element = document.getElementById(elementId);
         if (!element) return false;
 
-        const canvas = await html2canvas(element, {
-            backgroundColor: options.backgroundColor || '#0f172a',
-            scale: 2,
-            logging: false
+        const blob = await domtoimage.toBlob(element, {
+            bgcolor: options.backgroundColor || '#0f172a',
+            quality: options.quality || 0.95
         });
-
-        // Add watermark
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            addWatermark(ctx, canvas.width, canvas.height, options.watermarkText || 'Generated by SivaAstro', options.includeTimestamp !== false);
-        }
-
-        // Convert to blob
-        const blob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob(resolve, 'image/png', options.quality || 0.95);
-        });
-
-        if (!blob) return false;
 
         const file = new File([blob], 'astrological_chart.png', { type: 'image/png' });
 
-        if (navigator.canShare({ files: [file] })) {
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({
                 text: shareText,
                 files: [file]
@@ -223,18 +175,12 @@ export async function getChartImageDataUrl(
         const element = document.getElementById(elementId);
         if (!element) return null;
 
-        const canvas = await html2canvas(element, {
-            backgroundColor: options.backgroundColor || '#0f172a',
-            scale: 2,
-            logging: false
+        const dataUrl = await domtoimage.toPng(element, {
+            bgcolor: options.backgroundColor || '#0f172a',
+            quality: options.quality || 0.95
         });
 
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            addWatermark(ctx, canvas.width, canvas.height, options.watermarkText || 'Generated by SivaAstro', options.includeTimestamp !== false);
-        }
-
-        return canvas.toDataURL('image/png', options.quality || 0.95);
+        return dataUrl;
     } catch (error) {
         console.error('Error getting chart image data URL:', error);
         return null;

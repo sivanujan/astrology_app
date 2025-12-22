@@ -12,6 +12,8 @@ import AIPredictions from './components/AIPredictions';
 import DashaPeriods from './components/DashaPeriods';
 import GurujiPredictions from './components/GurujiPredictions';
 import DailySnapshot from './components/DailySnapshot';
+import MarriageMatching from './pages/MarriageMatching';
+import MatchingResults from './pages/MatchingResults';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -132,6 +134,19 @@ const AppRoutes = () => {
               <DailySnapshot data={chartData} />
             </>
           ) : <Navigate to="/" />}
+        </ProtectedRoute>
+      } />
+
+      <Route path="/marriage-matching" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Marriage Matching - Compatibility Analysis" />
+          <MarriageMatching />
+        </ProtectedRoute>
+      } />
+      <Route path="/matching-results" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Marriage Matching Results" />
+          <MatchingResults />
         </ProtectedRoute>
       } />
     </Routes>
