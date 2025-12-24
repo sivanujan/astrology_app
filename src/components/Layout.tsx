@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import PlanetaryBackground from './PlanetaryBackground';
-import Logo from '../assets/logo.png';
+import Logo from '/logo2.png';
 import FeatureAccessPopup from './FeatureAccessPopup';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -90,7 +90,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                            <div className="w-32 md:w-48 h-auto flex items-center justify-start">
+                            <div className="w-28 md:w-42 h-auto flex items-center justify-start">
                                 <img src={Logo} alt="Astro Siva Logo" className="w-full h-full object-contain" />
                             </div>
                         </div>

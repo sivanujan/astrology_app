@@ -7,6 +7,7 @@ import {
     checkLagnaQualityMatch,
     check5thHouseMatch,
     check8thHouseSafety,
+    check7thHouseSexualCompatibility,
     check2ndHouseWealth,
     check12thHouseSettlement,
     GurujiCompatibilityCheck
@@ -109,21 +110,7 @@ export async function analyzeMarriageCompatibility(
     const girlNature = analyzeChartNature(girlChart);
     const lagnaQualityCheck = checkLagnaQualityMatch(boyChart, girlChart);
 
-    // STEP 2: Critical 5 Houses Analysis (with auto-reject)
-    const house5Check = check5thHouseMatch(boyChart, girlChart);
-    const house8BoyCheck = check8thHouseSafety(boyChart, girlChart, 'boy');
-    const house8GirlCheck = check8thHouseSafety(girlChart, boyChart, 'girl');
-    const house2Check = check2ndHouseWealth(boyChart, girlChart);
-    const house12Check = check12thHouseSettlement(
-        boyChart,
-        girlChart,
-        boy.birthPlace,
-        boy.currentPlace,
-        girl.birthPlace,
-        girl.currentPlace
-    );
-
-    // STEP 3: Dasa-Bhukti Analysis (Current + 10-year forecast)
+    // STEP 2: Calculate Dasa periods first (needed for 8th house longevity check)
     const boyBirthDate = new Date(`${boy.date}T${boy.time}`);
     const girlBirthDate = new Date(`${girl.date}T${girl.time}`);
 
@@ -199,6 +186,28 @@ export async function analyzeMarriageCompatibility(
         ? check6to8Relationship(currentBoyDasa.maha.planet, currentGirlDasa.maha.planet, boyChart)
         : { is6to8: false, relationship: 'safe' as const, details: 'Dasa not available' };
 
+    // STEP 3: Critical 5 Houses Analysis (with auto-reject)
+    // NOW we can call these with birth dates and Dasa periods
+    const house5Check = check5thHouseMatch(boyChart, girlChart);
+
+    // 8th house safety - use comprehensive longevity analysis
+    const house8BoyCheck = check8thHouseSafety(boyChart, girlChart, 'boy', boyBirthDate, boyDasaPeriods);
+    const house8GirlCheck = check8thHouseSafety(girlChart, boyChart, 'girl', girlBirthDate, girlDasaPeriods);
+
+    // 7th house - sexual compatibility
+    const house7Check = check7thHouseSexualCompatibility(boyChart, girlChart);
+
+    const house2Check = check2ndHouseWealth(boyChart, girlChart);
+    const house12Check = check12thHouseSettlement(
+        boyChart,
+        girlChart,
+        boy.birthPlace,
+        boy.currentPlace,
+        girl.birthPlace,
+        girl.currentPlace
+    );
+
+
     // STEP 4: Collect all auto-reject reasons (Guruji criteria)
     const autoRejectReasons: string[] = [];
     let autoReject = false;
@@ -206,6 +215,7 @@ export async function analyzeMarriageCompatibility(
     const checks: GurujiCompatibilityCheck[] = [
         lagnaQualityCheck,
         house5Check,
+        house7Check,
         house8BoyCheck,
         house8GirlCheck,
         house2Check,
@@ -317,7 +327,7 @@ export async function analyzeMarriageCompatibility(
     };
 
 
-    const overallScore = calculateOverallScore(lagnaAnalysis, houseMatching, dasaMatching);
+    const overallScore = Math.round(calculateOverallScore(lagnaAnalysis, houseMatching, dasaMatching));
 
     // Determine verdict
     let verdict: MatchingResult['verdict'];

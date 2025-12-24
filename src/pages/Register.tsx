@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Sparkles, AlertCircle, CheckCircle, Send } from 'lucide-react';
+import { Mail, Lock, User, Sparkles, AlertCircle, CheckCircle, Send, Eye, EyeOff, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { isDisposableEmail } from '../utils/emailValidation';
@@ -21,6 +21,40 @@ const Register: React.FC = () => {
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [resendLoading, setResendLoading] = useState(false);
     const [resendSuccess, setResendSuccess] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [passwordStrength, setPasswordStrength] = useState<{ level: 'weak' | 'medium' | 'strong', label: string, color: string } | null>(null);
+    const [showFullscreenLoader, setShowFullscreenLoader] = useState(false);
+    const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
+
+    // Calculate password strength
+    const calculatePasswordStrength = (pwd: string) => {
+        if (!pwd) {
+            setPasswordStrength(null);
+            return;
+        }
+
+        let strength = 0;
+
+        // Length check
+        if (pwd.length >= 8) strength++;
+        if (pwd.length >= 12) strength++;
+
+        // Character variety
+        if (/[a-z]/.test(pwd)) strength++; // lowercase
+        if (/[A-Z]/.test(pwd)) strength++; // uppercase
+        if (/[0-9]/.test(pwd)) strength++; // numbers
+        if (/[^a-zA-Z0-9]/.test(pwd)) strength++; // special chars
+
+        // Determine strength level
+        if (strength <= 2) {
+            setPasswordStrength({ level: 'weak', label: 'Weak', color: 'text-red-400' });
+        } else if (strength <= 4) {
+            setPasswordStrength({ level: 'medium', label: 'Medium', color: 'text-yellow-400' });
+        } else {
+            setPasswordStrength({ level: 'strong', label: 'Strong', color: 'text-green-400' });
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,11 +78,17 @@ const Register: React.FC = () => {
         }
 
         setLoading(true);
+        setShowFullscreenLoader(true);
 
         try {
             await register(email, password, name);
-            setShowVerificationModal(true);
+            // Wait a moment for smooth transition
+            setTimeout(() => {
+                setShowFullscreenLoader(false);
+                setShowVerificationModal(true);
+            }, 800);
         } catch (err: any) {
+            setShowFullscreenLoader(false);
             if (err.code === 'auth/email-already-in-use') {
                 setError(t.auth.emailInUse);
             } else {
@@ -157,14 +197,50 @@ const Register: React.FC = () => {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={(e) => {
+                                        setPassword(e.target.value);
+                                        calculatePasswordStrength(e.target.value);
+                                    }}
                                     required
-                                    className="w-full bg-white/5 border border-white/20 rounded-xl px-10 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition"
+                                    className="w-full bg-white/5 border border-white/20 rounded-xl px-10 pr-10 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition"
                                     placeholder="••••••••"
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition"
+                                >
+                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
                             </div>
+
+                            {/* Password Strength Indicator */}
+                            <AnimatePresence>
+                                {passwordStrength && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -5 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="mt-2 flex items-center gap-2"
+                                    >
+                                        <Shield className={`w-4 h-4 ${passwordStrength.color}`} />
+                                        <span className={`text-sm font-medium ${passwordStrength.color}`}>
+                                            Password Strength: {passwordStrength.label}
+                                        </span>
+                                        <div className="flex-1 flex gap-1">
+                                            <div className={`h-1.5 flex-1 rounded-full transition-colors ${passwordStrength.level === 'weak' ? 'bg-red-400' : 'bg-gray-600'
+                                                }`} />
+                                            <div className={`h-1.5 flex-1 rounded-full transition-colors ${passwordStrength.level === 'medium' || passwordStrength.level === 'strong' ? 'bg-yellow-400' : 'bg-gray-600'
+                                                }`} />
+                                            <div className={`h-1.5 flex-1 rounded-full transition-colors ${passwordStrength.level === 'strong' ? 'bg-green-400' : 'bg-gray-600'
+                                                }`} />
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         {/* Confirm Password Field */}
@@ -173,14 +249,58 @@ const Register: React.FC = () => {
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                 <input
-                                    type="password"
+                                    type={showConfirmPassword ? "text" : "password"}
                                     value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    onChange={(e) => {
+                                        setConfirmPassword(e.target.value);
+                                        // Check if passwords match
+                                        if (e.target.value && password) {
+                                            setPasswordsMatch(e.target.value === password);
+                                        } else {
+                                            setPasswordsMatch(null);
+                                        }
+                                    }}
                                     required
-                                    className="w-full bg-white/5 border border-white/20 rounded-xl px-10 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition"
+                                    className="w-full bg-white/5 border border-white/20 rounded-xl px-10 pr-10 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition"
                                     placeholder="••••••••"
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition"
+                                >
+                                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
                             </div>
+
+                            {/* Password Match Indicator */}
+                            <AnimatePresence>
+                                {passwordsMatch !== null && confirmPassword && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -5 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -5 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="mt-2 flex items-center gap-2"
+                                    >
+                                        {passwordsMatch ? (
+                                            <>
+                                                <CheckCircle className="w-4 h-4 text-green-400" />
+                                                <span className="text-sm font-medium text-green-400">
+                                                    Passwords match ✓
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <AlertCircle className="w-4 h-4 text-red-400" />
+                                                <span className="text-sm font-medium text-red-400">
+                                                    Passwords do not match
+                                                </span>
+                                            </>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         {/* Submit Button */}
@@ -294,6 +414,36 @@ const Register: React.FC = () => {
                                 </div>
                             </div>
                         </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Fullscreen Loader */}
+            <AnimatePresence>
+                {showFullscreenLoader && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md"
+                    >
+                        <div className="text-center">
+                            <motion.div
+                                animate={{
+                                    rotate: 360,
+                                    scale: [1, 1.1, 1]
+                                }}
+                                transition={{
+                                    rotate: { duration: 2, repeat: Infinity, ease: "linear" },
+                                    scale: { duration: 1, repeat: Infinity }
+                                }}
+                                className="inline-block mb-4"
+                            >
+                                <Sparkles className="w-16 h-16 text-yellow-400" />
+                            </motion.div>
+                            <h3 className="text-2xl font-bold text-white mb-2">Creating Your Account</h3>
+                            <p className="text-slate-300">Please wait a moment...</p>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

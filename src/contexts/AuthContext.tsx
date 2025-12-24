@@ -7,11 +7,11 @@ import {
     GoogleAuthProvider,
     signOut,
     onAuthStateChanged,
-    sendEmailVerification,
     UserCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import API_CONFIG, { apiCall } from '../config/api';
 
 interface AuthContextType {
     user: User | null;
@@ -55,17 +55,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         console.log('User created:', userCredential.user.uid);
 
-        // Send email verification
+        // Send custom email verification via backend
         if (userCredential.user) {
-            console.log('Sending verification email...');
-            const actionCodeSettings = {
-                url: `${window.location.origin}/login?verified=true`,
-                handleCodeInApp: false,
-            };
+            console.log('Sending custom verification email...');
 
             try {
-                await sendEmailVerification(userCredential.user, actionCodeSettings);
-                console.log('Verification email sent successfully');
+                // Call YOUR backend API that uses the custom HTML template
+                const result = await apiCall(API_CONFIG.endpoints.auth.sendVerification, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        email: userCredential.user.email,
+                        userId: userCredential.user.uid
+                    })
+                });
+
+                if (result.success) {
+                    console.log('✅ Custom verification email sent successfully!');
+                } else {
+                    console.error('Failed to send verification email:', result.message);
+                }
             } catch (emailError) {
                 console.error('Error sending verification email:', emailError);
             }
@@ -140,11 +148,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const resendVerification = async () => {
         if (auth.currentUser) {
-            const actionCodeSettings = {
-                url: `${window.location.origin}/login?verified=true`,
-                handleCodeInApp: false,
-            };
-            await sendEmailVerification(auth.currentUser, actionCodeSettings);
+            try {
+                // Call YOUR backend API for custom verification email
+                const result = await apiCall(API_CONFIG.endpoints.auth.sendVerification, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        email: auth.currentUser.email,
+                        userId: auth.currentUser.uid
+                    })
+                });
+
+                if (!result.success) {
+                    throw new Error(result.message || 'Failed to send verification email');
+                }
+
+                console.log('✅ Verification email resent successfully!');
+            } catch (error) {
+                console.error('Error resending verification email:', error);
+                throw error;
+            }
         } else {
             throw new Error('No user logged in');
         }

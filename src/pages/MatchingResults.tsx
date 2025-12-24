@@ -245,7 +245,7 @@ const MatchingResults: React.FC = () => {
                                 {isTamil ? 'ஒட்டுமொத்த மதிப்பெண்' : 'Overall Compatibility Score'}
                             </h2>
                             <div className="text-7xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                                {result.overallScore}/100
+                                {Math.round(result.overallScore)}/100
                             </div>
                             <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-full text-xl font-semibold ${result.verdict === 'Excellent' ? 'bg-green-500/20 text-green-400' :
                                 result.verdict === 'Very Good' ? 'bg-blue-500/20 text-blue-400' :

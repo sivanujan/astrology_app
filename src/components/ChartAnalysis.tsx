@@ -43,6 +43,14 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
 
     const { yogas, doshas } = calculateYogas(planets, ascendant, language as 'en' | 'ta');
 
+    // Calculate all scores once before rendering to ensure fresh data
+    const planetScores = React.useMemo(() => calculateSubathuvamPavathuvam(planets, language), [planets, language]);
+    const houseScores = React.useMemo(() => calculateHouseSubathuvamPavathuvam(ascendant.signIndex, planets, language), [ascendant.signIndex, planets, language]);
+    const agScores = React.useMemo(() => calculateAdityaGurujiSubathuvam(planets), [planets]);
+    const yogaResults = React.useMemo(() => calculateDigbalaAndYogas(planets, ascendant.signIndex, agScores), [planets, ascendant.signIndex, agScores]);
+    const functionalNature = React.useMemo(() => getFunctionalNature(ascendant.signIndex, language), [ascendant.signIndex, language]);
+    const rkResults = React.useMemo(() => calculateRahuKetuStrength(planets, ascendant.signIndex), [planets, ascendant.signIndex]);
+
     const toggleSection = (section: string) => {
         setExpandedSection(expandedSection === section ? null : section);
     };
@@ -233,8 +241,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                         </thead>
                         <tbody className="divide-y divide-slate-800">
                             {planets.map((planet: any) => {
-                                const scores = calculateSubathuvamPavathuvam(planets, language);
-                                const pScores = scores[planet.name];
+                                const pScores = planetScores[planet.name];
                                 if (!pScores) return null;
 
                                 return (
@@ -298,7 +305,6 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                             </thead>
                             <tbody className="divide-y divide-slate-800">
                                 {Array.from({ length: 12 }, (_, i) => i + 1).map((houseNum) => {
-                                    const houseScores = calculateHouseSubathuvamPavathuvam(ascendant.signIndex, planets, language);
                                     const hScores = houseScores[houseNum];
                                     if (!hScores) return null;
 
@@ -367,7 +373,6 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                             </thead>
                             <tbody className="divide-y divide-slate-800">
                                 {planets.map((planet: any) => {
-                                    const agScores = calculateAdityaGurujiSubathuvam(planets);
                                     const pScore = agScores[planet.name];
                                     if (!pScore) return null;
 
@@ -424,8 +429,6 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                 {planets.map((planet: any) => {
                                     if (['Rahu', 'Ketu'].includes(planet.name)) return null;
 
-                                    const agScores = calculateAdityaGurujiSubathuvam(planets);
-                                    const yogaResults = calculateDigbalaAndYogas(planets, data.ascendant.signIndex, agScores);
                                     const result = yogaResults[planet.name];
 
                                     if (!result) return null;
@@ -481,7 +484,6 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">
                                     {planets.map((planet: any) => {
-                                        const functionalNature = getFunctionalNature(data.ascendant.signIndex, language);
                                         const status = functionalNature[planet.name];
                                         if (!status) return null;
 
@@ -513,7 +515,6 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                         <h4 className="text-md font-semibold text-slate-300 mb-4">{language === 'ta' ? 'சிறப்பு கணிப்புகள் (சுபத்துவம் வடிகட்டப்பட்டது)' : 'Special Predictions (Subathuvam Filtered)'}</h4>
                         <div className="space-y-4">
                             {(() => {
-                                const agScores = calculateAdityaGurujiSubathuvam(planets);
                                 const predictions = generateSpecialPredictions(planets, data.ascendant.signIndex, agScores);
 
                                 if (predictions.length === 0) {
@@ -584,7 +585,6 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                             </thead>
                             <tbody className="divide-y divide-slate-800">
                                 {['Rahu', 'Ketu'].map((planetName) => {
-                                    const rkResults = calculateRahuKetuStrength(planets, data.ascendant.signIndex);
                                     const result = rkResults[planetName];
                                     if (!result) return null;
 

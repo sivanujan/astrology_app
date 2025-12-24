@@ -1,6 +1,7 @@
-import { ChartData } from './astrology';
+import { ChartData, DashaPeriod } from './astrology';
 import { analyzeChartNature, getPlanetsAspectingHouse, isBenefic, isMalefic } from './vedicAspects';
 import { calculateAdityaGurujiSubathuvam } from './adityaGurujiSubathuvam';
+import { analyzeLongevityForMarriage } from './longevityAnalysis';
 
 /**
  * Guruji-specific marriage matching rules and auto-reject criteria
@@ -165,55 +166,269 @@ function analyze5thHouseStrength(chart: ChartData): House5Strength {
 
 /**
  * RULE 3: 8th House - Longevity & Mangalya
- * Groom short life = REJECT
- * Bride widowhood yoga = REJECT
+ * USES COMPREHENSIVE LONGEVITY ANALYSIS instead of simple house check
+ * 
+ * Groom short life = REJECT (only if truly critical)
+ * Bride widowhood yoga = REJECT (only if truly critical)
+ * 
+ * NEW LOGIC:
+ * - Strong Lagna (>=70) can compensate for bad 8th house
+ * - Checks 3 factors: Lagna 40%, 8th House 35%, Saturn 25%
+ * - Analyzes Dasa periods for death risk
+ * - AUTO-REJECT only if:
+ *   1. Lagna weak (<30) AND 8th house bad (<30), OR
+ *   2. Current Dasa has EXTREME risk (>=80), OR
+ *   3. EXTREME risk in next 5 years
  */
 export function check8thHouseSafety(
     boyChart: ChartData,
     girlChart: ChartData,
-    gender: 'boy' | 'girl'
+    gender: 'boy' | 'girl',
+    birthDate?: Date,
+    dasaPeriods?: DashaPeriod[]
 ): GurujiCompatibilityCheck {
     const chart = gender === 'boy' ? boyChart : girlChart;
-    const eighthHouseAspects = getPlanetsAspectingHouse(chart, 8);
 
-    const maleficAspects = eighthHouseAspects.filter(a => isMalefic(a.planet));
-    const beneficAspects = eighthHouseAspects.filter(a => isBenefic(a.planet));
+    console.log(`=== 8TH HOUSE SAFETY CHECK (${gender}) ===`);
+    console.log('birthDate received:', birthDate);
+    console.log('dasaPeriods received:', dasaPeriods ? `${dasaPeriods.length} periods` : 'null');
 
-    // Critical risk if multiple malefics without benefic protection
-    const criticalRisk = maleficAspects.length >= 2 && beneficAspects.length === 0;
+    // If no birth date provided, fall back to simple check
+    if (!birthDate) {
+        console.warn(`No birthDate provided for ${gender}, using fallback simple check`);
+        const eighthHouseAspects = getPlanetsAspectingHouse(chart, 8);
+        const maleficAspects = eighthHouseAspects.filter(a => isMalefic(a.planet));
+        const beneficAspects = eighthHouseAspects.filter(a => isBenefic(a.planet));
 
-    if (criticalRisk) {
+        const criticalRisk = maleficAspects.length >= 2 && beneficAspects.length === 0;
+
+        if (criticalRisk) {
+            return {
+                passed: false,
+                autoReject: true,
+                severity: 'critical',
+                reason: gender === 'boy'
+                    ? 'CRITICAL: Groom has short life indication (8th house severely afflicted). REJECT.'
+                    : 'CRITICAL: Bride has widowhood yoga (8th house severely afflicted). REJECT.',
+                tamilReason: gender === 'boy'
+                    ? 'முக்கியம்: மாப்பிள்ளைக்கு ஆயுள் குற்றம். நிராகரிக்கவும்.'
+                    : 'முக்கியம்: பெண்ணுக்கு விதவை யோகம். நிராகரிக்கவும்.'
+            };
+        }
+
+        return {
+            passed: true,
+            autoReject: false,
+            severity: 'medium',
+            reason: '8th house check needs birth date for comprehensive analysis.',
+            tamilReason: '8-ம் இட விளக்கத்திற்கு பிறந்த நேரம் தேவை.'
+        };
+    }
+
+    console.log(`Using comprehensive longevity analysis for ${gender}`);
+
+    // Use comprehensive longevity analysis
+    try {
+        const longevityVerdict = analyzeLongevityForMarriage(chart, birthDate, dasaPeriods);
+
+        // Convert verdict to GurujiCompatibilityCheck format
+        if (longevityVerdict.marriageRecommendation === 'REJECT') {
+            return {
+                passed: false,
+                autoReject: true,
+                severity: 'critical',
+                reason: gender === 'boy'
+                    ? `CRITICAL: Groom - ${longevityVerdict.reason} (Score: ${longevityVerdict.longevityScore}/100, Current Risk: ${longevityVerdict.currentRisk}/100). REJECT.`
+                    : `CRITICAL: Bride - ${longevityVerdict.reason} (Score: ${longevityVerdict.longevityScore}/100, Current Risk: ${longevityVerdict.currentRisk}/100). REJECT.`,
+                tamilReason: gender === 'boy'
+                    ? `முக்கியம்: மாப்பிள்ளை - ${longevityVerdict.tamilReason} (மதிப்பு: ${longevityVerdict.longevityScore}/100, தற்போதைய ஆபத்து: ${longevityVerdict.currentRisk}/100). நிராகர் க்கவும்.`
+                    : `முக்கியம்: பெண் - ${longevityVerdict.tamilReason} (மதிப்பு: ${longevityVerdict.longevityScore}/100, தற்போதைய ஆபத்து: ${longevityVerdict.currentRisk}/100). நிராகரிக்கவும்.`
+            };
+        } else if (longevityVerdict.marriageRecommendation === 'PROCEED_WITH_CAUTION') {
+            return {
+                passed: true,
+                autoReject: false,
+                severity: 'high',
+                reason: `${gender === 'boy' ? 'Groom' : 'Bride'} - ${longevityVerdict.reason}. Category: ${longevityVerdict.category}. Proceed with caution and remedies.`,
+                tamilReason: `${gender === 'boy' ? 'மாப்பிள்ளை' : 'பெண்'} - ${longevityVerdict.tamilReason}. வகை: ${longevityVerdict.detailedAnalysis.longevity.categoryTamil}. எச்சரிக்கையுடன் தொடரவும்.`
+            };
+        } else {
+            return {
+                passed: true,
+                autoReject: false,
+                severity: 'low',
+                reason: `${gender === 'boy' ? 'Groom' : 'Bride'} has good longevity (${longevityVerdict.category}: ${longevityVerdict.longevityScore}/100). No extreme risks.`,
+                tamilReason: `${gender === 'boy' ? 'மாப்பிள்ளை' : 'பெண்'} நல்ல ஆயுள் உண்டு (${longevityVerdict.detailedAnalysis.longevity.categoryTamil}: ${longevityVerdict.longevityScore}/100). உயர் ஆபத்து இல்லை.`
+            };
+        }
+    } catch (error) {
+        console.error('Error in longevity analysis:', error);
+        // Fallback to simple check
+        return {
+            passed: true,
+            autoReject: false,
+            severity: 'medium',
+            reason: 'Error in comprehensive analysis. Manual review recommended.',
+            tamilReason: 'முழுமையான பகுப்பாய்வில் பிழை. கைமுறை மதிப்பாய்வு பரிந்துரைக்கப்படுகிறது.'
+        };
+    }
+}
+
+/**
+ * RULE 3.5: 7th House - Sexual Compatibility & Marriage Harmony
+ * 
+ * Checks:
+ * - 7th house strength (marriage house)
+ * - Venus strength (desire, romance)
+ * - Mars strength (sexual energy)
+ * - Similar libido/intensity levels
+ * - Impotency yogas
+ */
+export function check7thHouseSexualCompatibility(
+    boyChart: ChartData,
+    girlChart: ChartData
+): GurujiCompatibilityCheck {
+    console.log('=== 7TH HOUSE SEXUAL COMPATIBILITY CHECK ===');
+
+    // Analyze both charts
+    const boyAnalysis = analyze7thHouseStrength(boyChart);
+    const girlAnalysis = analyze7thHouseStrength(girlChart);
+
+    console.log('Boy 7th house:', boyAnalysis);
+    console.log('Girl 7th house:', girlAnalysis);
+
+    // Check for impotency yogas (very weak Venus + weak Jupiter)
+    const boyImpotency = boyAnalysis.venusStrength < 20 && boyAnalysis.jupiterStrength < 30;
+    const girlImpotency = girlAnalysis.venusStrength < 20 && girlAnalysis.jupiterStrength < 30;
+
+    if (boyImpotency) {
         return {
             passed: false,
             autoReject: true,
             severity: 'critical',
-            reason: gender === 'boy'
-                ? 'CRITICAL: Groom has short life indication (8th house severely afflicted). REJECT.'
-                : 'CRITICAL: Bride has widowhood yoga (8th house severely afflicted). REJECT.',
-            tamilReason: gender === 'boy'
-                ? 'முக்கியம்: மாப்பிள்ளைக்கு ஆயுள் குற்றம். நிராகரிக்கவும்.'
-                : 'முக்கியம்: பெண்ணுக்கு விதவை யோகம். நிராகரிக்கவும்.'
+            reason: 'REJECT: Groom has impotency yoga (Venus & Jupiter severely weak). Sexual compatibility issues.',
+            tamilReason: 'நிராகரிக்கவும்: மாப்பிள்ளைக்கு தாம்பத்திய குறை யோகம். சுக்ரன் மற்றும் குரு மிகவும் பலவீனம்.'
         };
     }
 
-    // Moderate risk - needs remedies
-    if (maleficAspects.length > beneficAspects.length) {
+    if (girlImpotency) {
+        return {
+            passed: false,
+            autoReject: true,
+            severity: 'critical',
+            reason: 'REJECT: Bride has severe marital issues (Venus & Jupiter severely weak). Sexual compatibility concerns.',
+            tamilReason: 'நிராகரிக்கவும்: பெண்ணுக்கு தாம்பத்திய குறை யோகம். சுக்ரன் மற்றும் குரு மிகவும் பலவீனம்.'
+        };
+    }
+
+    // Check libido mismatch (one very high, other very low)
+    const boyLibido = boyAnalysis.sexualEnergy;
+    const girlLibido = girlAnalysis.sexualEnergy;
+
+    const extremeMismatch =
+        (boyLibido === 'VERY HIGH' && girlLibido === 'VERY LOW') ||
+        (boyLibido === 'VERY LOW' && girlLibido === 'VERY HIGH');
+
+    if (extremeMismatch) {
+        return {
+            passed: false,
+            autoReject: true,
+            severity: 'critical',
+            reason: `REJECT: Extreme sexual compatibility mismatch (Boy: ${boyLibido}, Girl: ${girlLibido}). Will cause marital discord.`,
+            tamilReason: `நிராகரிக்கவும்: தாம்பத்திய பொருத்தமின்மை (மாப்பிள்ளை: ${boyLibido}, பெண்: ${girlLibido}). திருமண வாழ்வில் பிரச்சனை.`
+        };
+    }
+
+    // Check for moderate mismatch
+    const moderateMismatch =
+        (boyLibido === 'HIGH' && girlLibido === 'LOW') ||
+        (boyLibido === 'LOW' && girlLibido === 'HIGH');
+
+    if (moderateMismatch) {
         return {
             passed: true,
             autoReject: false,
             severity: 'high',
-            reason: '8th house has some afflictions. Remedies recommended.',
-            tamilReason: '8-ம் இடத்தில் சில குறைகள். பரிகாரங்கள் தேவை.'
+            reason: `Sexual compatibility mismatch (Boy: ${boyLibido}, Girl: ${girlLibido}). Needs communication & understanding.`,
+            tamilReason: `தாம்பத்திய பொருத்தம் நடுத்தரம் (மாப்பிள்ளை: ${boyLibido}, பெண்: ${girlLibido}). புரிதல் தேவை.`
         };
     }
 
-    // Safe
+    // Both weak - acceptable but needs awareness
+    if (boyAnalysis.houseStrength < 4 && girlAnalysis.houseStrength < 4) {
+        return {
+            passed: true,
+            autoReject: false,
+            severity: 'medium',
+            reason: 'Both have moderate 7th house strength. Sexual compatibility acceptable but not ideal.',
+            tamilReason: 'இருவருக்கும் 7-ம் இடம் நடுத்தரம். தாம்பத்திய பொருத்தம் ஏற்கத்தக்கது.'
+        };
+    }
+
+    // Good match
     return {
         passed: true,
         autoReject: false,
         severity: 'low',
-        reason: '8th house is safe. Good longevity indicators.',
-        tamilReason: '8-ம் இடம் பாதுகாப்பானது. நல்ல ஆயுள் குறிப்புகள்.'
+        reason: `Good sexual compatibility (Boy: ${boyLibido}, Girl: ${girlLibido}). 7th house favorable.`,
+        tamilReason: `நல்ல தாம்பத்திய பொருத்தம் (மாப்பிள்ளை: ${boyLibido}, பெண்: ${girlLibido}). 7-ம் இடம் சாதகம்.`
+    };
+}
+
+interface House7Analysis {
+    houseStrength: number;
+    venusStrength: number;
+    marsStrength: number;
+    jupiterStrength: number;
+    sexualEnergy: 'VERY LOW' | 'LOW' | 'MODERATE' | 'HIGH' | 'VERY HIGH';
+    details: string;
+}
+
+function analyze7thHouseStrength(chart: ChartData): House7Analysis {
+    // Get 7th house aspects
+    const seventhHouseAspects = getPlanetsAspectingHouse(chart, 7);
+    const beneficAspects = seventhHouseAspects.filter(a => isBenefic(a.planet));
+    const maleficAspects = seventhHouseAspects.filter(a => isMalefic(a.planet));
+
+    // Calculate house strength
+    let houseStrength = 5; // Base
+    houseStrength += beneficAspects.length * 2;
+    houseStrength -= maleficAspects.length * 1.5;
+    houseStrength = Math.max(0, Math.min(10, houseStrength));
+
+    // Get Venus (karaka for marriage)
+    const venus = chart.planets.find(p => p.name === 'Venus');
+    const venusSubathuvam = calculateAdityaGurujiSubathuvam(chart.planets)['Venus'];
+    const venusStrength = venusSubathuvam ? venusSubathuvam.totalScore : 50;
+
+    // Get Mars (sexual energy)
+    const mars = chart.planets.find(p => p.name === 'Mars');
+    const marsSubathuvam = calculateAdityaGurujiSubathuvam(chart.planets)['Mars'];
+    const marsStrength = marsSubathuvam ? marsSubathuvam.totalScore : 50;
+
+    // Get Jupiter (blessing/fertility)
+    const jupiter = chart.planets.find(p => p.name === 'Jupiter');
+    const jupiterSubathuvam = calculateAdityaGurujiSubathuvam(chart.planets)['Jupiter'];
+    const jupiterStrength = jupiterSubathuvam ? jupiterSubathuvam.totalScore : 50;
+
+    // Calculate sexual energy level
+    // Mars = drive, Venus = desire
+    const avgSexualEnergy = (marsStrength + venusStrength) / 2;
+
+    let sexualEnergy: House7Analysis['sexualEnergy'];
+    if (avgSexualEnergy >= 80) sexualEnergy = 'VERY HIGH';
+    else if (avgSexualEnergy >= 60) sexualEnergy = 'HIGH';
+    else if (avgSexualEnergy >= 40) sexualEnergy = 'MODERATE';
+    else if (avgSexualEnergy >= 20) sexualEnergy = 'LOW';
+    else sexualEnergy = 'VERY LOW';
+
+    return {
+        houseStrength,
+        venusStrength,
+        marsStrength,
+        jupiterStrength,
+        sexualEnergy,
+        details: `7th: ${houseStrength}/10, Venus: ${venusStrength}, Mars: ${marsStrength}, Energy: ${sexualEnergy}`
     };
 }
 

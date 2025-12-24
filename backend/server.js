@@ -23,11 +23,16 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Import Routes (To be created)
+// Import Routes
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
+// Additional routes to be created:
 // const userRoutes = require('./routes/user');
 // const ruleRoutes = require('./routes/rules');
 // app.use('/api/users', userRoutes);
 // app.use('/api/rules', ruleRoutes);
+
 
 // 404 Handler
 app.use((req, res) => {

@@ -16,6 +16,8 @@ import MarriageMatching from './pages/MarriageMatching';
 import MatchingResults from './pages/MatchingResults';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import EmailVerification from './pages/EmailVerification';
 import Dashboard from './pages/Dashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
@@ -47,6 +49,18 @@ const AppRoutes = () => {
         <>
           <SEO title="Create Account" />
           <Register />
+        </>
+      } />
+      <Route path="/forgot-password" element={
+        <>
+          <SEO title="Forgot Password" />
+          <ForgotPassword />
+        </>
+      } />
+      <Route path="/verify-email" element={
+        <>
+          <SEO title="Verify Email" />
+          <EmailVerification />
         </>
       } />
 

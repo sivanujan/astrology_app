@@ -6,6 +6,7 @@ export interface SubathuvamResult {
     navamsaScore: number;
     totalScore: number;
     isSubathuva: boolean;
+    isNeutral: boolean; // NEW: True if malefic achieved Subathuvam (through Jupiter)
     details: string[];
 }
 
@@ -48,6 +49,41 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
         moonStatus = calculateMoonPhase(moon.longitude, sun.longitude);
     }
 
+    // NEW: Pre-check if benefics have power (before giving conjunction bonuses)
+    // குரு/சுக்ரன் சக்தி சோதனை
+    const isBeneficAfflictedEarly = (benefic: any, beneficName: string): boolean => {
+        if (!benefic || !sun) return false;
+
+        const malefics = ['Saturn', 'Mars', 'Rahu', 'Ketu'];
+
+        // Check combustion
+        const combustionRanges: Record<string, number> = {
+            'Jupiter': 11, 'Venus': 10, 'Mercury': 14, 'Moon': 12
+        };
+
+        if (combustionRanges[beneficName]) {
+            const sunDiff = Math.abs(benefic.longitude - sun.longitude);
+            const actualDiff = Math.min(sunDiff, 360 - sunDiff);
+            if (actualDiff < combustionRanges[beneficName]) {
+                return true; // Combusted
+            }
+        }
+
+        // Check malefic conjunction
+        for (const malefic of rasiPlanets.filter(p => malefics.includes(p.name))) {
+            const conjDiff = Math.abs(benefic.longitude - malefic.longitude);
+            const actualDiff = Math.min(conjDiff, 360 - conjDiff);
+            if (actualDiff <= 10) {
+                return true; // Conjoined with malefic
+            }
+        }
+
+        return false;
+    };
+
+    const jupiterHasPower = jupiter ? !isBeneficAfflictedEarly(jupiter, 'Jupiter') : false;
+    const venusHasPower = venus ? !isBeneficAfflictedEarly(venus, 'Venus') : false;
+
     rasiPlanets.forEach(planet => {
         let rasiScore = 0;
         let navamsaScore = 0;
@@ -56,26 +92,76 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
 
         // --- Step A: Rasi Chart Subathuvam (Base Strength) ---
 
-        // Rule 1: Jupiter's Aspect (Guru Drishti) - +40 Marks
+        // Rule 1: Jupiter's Aspect (Guru Drishti) - +40 Marks (only if Jupiter has power!)
         if (jupiter && planet.name !== 'Jupiter') {
             const signDiff = (planet.signIndex - jupiter.signIndex + 12) % 12;
             const houseDist = signDiff + 1;
 
             if ([5, 7, 9].includes(houseDist)) {
-                rasiScore += 40;
-                details.push("Jupiter Aspect (+40)");
+                if (jupiterHasPower) {
+                    rasiScore += 40;
+                    details.push("Jupiter Aspect (+40)");
+                } else {
+                    details.push("Jupiter Aspect (பலவீனம் - No power, Jupiter afflicted)");
+                }
             }
         }
 
-        // Rule 2: Conjunction with Benefics - +20 Marks
-        // Benefics: Jupiter, Venus, Waxing Moon (Guru, Sukra, Valarpirai Chandran)
-        if (planet.name !== 'Jupiter' && jupiter && planet.signIndex === jupiter.signIndex) {
-            rasiScore += 20;
-            details.push("Conjoined Jupiter (+20)");
+        // Rule 2: Conjunction with Benefics - Up to +40 Marks (degree-based)
+        // NEW: Check degree difference AND benefic power!
+        if (planet.name !== 'Jupiter' && jupiter) {
+            const degreeDiff = Math.abs(planet.longitude - jupiter.longitude);
+            const actualDiff = Math.min(degreeDiff, 360 - degreeDiff);
+
+            if (actualDiff <= 10) {
+                if (jupiterHasPower) {
+                    // Powerful Jupiter conjunction!
+                    rasiScore += 40;
+                    details.push(`Close Conjunction with Jupiter (${actualDiff.toFixed(1)}°) (+40)`);
+                } else {
+                    // Afflicted Jupiter - no bonus
+                    details.push(`Conjunction with Jupiter (${actualDiff.toFixed(1)}° - பலவீனம், No bonus)`);
+                }
+            } else if (planet.signIndex === jupiter.signIndex) {
+                if (jupiterHasPower) {
+                    rasiScore += 20;
+                    details.push("Conjoined Jupiter (same sign) (+20)");
+                } else {
+                    // Same sign but Jupiter afflicted - no bonus
+                    details.push("Conjoined Jupiter (same sign - பலவீனம், No bonus)");
+
+                    // DEBUG for Saturn
+                    if (planet.name === 'Saturn') {
+                        console.log('🪐 SATURN: Jupiter afflicted, NO bonus granted!', {
+                            saturnLongitude: planet.longitude,
+                            jupiterLongitude: jupiter.longitude,
+                            jupiterHasPower,
+                            detailsAdded: details[details.length - 1]
+                        });
+                    }
+                }
+            }
         }
-        if (planet.name !== 'Venus' && venus && planet.signIndex === venus.signIndex) {
-            rasiScore += 20;
-            details.push("Conjoined Venus (+20)");
+
+        if (planet.name !== 'Venus' && venus) {
+            const degreeDiff = Math.abs(planet.longitude - venus.longitude);
+            const actualDiff = Math.min(degreeDiff, 360 - degreeDiff);
+
+            if (actualDiff <= 10) {
+                if (venusHasPower) {
+                    rasiScore += 40;
+                    details.push(`Close Conjunction with Venus (${actualDiff.toFixed(1)}°) (+40)`);
+                } else {
+                    details.push(`Conjunction with Venus (${actualDiff.toFixed(1)}° - பலவீனம், No bonus)`);
+                }
+            } else if (planet.signIndex === venus.signIndex) {
+                if (venusHasPower) {
+                    rasiScore += 20;
+                    details.push("Conjoined Venus (same sign) (+20)");
+                } else {
+                    details.push("Conjoined Venus (same sign - பலவீனம், No bonus)");
+                }
+            }
         }
 
         // Moon Special Rule: Waxing Moon acts as Benefic
@@ -140,14 +226,52 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
 
         isSubathuva = totalScore >= 50;
 
+        // UPDATED: Check if malefic achieved Subathuvam (= Neutral)
+        // சுபத்துவம் அடைந்த பாவி = நடுநிலை (BUT only if Jupiter has power!)
+        let isNeutral = false;
+        const isMalefic = ['Saturn', 'Mars', 'Sun', 'Rahu', 'Ketu'].includes(planet.name);
+
+        if (isMalefic && jupiter && jupiterHasPower) { // Jupiter must have power!
+            // Check if this malefic has Jupiter conjunction (already counted in rasiScore)
+            const conjDiff = Math.abs(planet.longitude - jupiter.longitude);
+            const actualDiff = Math.min(conjDiff, 360 - conjDiff);
+            const hasJupiterConj = actualDiff <= 10;
+
+            // Check if Jupiter aspects this malefic (5th, 7th, 9th)
+            const signDiff = (planet.signIndex - jupiter.signIndex + 12) % 12;
+            const houseDist = signDiff + 1;
+            const hasJupiterAspect = [5, 7, 9].includes(houseDist);
+
+            // If malefic has Subathuvam through POWERFUL Jupiter = Neutral
+            if ((hasJupiterConj || hasJupiterAspect) && isSubathuva) {
+                isNeutral = true;
+                details.push("நடுநிலை (Neutral - Subathuvam achieved through Jupiter)");
+            }
+        } else if (isMalefic && jupiter && !jupiterHasPower) {
+            // Jupiter is afflicted - cannot purify malefics
+            details.push("குரு பலவீனம் (Jupiter afflicted - cannot purify)");
+        }
+
         results[planet.name] = {
             planet: planet.name,
             rasiScore: Math.round(rasiScore),
             navamsaScore: Math.round(navamsaScore),
             totalScore: Math.round(totalScore),
             isSubathuva,
+            isNeutral,
             details
         };
+
+        // FINAL DEBUG for Saturn
+        if (planet.name === 'Saturn') {
+            console.log('🪐 SATURN FINAL RESULT:', {
+                totalScore: Math.round(totalScore),
+                isSubathuva,
+                isNeutral,
+                detailsArray: details,
+                detailsCount: details.length
+            });
+        }
     });
 
     return results;
