@@ -24,6 +24,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         { path: '/predictions', label: t.nav.predictions, icon: Sparkles, protected: true },
         { path: '/daily-snapshot', label: "Next 15 Days Forecast", icon: Sun, protected: true },
         { path: '/marriage-matching', label: language === 'ta' ? 'திருமண பொருத்தம்' : 'Marriage Matching', icon: Heart, protected: false },
+        { path: '/comprehensive-matching', label: language === 'ta' ? 'விரிவான பொருத்தம்' : 'Comprehensive Matching', icon: Heart, protected: false },
     ];
 
     const currentStepIndex = steps.findIndex(s => s.path === location.pathname);
