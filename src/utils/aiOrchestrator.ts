@@ -1635,18 +1635,53 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
             strength: subathuvamScores[rasiLord]?.totalScore || 0
         },
         Star: moon ? getNakshatra(moon.longitude) : "Unknown",
-        CurrentDasa: currentDasa ? {
-            lord: currentDasa.maha.planet,
-            functional_nature: getFunctionalNature(ascSignIndex, language)[currentDasa.maha.planet]?.nature || "Neutral",
-            bhukti: currentDasa.bhukti?.planet,
-            antaram: currentDasa.antaram?.planet,
-            start_date: currentDasa.maha.startDate ? new Date(currentDasa.maha.startDate).toLocaleDateString() : "Unknown",
-            end_date: currentDasa.maha.endDate ? new Date(currentDasa.maha.endDate).toLocaleDateString() : "Unknown",
-            bhukti_end_date: currentDasa.bhukti?.endDate ? new Date(currentDasa.bhukti.endDate).toLocaleDateString() : "Unknown",
-            timeline_summary: "See 'dasa_schedule' below for full timeline."
-        } : "Unknown",
+        CurrentDasa: currentDasa ? (() => {
+            const dasaLordFunc = getFunctionalNature(ascSignIndex, language)[currentDasa.maha.planet];
+            const bhuktiLordFunc = currentDasa.bhukti ? getFunctionalNature(ascSignIndex, language)[currentDasa.bhukti.planet] : null;
+
+            return {
+                lord: currentDasa.maha.planet,
+                functional_nature: dasaLordFunc?.nature || "Neutral",
+                lord_of_houses: dasaLordFunc?.lordOfHouses || [],
+                natural_significations: dasaLordFunc?.karakatvam || [],
+                affected_persons: dasaLordFunc?.affectedPersons || [],
+                combined_interpretation: dasaLordFunc?.combinedEffect || "",
+                bhukti: currentDasa.bhukti?.planet,
+                bhukti_lord_nature: bhuktiLordFunc?.nature || "Neutral",
+                bhukti_affected_persons: bhuktiLordFunc?.affectedPersons || [],
+                bhukti_combined_interpretation: bhuktiLordFunc?.combinedEffect || "",
+                antaram: currentDasa.antaram?.planet,
+                start_date: currentDasa.maha.startDate ? new Date(currentDasa.maha.startDate).toLocaleDateString() : "Unknown",
+                end_date: currentDasa.maha.endDate ? new Date(currentDasa.maha.endDate).toLocaleDateString() : "Unknown",
+                bhukti_end_date: currentDasa.bhukti?.endDate ? new Date(currentDasa.bhukti.endDate).toLocaleDateString() : "Unknown",
+                timeline_summary: "See 'dasa_schedule' below for full timeline."
+            };
+        })() : "Unknown",
         DasaSchedule: getReadableDashaSchedule(data.dashaPeriods),
-        FunctionalMalefics: getFunctionalNature(ascSignIndex, language),
+        FunctionalNature: getFunctionalNature(ascSignIndex, language),
+        // Example of how to use Adhipathiyam vs Karakatvam:
+        // For Sagittarius Lagna: Sun lords 9th house (Father) + naturally signifies Father = HIGH CONFIDENCE father prediction
+        PredictionLogicExample: `
+When making predictions, use BOTH Adhipathiyam (house lordship) AND Karakatvam (natural significations):
+
+1. **Determine WHO is affected**:
+   - Check 'lord_of_houses' (Adhipathiyam): If planet lords 9th house → affects Father
+   - Check 'natural_significations' (Karakatvam): If planet naturally signifies Father → affects Father
+   - If BOTH match → DOUBLE CONFIRMATION → HIGH CONFIDENCE prediction for that person
+
+2. **Determine WHAT happens**:
+   - Check planet's nature (Yogakaraka/Benefic/Malefic/Maraka)
+   - Check 'affected_areas' for combined areas of influence
+   - Cross-reference with Dasa timing
+
+3. **Example (Sagittarius Lagna - Sun Dasa):**
+   - Sun lords 9th house (Adhipathiyam) → Father house
+   - Sun naturally signifies Father (Karakatvam) → Father person
+   - Sun with Saturn (2nd lord Maraka) → Death-like situation
+   - **Prediction**: "Father will face serious health crisis during Sun Dasa"
+
+ALWAYS use 'combined_interpretation' field to understand WHO + WHAT for each planet.
+        `,
         SpecialRulesAnalysis: advancedRules,
         HouseLords: houseLords,
         CalculatedAspects: calculatedAspects,

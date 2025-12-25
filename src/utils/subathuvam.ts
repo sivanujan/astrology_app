@@ -68,11 +68,33 @@ const getMoonPower = (moonLon: number, sunLon: number): { subPower: number; pava
 };
 
 // Get Planet Strength/Goodness Score based on Conjunction
-const getConjunctionScore = (target: any, source: any, orb: number = 15) => {
+// Graduated scale based on degree proximity
+const getConjunctionScore = (target: any, source: any, orb: number = 30) => {
     const diff = getDegreeDifference(target.longitude, source.longitude);
     if (diff > orb) return 0;
-    // Formula: (15 - diff) / 15 * 100
-    return ((orb - diff) / orb) * 100;
+
+    // Graduated scoring based on closeness
+    if (diff <= 1) {
+        return 100; // 0° to 1° - Perfect conjunction
+    } else if (diff <= 3) {
+        // 1° to 3° - 90% to 95%
+        return 95 - ((diff - 1) / 2) * 5;
+    } else if (diff <= 7) {
+        // 3° to 7° - 75% to 90%
+        return 90 - ((diff - 3) / 4) * 15;
+    } else if (diff <= 12) {
+        // 7° to 12° - 50% to 75%
+        return 75 - ((diff - 7) / 5) * 25;
+    } else if (diff <= 18) {
+        // 12° to 18° - 25% to 50%
+        return 50 - ((diff - 12) / 6) * 25;
+    } else if (diff <= 25) {
+        // 18° to 25° - 10% to 25%
+        return 25 - ((diff - 18) / 7) * 15;
+    } else {
+        // 25° to 30° - 0% to 10%
+        return 10 - ((diff - 25) / 5) * 10;
+    }
 };
 
 // Get Aspect Score
@@ -146,14 +168,24 @@ export const calculateSubathuvamPavathuvam = (allPlanets: any[], language: 'en' 
     const isMoonWaxing = isWaxingMoon(moon.longitude, sun.longitude);
     const isMercBenefic = isMercuryBenefic(mercury, allPlanets);
 
+
     allPlanets.forEach(target => {
-        let subathuvamScore = 0;
-        let pavathuvamScore = 0;
         const subathuvamDetails: string[] = [];
         const pavathuvamDetails: string[] = [];
 
+
         // 1. Check Star (Nakshatra) Lord (Placeholder)
         // ...
+
+        // 2. Collect ALL Subathuvam sources with scores (for progressive stacking)
+        interface SubathuvamSource {
+            source: string;
+            score: number;
+            type: 'conjunction' | 'aspect';
+            detail: string;
+        }
+        const subathuvamSources: SubathuvamSource[] = [];
+        const pavathuvamSources: SubathuvamSource[] = [];
 
         // 2. Check Conjunctions & Aspects
         allPlanets.forEach(source => {
@@ -163,60 +195,128 @@ export const calculateSubathuvamPavathuvam = (allPlanets: any[], language: 'en' 
 
             // Conjunction with Benefics (Jupiter, Venus)
             if (['Jupiter', 'Venus'].includes(source.name)) {
-                const score = getConjunctionScore(target, source);
-                if (score > 0) {
-                    subathuvamScore += score;
+                const rawScore = getConjunctionScore(target, source);
+                if (rawScore > 0) {
                     const conjoinedText = language === 'ta' ? 'கூட்டு' : 'Conjoined with';
-                    subathuvamDetails.push(`${conjoinedText} ${translatePlanetName(source.name, language)} (${Math.round(score)}%)`);
+                    subathuvamSources.push({
+                        source: source.name,
+                        score: rawScore,
+                        type: 'conjunction',
+                        detail: `${conjoinedText} ${translatePlanetName(source.name, language)} (${Math.round(rawScore)}%)`
+                    });
                 }
             }
             // Conjunction with Waxing Moon / Benefic Mercury
             if (source.name === 'Moon' && isMoonWaxing) {
-                const score = getConjunctionScore(target, source);
-                if (score > 0) {
-                    subathuvamScore += score * 0.5; // Moon is less strong than Guru/Sukra
+                const rawScore = getConjunctionScore(target, source);
+                if (rawScore > 0) {
                     const conjoinedText = language === 'ta' ? 'கூட்டு' : 'Conjoined with';
-                    subathuvamDetails.push(`${conjoinedText} ${translatePlanetName('Waxing Moon', language)} (${Math.round(score * 0.5)}%)`);
+                    subathuvamSources.push({
+                        source: 'Waxing Moon',
+                        score: rawScore * 0.5, // Moon is less strong
+                        type: 'conjunction',
+                        detail: `${conjoinedText} ${translatePlanetName('Waxing Moon', language)} (${Math.round(rawScore * 0.5)}%)`
+                    });
                 }
             }
             if (source.name === 'Mercury' && isMercBenefic) {
-                const score = getConjunctionScore(target, source);
-                if (score > 0) {
-                    subathuvamScore += score * 0.5;
+                const rawScore = getConjunctionScore(target, source);
+                if (rawScore > 0) {
                     const conjoinedText = language === 'ta' ? 'கூட்டு' : 'Conjoined with';
-                    subathuvamDetails.push(`${conjoinedText} ${translatePlanetName('Benefic Mercury', language)} (${Math.round(score * 0.5)}%)`);
+                    subathuvamSources.push({
+                        source: 'Benefic Mercury',
+                        score: rawScore * 0.5,
+                        type: 'conjunction',
+                        detail: `${conjoinedText} ${translatePlanetName('Benefic Mercury', language)} (${Math.round(rawScore * 0.5)}%)`
+                    });
                 }
             }
 
             // Aspects (Use Refined Function)
-            // Determine if source is Benefic/Malefic for Aspect Calculation
             let isBeneficSource = ['Jupiter', 'Venus'].includes(source.name);
             if (source.name === 'Moon' && isMoonWaxing) isBeneficSource = true;
             if (source.name === 'Mercury' && isMercBenefic) isBeneficSource = true;
 
             let isMaleficSource = ['Saturn', 'Mars'].includes(source.name);
 
-            // Calculate raw aspect score
             const aspectScore = getAspectScore(target, source);
 
             if (aspectScore > 0) {
                 const aspectedText = language === 'ta' ? 'பார்வை' : 'Aspected by';
                 if (source.name === 'Jupiter') {
-                    subathuvamScore += aspectScore;
-                    subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Jupiter', language)} (${Math.round(aspectScore)}%)`);
+                    subathuvamSources.push({
+                        source: 'Jupiter',
+                        score: aspectScore,
+                        type: 'aspect',
+                        detail: `${aspectedText} ${translatePlanetName('Jupiter', language)} (${Math.round(aspectScore)}%)`
+                    });
                 } else if (source.name === 'Venus') {
-                    subathuvamScore += aspectScore * 0.75;
-                    subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Venus', language)} (${Math.round(aspectScore * 0.75)}%)`);
+                    subathuvamSources.push({
+                        source: 'Venus',
+                        score: aspectScore * 0.75,
+                        type: 'aspect',
+                        detail: `${aspectedText} ${translatePlanetName('Venus', language)} (${Math.round(aspectScore * 0.75)}%)`
+                    });
                 } else if (source.name === 'Moon' && isMoonWaxing) {
-                    subathuvamScore += aspectScore * 0.6;
-                    subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Waxing Moon', language)} (${Math.round(aspectScore * 0.6)}%)`);
+                    subathuvamSources.push({
+                        source: 'Waxing Moon',
+                        score: aspectScore * 0.6,
+                        type: 'aspect',
+                        detail: `${aspectedText} ${translatePlanetName('Waxing Moon', language)} (${Math.round(aspectScore * 0.6)}%)`
+                    });
                 } else if (source.name === 'Mercury' && isMercBenefic) {
-                    subathuvamScore += aspectScore * 0.5;
-                    subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Benefic Mercury', language)} (${Math.round(aspectScore * 0.5)}%)`);
+                    subathuvamSources.push({
+                        source: 'Benefic Mercury',
+                        score: aspectScore * 0.5,
+                        type: 'aspect',
+                        detail: `${aspectedText} ${translatePlanetName('Benefic Mercury', language)} (${Math.round(aspectScore * 0.5)}%)`
+                    });
                 } else if (isMaleficSource) {
-                    pavathuvamScore += aspectScore;
-                    pavathuvamDetails.push(`${aspectedText} ${translatePlanetName(source.name, language)} (${Math.round(aspectScore)}%)`);
+                    pavathuvamSources.push({
+                        source: source.name,
+                        score: aspectScore,
+                        type: 'aspect',
+                        detail: `${aspectedText} ${translatePlanetName(source.name, language)} (${Math.round(aspectScore)}%)`
+                    });
                 }
+            }
+        });
+
+        // Apply Progressive Stacking (Diminishing Returns)
+        // Sort by score (descending - strongest first)
+        subathuvamSources.sort((a, b) => b.score - a.score);
+        pavathuvamSources.sort((a, b) => b.score - a.score);
+
+        // Apply multipliers: 1st=100%, 2nd=50%, 3rd=30%, 4th+=10%
+        const multipliers = [1.0, 0.5, 0.3, 0.1, 0.1, 0.1]; // 4th+ all get 10%
+
+        let subathuvamScore = 0;
+        let pavathuvamScore = 0;
+
+        subathuvamSources.forEach((src, index) => {
+            const multiplier = multipliers[Math.min(index, multipliers.length - 1)];
+            const adjustedScore = src.score * multiplier;
+            subathuvamScore += adjustedScore;
+
+            // Update detail with multiplier if not first
+            if (index === 0) {
+                subathuvamDetails.push(src.detail);
+            } else {
+                const percent = Math.round(multiplier * 100);
+                subathuvamDetails.push(`${src.detail} [${percent}% effectiveness]`);
+            }
+        });
+
+        pavathuvamSources.forEach((src, index) => {
+            const multiplier = multipliers[Math.min(index, multipliers.length - 1)];
+            const adjustedScore = src.score * multiplier;
+            pavathuvamScore += adjustedScore;
+
+            if (index === 0) {
+                pavathuvamDetails.push(src.detail);
+            } else {
+                const percent = Math.round(multiplier * 100);
+                pavathuvamDetails.push(`${src.detail} [${percent}% effectiveness]`);
             }
         });
 
@@ -232,11 +332,11 @@ export const calculateSubathuvamPavathuvam = (allPlanets: any[], language: 'en' 
 
         results[target.name] = {
             subathuvam: {
-                score: Math.round(subathuvamScore),
+                score: Math.min(100, Math.round(subathuvamScore)), // Cap at 100
                 details: subathuvamDetails
             },
             pavathuvam: {
-                score: Math.round(pavathuvamScore),
+                score: Math.min(100, Math.round(pavathuvamScore)), // Cap at 100
                 details: pavathuvamDetails
             }
         };
@@ -317,21 +417,27 @@ export const calculateHouseSubathuvamPavathuvam = (ascendantSign: number, allPla
     // Check if Jupiter has power (not afflicted)
     const jupiterHasPower = jupiter ? !isBeneficAfflicted(jupiter, 'Jupiter') : false;
 
-    // Get planet Subathuvam to check neutral status
-    const planetSubathuvam = calculateAdityaGurujiSubathuvam(allPlanets);
+    // Calculate SIMPLE Subathuvam scores for neutral check
+    // (These match what the user sees in the UI - 79% for Saturn)
+    const simpleSubathuvam = calculateSubathuvamPavathuvam(allPlanets, language);
 
-    // UPDATED: Check if malefics are neutral using planet Subathuvam results
+    // UPDATED: Check if malefics are neutral
+    // Use SIMPLE Subathuvam scores (not Aditya Guruji) to match UI display
     // சுபத்துவம் அடைந்த பாபி = நடுநிலை
     const isMaleficNeutral = (malefic: any): boolean => {
         if (!malefic) return false;
 
-        // Use planet Subathuvam results isNeutral flag
-        const maleficSubResult = planetSubathuvam[malefic.name];
-        if (maleficSubResult && maleficSubResult.isNeutral) {
-            return true; // Planet calculation already determined neutral status
-        }
+        const malefics = ['Saturn', 'Mars', 'Sun', 'Rahu', 'Ketu'];
+        if (!malefics.includes(malefic.name)) return false;
 
-        return false;
+        // Use simple Subathuvam calculation (matches UI)
+        const simpleScore = simpleSubathuvam[malefic.name];
+        if (!simpleScore) return false;
+
+        // If Subathuvam score >= 50, malefic becomes neutral
+        const isNeutral = simpleScore.subathuvam.score >= 50;
+
+        return isNeutral;
     };
 
     // Iterate through 12 houses
@@ -473,44 +579,31 @@ export const calculateHouseSubathuvamPavathuvam = (ascendantSign: number, allPla
                 }
 
                 // PAVATHUVAM ASPECTS
-                // சுபத்துவம் அடைந்த பாபி பார்வை = நடுநிலை
+                // சுபத்துவம் அடைந்த பாபி பார்வை = முற்றிலும் நடுநிலை (NO Subathuvam, NO Pavathuvam)
                 else if (source.name === 'Saturn') {
-                    if (isMaleficNeutral(source)) {
-                        const neutralText = language === 'ta' ? 'நடுநிலை' : 'Neutral';
-                        subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Saturn', language)} (${neutralText})`);
-                    } else {
+                    if (!isMaleficNeutral(source)) {
+                        // Only give Pavathuvam if NOT neutral
                         pavathuvamScore += aspectScore;
                         pavathuvamDetails.push(`${aspectedText} ${translatePlanetName('Saturn', language)}`);
                     }
+                    // If neutral: Do NOTHING (no suba, no pava)
                 } else if (source.name === 'Rahu') {
-                    if (isMaleficNeutral(source)) {
-                        const neutralText = language === 'ta' ? 'நடுநிலை' : 'Neutral';
-                        subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Rahu', language)} (${neutralText})`);
-                    } else {
+                    if (!isMaleficNeutral(source)) {
                         pavathuvamScore += aspectScore * 0.90;
                         pavathuvamDetails.push(`${aspectedText} ${translatePlanetName('Rahu', language)}`);
                     }
                 } else if (source.name === 'Ketu') {
-                    if (isMaleficNeutral(source)) {
-                        const neutralText = language === 'ta' ? 'நடுநிலை' : 'Neutral';
-                        subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Ketu', language)} (${neutralText})`);
-                    } else {
+                    if (!isMaleficNeutral(source)) {
                         pavathuvamScore += aspectScore * 0.80;
                         pavathuvamDetails.push(`${aspectedText} ${translatePlanetName('Ketu', language)}`);
                     }
                 } else if (source.name === 'Mars') {
-                    if (isMaleficNeutral(source)) {
-                        const neutralText = language === 'ta' ? 'நடுநிலை' : 'Neutral';
-                        subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Mars', language)} (${neutralText})`);
-                    } else {
+                    if (!isMaleficNeutral(source)) {
                         pavathuvamScore += aspectScore * 0.75;
                         pavathuvamDetails.push(`${aspectedText} ${translatePlanetName('Mars', language)}`);
                     }
                 } else if (source.name === 'Sun') {
-                    if (isMaleficNeutral(source)) {
-                        const neutralText = language === 'ta' ? 'நடுநிலை' : 'Neutral';
-                        subathuvamDetails.push(`${aspectedText} ${translatePlanetName('Sun', language)} (${neutralText})`);
-                    } else {
+                    if (!isMaleficNeutral(source)) {
                         pavathuvamScore += aspectScore * 0.60;
                         pavathuvamDetails.push(`${aspectedText} ${translatePlanetName('Sun', language)}`);
                     }
@@ -525,13 +618,14 @@ export const calculateHouseSubathuvamPavathuvam = (ascendantSign: number, allPla
             }
         });
 
+
         results[houseNumber] = {
             subathuvam: {
-                score: Math.round(subathuvamScore),
+                score: Math.min(100, Math.round(subathuvamScore)), // Cap at 100
                 details: subathuvamDetails
             },
             pavathuvam: {
-                score: Math.round(pavathuvamScore),
+                score: Math.min(100, Math.round(pavathuvamScore)), // Cap at 100
                 details: pavathuvamDetails
             }
         };

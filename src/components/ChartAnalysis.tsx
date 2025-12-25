@@ -299,8 +299,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                             <thead>
                                 <tr className="bg-slate-900/80 text-slate-400 text-sm uppercase tracking-wider">
                                     <th className="p-4">{t.subathuvam.house}</th>
-                                    <th className="p-4 text-green-400">{t.subathuvam.subathuvam}</th>
-                                    <th className="p-4 text-red-400">{t.subathuvam.pavathuvam}</th>
+                                    <th className="p-4">{language === 'ta' ? 'இறுதி மதிப்பெண்' : 'Final Score'}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
@@ -308,43 +307,40 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                     const hScores = houseScores[houseNum];
                                     if (!hScores) return null;
 
+                                    // Determine final score and color
+                                    const hasSubathuvam = hScores.subathuvam.score > 0;
+                                    const hasPavathuvam = hScores.pavathuvam.score > 0;
+
+                                    const finalScore = hasSubathuvam ? hScores.subathuvam.score : hScores.pavathuvam.score;
+                                    const scoreColor = hasSubathuvam ? 'text-green-400' : 'text-red-400';
+                                    const barColor = hasSubathuvam ? 'bg-green-500' : 'bg-red-500';
+                                    const label = hasSubathuvam
+                                        ? (language === 'ta' ? 'சுபத்துவம்' : 'Subathuvam')
+                                        : (language === 'ta' ? 'பாவத்துவம்' : 'Pavathuvam');
+                                    const details = hasSubathuvam ? hScores.subathuvam.details : hScores.pavathuvam.details;
+
                                     return (
                                         <tr key={houseNum} className="hover:bg-slate-800/30 transition-colors">
                                             <td className="p-4 font-medium">
-                                                House {houseNum}
+                                                {language === 'ta' ? `வீடு ${houseNum}` : `House ${houseNum}`}
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex flex-col gap-1">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
                                                             <div
-                                                                className="h-full bg-green-500"
-                                                                style={{ width: `${Math.min(hScores.subathuvam.score, 100)}%` }}
+                                                                className={`h-full ${barColor}`}
+                                                                style={{ width: `${Math.min(finalScore, 100)}%` }}
                                                             />
                                                         </div>
-                                                        <span className="font-bold text-green-400">{hScores.subathuvam.score}</span>
+                                                        <span className={`font-bold ${scoreColor}`}>{finalScore}</span>
+                                                        {finalScore > 0 && (
+                                                            <span className={`text-xs ${scoreColor}`}>({label})</span>
+                                                        )}
                                                     </div>
-                                                    {hScores.subathuvam.details.length > 0 && (
+                                                    {details.length > 0 && (
                                                         <div className="text-xs text-slate-400">
-                                                            {hScores.subathuvam.details.join(', ')}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-16 h-2 bg-slate-700 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-red-500"
-                                                                style={{ width: `${Math.min(hScores.pavathuvam.score, 100)}%` }}
-                                                            />
-                                                        </div>
-                                                        <span className="font-bold text-red-400">{hScores.pavathuvam.score}</span>
-                                                    </div>
-                                                    {hScores.pavathuvam.details.length > 0 && (
-                                                        <div className="text-xs text-slate-400">
-                                                            {hScores.pavathuvam.details.join(', ')}
+                                                            {details.join(', ')}
                                                         </div>
                                                     )}
                                                 </div>
@@ -369,6 +365,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                     <th className="p-4 text-center">Navamsa Score</th>
                                     <th className="p-4 text-center">Total Score</th>
                                     <th className="p-4">Status</th>
+                                    <th className="p-4 text-center">{language === 'ta' ? 'சூட்சும வலு' : 'Sookshma Valu'}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
@@ -402,6 +399,35 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
                                                         Normal
                                                     </span>
+                                                )}
+                                                {pScore.isNeutral && (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-300 border border-blue-700/50 ml-2">
+                                                        Neutral
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {pScore.hasSookshmaValu ? (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className="text-2xl" title="Sookshma Valu">🌟</span>
+                                                        {pScore.sookshmaValuReason && (
+                                                            <div className="text-xs text-amber-400 text-center max-w-xs">
+                                                                {pScore.sookshmaValuReason}
+                                                            </div>
+                                                        )}
+                                                        <div className="text-xs text-slate-400 italic text-center mt-1">
+                                                            {planet.name === 'Saturn' && language === 'ta'
+                                                                ? 'வலி இல்லாமல் வழி தரும்'
+                                                                : planet.name === 'Saturn'
+                                                                    ? 'Success without torture'
+                                                                    : planet.name === 'Mars' && language === 'ta'
+                                                                        ? 'விவேகமான வீரம்'
+                                                                        : 'Wise courage'
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-600">-</span>
                                                 )}
                                             </td>
                                         </tr>

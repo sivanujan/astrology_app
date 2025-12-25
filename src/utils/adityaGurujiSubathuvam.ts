@@ -1,4 +1,6 @@
 import { calculateNavamsa, getNakshatra, NAKSHATRA_LORDS } from './astrology';
+import { ZODIAC_SIGNS } from './constants';
+import { calculateSubathuvamPavathuvam } from './subathuvam';
 
 export interface SubathuvamResult {
     planet: string;
@@ -84,120 +86,35 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
     const jupiterHasPower = jupiter ? !isBeneficAfflictedEarly(jupiter, 'Jupiter') : false;
     const venusHasPower = venus ? !isBeneficAfflictedEarly(venus, 'Venus') : false;
 
+    // Calculate Simple Subathuvam/Pavathuvam FIRST (for Rasi base)
+    const simpleSubathuvam = calculateSubathuvamPavathuvam(rasiPlanets, 'en');
+
     rasiPlanets.forEach(planet => {
-        let rasiScore = 0;
         let navamsaScore = 0;
         const details: string[] = [];
         let isSubathuva = false;
 
-        // --- Step A: Rasi Chart Subathuvam (Base Strength) ---
+        // --- Step A: Rasi Score = Simple Subathuvam - Simple Pavathuvam ---
+        // This ensures consistency between two tables!
 
-        // Rule 1: Jupiter's Aspect (Guru Drishti) - +40 Marks (only if Jupiter has power!)
-        if (jupiter && planet.name !== 'Jupiter') {
-            const signDiff = (planet.signIndex - jupiter.signIndex + 12) % 12;
-            const houseDist = signDiff + 1;
+        const simpleScore = simpleSubathuvam[planet.name];
+        const subathuvamScore = simpleScore?.subathuvam?.score || 0;
+        const pavathuvamScore = simpleScore?.pavathuvam?.score || 0;
 
-            if ([5, 7, 9].includes(houseDist)) {
-                if (jupiterHasPower) {
-                    rasiScore += 40;
-                    details.push("Jupiter Aspect (+40)");
-                } else {
-                    details.push("Jupiter Aspect (பலவீனம் - No power, Jupiter afflicted)");
-                }
+        // Rasi Score = Positive (Subathuvam) - Negative (Pavathuvam)
+        let rasiScore = subathuvamScore - pavathuvamScore;
+
+        // Add details from simple calculation
+        if (simpleScore) {
+            if (simpleScore.subathuvam.details.length > 0) {
+                details.push(...simpleScore.subathuvam.details.map((d: string) => `✅ ${d}`));
+            }
+            if (simpleScore.pavathuvam.details.length > 0) {
+                details.push(...simpleScore.pavathuvam.details.map((d: string) => `❌ ${d}`));
             }
         }
 
-        // Rule 2: Conjunction with Benefics - Up to +40 Marks (degree-based)
-        // NEW: Check degree difference AND benefic power!
-        if (planet.name !== 'Jupiter' && jupiter) {
-            const degreeDiff = Math.abs(planet.longitude - jupiter.longitude);
-            const actualDiff = Math.min(degreeDiff, 360 - degreeDiff);
-
-            if (actualDiff <= 10) {
-                if (jupiterHasPower) {
-                    // Powerful Jupiter conjunction!
-                    rasiScore += 40;
-                    details.push(`Close Conjunction with Jupiter (${actualDiff.toFixed(1)}°) (+40)`);
-                } else {
-                    // Afflicted Jupiter - no bonus
-                    details.push(`Conjunction with Jupiter (${actualDiff.toFixed(1)}° - பலவீனம், No bonus)`);
-                }
-            } else if (planet.signIndex === jupiter.signIndex) {
-                if (jupiterHasPower) {
-                    rasiScore += 20;
-                    details.push("Conjoined Jupiter (same sign) (+20)");
-                } else {
-                    // Same sign but Jupiter afflicted - no bonus
-                    details.push("Conjoined Jupiter (same sign - பலவீனம், No bonus)");
-
-                    // DEBUG for Saturn
-                    if (planet.name === 'Saturn') {
-                        console.log('🪐 SATURN: Jupiter afflicted, NO bonus granted!', {
-                            saturnLongitude: planet.longitude,
-                            jupiterLongitude: jupiter.longitude,
-                            jupiterHasPower,
-                            detailsAdded: details[details.length - 1]
-                        });
-                    }
-                }
-            }
-        }
-
-        if (planet.name !== 'Venus' && venus) {
-            const degreeDiff = Math.abs(planet.longitude - venus.longitude);
-            const actualDiff = Math.min(degreeDiff, 360 - degreeDiff);
-
-            if (actualDiff <= 10) {
-                if (venusHasPower) {
-                    rasiScore += 40;
-                    details.push(`Close Conjunction with Venus (${actualDiff.toFixed(1)}°) (+40)`);
-                } else {
-                    details.push(`Conjunction with Venus (${actualDiff.toFixed(1)}° - பலவீனம், No bonus)`);
-                }
-            } else if (planet.signIndex === venus.signIndex) {
-                if (venusHasPower) {
-                    rasiScore += 20;
-                    details.push("Conjoined Venus (same sign) (+20)");
-                } else {
-                    details.push("Conjoined Venus (same sign - பலவீனம், No bonus)");
-                }
-            }
-        }
-
-        // Moon Special Rule: Waxing Moon acts as Benefic
-        if (planet.name !== 'Moon' && moon && moonStatus.isBenefic && planet.signIndex === moon.signIndex) {
-            rasiScore += 15; // Slightly less than Jupiter/Venus
-            details.push(`Conjoined Waxing Moon (${Math.round(moonStatus.lightPercentage)}% Light) (+15)`);
-        }
-
-        // Rule 3: Star Lord (Nakshatra) - +10 Marks
-        const nakshatraInfo = getNakshatra(planet.longitude);
-        if (nakshatraInfo.index >= 0 && nakshatraInfo.index < NAKSHATRA_LORDS.length) {
-            const starLord = NAKSHATRA_LORDS[nakshatraInfo.index];
-            if (['Jupiter', 'Venus'].includes(starLord)) {
-                rasiScore += 10;
-                details.push(`Star of ${starLord} (+10)`);
-            }
-            // Moon Star: Only if Waxing
-            if (starLord === 'Moon' && moonStatus.isBenefic) {
-                rasiScore += 10;
-                details.push(`Star of Waxing Moon (+10)`);
-            }
-        }
-
-        // --- Moon Specific Subathuvam Logic ---
-        if (planet.name === 'Moon') {
-            rasiScore += moonStatus.lightPercentage; // Direct add of light %
-            details.push(`${moonStatus.phaseName}: ${Math.round(moonStatus.lightPercentage)}% Light (+${Math.round(moonStatus.lightPercentage)})`);
-
-            if (!moonStatus.isBenefic) {
-                details.push("Low Light: Treated as Malefic (Saturn-like)");
-                // If extremely dark (<20%), maybe subtract or flag as Pavathuvam?
-                // For now, low score reflects this.
-            }
-        }
-
-        // --- Step B: Navamsa Chart Subathuvam (Hidden Strength) ---
+        // --- Step B: Navamsa Chart Subathuvam (Advanced Aditya Guruji Rules) ---
 
         const navamsa = calculateNavamsa(planet.longitude);
         const navamsaSignIndex = navamsa.signIndex;
@@ -208,16 +125,56 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
             details.push("Vargottama (+30)");
         }
 
-        // Rule 5: Placement in Benefic Houses
-        if ([1, 6, 8, 11].includes(navamsaSignIndex)) {
-            navamsaScore += 20;
-            details.push("Navamsa Benefic Sign (+20)");
+        // Rule 5: Navamsa House Rankings (Detailed as per yesterday's chat)
+        const navamsaRankings: Record<number, number> = {
+            8: 100,   // Sagittarius (Jupiter's sign) - Best
+            11: 90,   // Pisces (Jupiter's sign)
+            6: 80,    // Libra (Venus exaltation)
+            1: 70,    // Taurus (Venus sign)
+            3: 60,    // Cancer (Moon, conditional)
+            2: 55,    // Gemini (Mercury, conditional)
+            5: 55,    // Virgo (Mercury, conditional)
+            // Remaining houses get lower or zero
+        };
+
+        const navamsaBonus = navamsaRankings[navamsaSignIndex] || 0;
+        if (navamsaBonus > 0) {
+            navamsaScore += navamsaBonus;
+            const signName = ZODIAC_SIGNS[navamsaSignIndex];
+            details.push(`Navamsa in ${signName} (+${navamsaBonus})`);
         }
+
+        // Navamsa Conjunctions (if in same Navamsa sign)
+        rasiPlanets.forEach(otherPlanet => {
+            if (otherPlanet.name === planet.name) return;
+            const otherNavamsa = calculateNavamsa(otherPlanet.longitude);
+
+            if (otherNavamsa.signIndex === navamsaSignIndex) {
+                if (otherPlanet.name === 'Jupiter' && jupiterHasPower) {
+                    navamsaScore += 30;
+                    details.push("Navamsa Conj. with Jupiter (+30)");
+                } else if (otherPlanet.name === 'Venus' && venusHasPower) {
+                    navamsaScore += 25;
+                    details.push("Navamsa Conj. with Venus (+25)");
+                } else if (otherPlanet.name === 'Ketu') {
+                    navamsaScore += 15;
+                    details.push("Navamsa Conj. with Ketu (+15)");
+                }
+            }
+        });
+
+        // NOTE: Navamsa has NO negative marks - only positive bonuses!
+        // Negative influences (debilitation, malefic houses) apply to RASI only.
+
 
         // --- Step C: Final Calculation & Identification ---
 
-        let totalScore = rasiScore + navamsaScore;
-        if (totalScore > 100) totalScore = 100;
+        // Cap individual scores at 100
+        rasiScore = Math.min(rasiScore, 100);
+        navamsaScore = Math.min(navamsaScore, 100);
+
+        // Total = Average of Rasi and Navamsa
+        let totalScore = Math.round((rasiScore + navamsaScore) / 2);
 
         // Definition of Subathuva:
         // Usually > 50.

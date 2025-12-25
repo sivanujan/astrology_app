@@ -95,7 +95,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             </div>
                         </div>
 
-                        <div className="hidden md:flex items-center gap-1 lg:gap-2">
+                        <div className="hidden md:flex items-center gap-4">
                             {steps.map((step, idx) => {
                                 const Icon = step.icon;
                                 const isActive = location.pathname === step.path;

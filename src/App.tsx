@@ -13,6 +13,8 @@ import DashaPeriods from './components/DashaPeriods';
 import GurujiPredictions from './components/GurujiPredictions';
 import DailySnapshot from './components/DailySnapshot';
 import MarriageMatching from './pages/MarriageMatching';
+import ComprehensiveMarriageMatching from './pages/ComprehensiveMarriageMatching';
+import ComprehensiveResultsPage from './pages/ComprehensiveResultsPage';
 import MatchingResults from './pages/MatchingResults';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -155,6 +157,18 @@ const AppRoutes = () => {
         <ProtectedRoute requireAuth={false}>
           <SEO title="Marriage Matching - Compatibility Analysis" />
           <MarriageMatching />
+        </ProtectedRoute>
+      } />
+      <Route path="/comprehensive-matching" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Comprehensive Marriage Matching - 7 Guruji Rules" />
+          <ComprehensiveMarriageMatching />
+        </ProtectedRoute>
+      } />
+      <Route path="/comprehensive-results" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Comprehensive Matching Results" />
+          <ComprehensiveResultsPage />
         </ProtectedRoute>
       } />
       <Route path="/matching-results" element={
