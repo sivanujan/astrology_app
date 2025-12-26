@@ -7,7 +7,7 @@
 import { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } from './subathuvam';
 import { calculateAdityaGurujiSubathuvam } from './adityaGurujiSubathuvam';
 import { calculateVimshottariDasha, getCurrentDasha, getDashaAtDate } from './dashaCalculation';
-import { ZODIAC_SIGNS } from './constants';
+import { ZODIAC_SIGNS, SIGN_LORDS } from './constants';
 import {
     getHousesRuledByPlanet,
     getHouseLord,
@@ -358,7 +358,7 @@ function calculateMilliliterDoshaBalance(boyChart: any, girlChart: any): RuleRes
 function calculateDoshaMilliliters(chart: any): number {
     let dosha = 0;
     const planets = chart.planets || [];
-    const lagna = chart.ascendant?.sign || 0;
+    const lagna = chart.ascendant?.signIndex ?? 0;
     const moon = planets.find((p: any) => p.name === 'Moon');
     const venus = planets.find((p: any) => p.name === 'Venus');
 
@@ -592,26 +592,52 @@ function hasSaturnIn7th(chart: any): boolean {
 }
 
 function get7thHouseScore(chart: any): number {
+    console.log('===== 7TH HOUSE SCORE DEBUG =====');
+
     let score = 70;
-    const planets = chart.planets || [];
+    let planets = chart.planets || [];
+
+    // Ensure planets is an array
+    if (!Array.isArray(planets) && typeof planets === 'object') {
+        console.log('Converting planets object to array...');
+        planets = Object.values(planets);
+    }
+
+    console.log('Starting score:', score);
+    console.log('Chart planets count:', planets.length);
+    console.log('Planets is array?', Array.isArray(planets));
 
     // 7th House Lord Strength (30% of score)
     const lordStrength = getHouseLordStrength(7, chart);
-    score += (lordStrength - 50) * 0.3; // Convert 0-100 to -15 to +15
+    const lordAdjustment = (lordStrength - 50) * 0.3;
+    score += lordAdjustment;
+
+    console.log('7th lord strength:', lordStrength);
+    console.log('Lord adjustment:', lordAdjustment);
+    console.log('Score after lord:', score);
 
     const in7th = planets.filter((p: any) => p.house === 7);
+    console.log('Planets in 7th house:', in7th.map((p: any) => p.name));
 
     for (const planet of in7th) {
-        if (planet.name === 'Jupiter') score += 25;
-        else if (planet.name === 'Venus') score += 30;
-        else if (planet.name === 'Mercury') score += 15;
-        else if (planet.name === 'Saturn') score -= 20;
-        else if (planet.name === 'Mars') score -= 20;
-        else if (planet.name === 'Rahu') score -= 25;
-        else if (planet.name === 'Ketu') score -= 20;
+        let adjustment = 0;
+        if (planet.name === 'Jupiter') adjustment = 25;
+        else if (planet.name === 'Venus') adjustment = 30;
+        else if (planet.name === 'Mercury') adjustment = 15;
+        else if (planet.name === 'Saturn') adjustment = -20;
+        else if (planet.name === 'Mars') adjustment = -20;
+        else if (planet.name === 'Rahu') adjustment = -25;
+        else if (planet.name === 'Ketu') adjustment = -20;
+
+        score += adjustment;
+        console.log(`${planet.name} in 7th: ${adjustment > 0 ? '+' : ''}${adjustment}, score now: ${score}`);
     }
 
-    return Math.min(100, Math.max(20, score));
+    const finalScore = Math.min(100, Math.max(20, score));
+    console.log('Final 7th house score:', finalScore);
+    console.log('================================');
+
+    return finalScore;
 }
 
 // ============================================================================
@@ -625,8 +651,16 @@ function analyze8thHouseForeign(boyChart: any, girlChart: any): RuleResult {
         details: []
     };
 
-    const boyForeign = hasForeignYoga(boyChart);
-    const girlForeign = hasForeignYoga(girlChart);
+    // Get detailed foreign yoga info for both
+    const boyForeignInfo = getForeignYogaDetails(boyChart);
+    const girlForeignInfo = getForeignYogaDetails(girlChart);
+
+    // Add house Subathuvam details
+    result.details.push(`Boy 8th house: ${boyForeignInfo.house8Sub.toFixed(0)}, 12th house: ${boyForeignInfo.house12Sub.toFixed(0)}`);
+    result.details.push(`Girl 8th house: ${girlForeignInfo.house8Sub.toFixed(0)}, 12th house: ${girlForeignInfo.house12Sub.toFixed(0)}`);
+
+    const boyForeign = boyForeignInfo.hasForeignYoga;
+    const girlForeign = girlForeignInfo.hasForeignYoga;
 
     if (boyForeign && girlForeign) {
         result.score = 100;
@@ -642,30 +676,119 @@ function analyze8thHouseForeign(boyChart: any, girlChart: any): RuleResult {
     return result;
 }
 
+function getForeignYogaDetails(chart: any): { hasForeignYoga: boolean; house8Sub: number; house12Sub: number } {
+    try {
+        // Ensure planets is an array
+        let planets = chart.planets || [];
+
+        console.log('===== FOREIGN YOGA DEBUG =====');
+        console.log('Original planets type:', typeof planets);
+        console.log('Original planets isArray:', Array.isArray(planets));
+        console.log('Original planets:', planets);
+
+        // If planets is an object with planet data, convert to array
+        if (!Array.isArray(planets) && typeof planets === 'object') {
+            console.log('Converting planets object to array...');
+            planets = Object.values(planets);
+            console.log('Converted planets:', planets);
+        }
+
+        const ascendantSign = chart.ascendant?.signIndex;
+        if (ascendantSign === undefined) return { hasForeignYoga: false, house8Sub: 0, house12Sub: 0 };
+
+        console.log('Ascendant sign:', ascendantSign);
+        console.log('Planets (is array?):', Array.isArray(planets), planets.length);
+
+
+        const houseSubathuvam = calculateHouseSubathuvamPavathuvam(planets, ascendantSign);
+
+        console.log('House Subathuvam results:', houseSubathuvam);
+
+        // Access houses directly by number (returns object with numeric keys 1-12)
+        const house8 = houseSubathuvam[8];
+        const house12 = houseSubathuvam[12];
+
+        console.log('House 8:', house8);
+        console.log('House 12:', house12);
+
+        // Use direct Subathuvam scores (not net) for foreign yoga
+        const house8Sub = house8 ? house8.subathuvam.score : 0;
+        const house12Sub = house12 ? house12.subathuvam.score : 0;
+
+
+        console.log('8th house Subathuvam:', house8Sub);
+        console.log('12th house Subathuvam:', house12Sub);
+
+        let foreignScore = 0;
+
+        if (house8Sub > 0) foreignScore += 40;
+        if (house12Sub > 0) foreignScore += 40;
+
+        const rahu = planets.find((p: { name: string }) => p.name === 'Rahu');
+        if (rahu && [8, 9, 12].includes(rahu.house)) {
+            foreignScore += 20;
+        }
+
+        return {
+            hasForeignYoga: foreignScore >= 60,
+            house8Sub,
+            house12Sub
+        };
+    } catch (error) {
+        console.error('Error calculating foreign yoga details:', error);
+        return { hasForeignYoga: false, house8Sub: 0, house12Sub: 0 };
+    }
+}
+
 function hasForeignYoga(chart: any): boolean {
-    const planets = chart.planets || [];
-    const in8th = planets.filter((p: { house: number }) => p.house === 8);
-    const in12th = planets.filter((p: { house: number }) => p.house === 12);
-    const rahu = planets.find((p: { name: string }) => p.name === 'Rahu');
+    try {
+        // Ensure planets is an array
+        let planets = chart.planets || [];
 
-    // Check 8th and 12th house lord strength
-    const lord8thStrength = getHouseLordStrength(8, chart);
-    const lord12thStrength = getHouseLordStrength(12, chart);
+        // If planets is an object with planet data, convert to array
+        if (!Array.isArray(planets) && typeof planets === 'object') {
+            planets = Object.values(planets);
+        }
 
-    let foreignScore = 0;
+        // Calculate House Subathuvam for all 12 houses
+        const ascendantSign = chart.ascendant?.signIndex;
+        if (ascendantSign === undefined) return false;
 
-    // House lord strength
-    if (lord8thStrength >= 60) foreignScore += 25;
-    if (lord12thStrength >= 60) foreignScore += 25;
 
-    // Benefics in 8/12
-    if (in8th.some((p: { name: string }) => ['Jupiter', 'Venus', 'Mercury'].includes(p.name))) foreignScore += 20;
-    if (in12th.some((p: { name: string }) => ['Jupiter', 'Venus', 'Mercury'].includes(p.name))) foreignScore += 20;
+        const houseSubathuvam = calculateHouseSubathuvamPavathuvam(planets, ascendantSign);
 
-    // Rahu strong
-    if (rahu && [8, 12, 9].includes(rahu.house)) foreignScore += 30;
+        // Access houses directly by number (returns object with numeric keys 1-12)
+        const house8 = houseSubathuvam[8];
+        const house12 = houseSubathuvam[12];
 
-    return foreignScore >= 60;
+        // Use direct Subathuvam scores (not net) for foreign yoga
+        const house8Sub = house8 ? house8.subathuvam.score : 0;
+        const house12Sub = house12 ? house12.subathuvam.score : 0;
+
+        let foreignScore = 0;
+
+        // If 8th house has Subathuvam (net positive) = Foreign potential
+        if (house8Sub > 0) {
+            foreignScore += 40;
+        }
+
+        // If 12th house has Subathuvam (net positive) = Strong foreign yoga
+        if (house12Sub > 0) {
+            foreignScore += 40;
+        }
+
+        // Additional check: Rahu in 8th, 9th, or 12th house
+        const rahu = planets.find((p: { name: string }) => p.name === 'Rahu');
+        if (rahu && [8, 9, 12].includes(rahu.house)) {
+            foreignScore += 20;
+        }
+
+        // Foreign Yoga = TRUE if score >= 60
+        return foreignScore >= 60;
+    } catch (error) {
+        console.error('Error calculating foreign yoga:', error);
+        return false;
+    }
 }
 
 // ============================================================================
@@ -805,8 +928,24 @@ function analyzeLagnaCompatibility(boyChart: any, girlChart: any): RuleResult {
         details: []
     };
 
-    const boyLagna = boyChart.ascendant?.sign || 0;
-    const girlLagna = girlChart.ascendant?.sign || 0;
+    // FIXED: Properly extract Lagna sign index
+    // Check signIndex first, then calculate from longitude if needed
+    let boyLagna = boyChart.ascendant?.signIndex;
+    if (boyLagna === undefined && boyChart.ascendant?.longitude !== undefined) {
+        boyLagna = Math.floor(boyChart.ascendant.longitude / 30);
+    }
+
+    let girlLagna = girlChart.ascendant?.signIndex;
+    if (girlLagna === undefined && girlChart.ascendant?.longitude !== undefined) {
+        girlLagna = Math.floor(girlChart.ascendant.longitude / 30);
+    }
+
+    // Validate we have valid Lagna values
+    if (boyLagna === undefined || girlLagna === undefined) {
+        result.score = 50;
+        result.details.push('⚠️ Unable to determine Lagna - using default score');
+        return result;
+    }
 
     const position = (girlLagna - boyLagna + 12) % 12;
 

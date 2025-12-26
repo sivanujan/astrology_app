@@ -230,7 +230,7 @@ function calculateLagnaFactor(chart: any): { score: number; verdict: string; det
         : getSignIndex(chart.ascendant);
 
     // Calculate house Subathuvam/Pavathuvam
-    const houseSubathuvam = calculateHouseSubathuvamPavathuvam(ascendantSign, chart.planets);
+    const houseSubathuvam = calculateHouseSubathuvamPavathuvam(chart.planets, ascendantSign);
     const lagnaSubathuvam = houseSubathuvam[1]; // 1st house
 
     // Lagna Subathuvam score (NET score, not subtraction)
@@ -296,7 +296,7 @@ function calculate8thHouseFactor(chart: any): { score: number; verdict: string; 
         : getSignIndex(chart.ascendant);
 
     // Calculate 8th house Subathuvam/Pavathuvam
-    const houseSubathuvam = calculateHouseSubathuvamPavathuvam(ascendantSign, chart.planets);
+    const houseSubathuvam = calculateHouseSubathuvamPavathuvam(chart.planets, ascendantSign);
     const eighthHouse = houseSubathuvam[8];
 
     // 8th house score: MORE SUBATHUVAM = GOOD for longevity!

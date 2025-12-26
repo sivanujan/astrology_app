@@ -45,7 +45,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
 
     // Calculate all scores once before rendering to ensure fresh data
     const planetScores = React.useMemo(() => calculateSubathuvamPavathuvam(planets, language), [planets, language]);
-    const houseScores = React.useMemo(() => calculateHouseSubathuvamPavathuvam(ascendant.signIndex, planets, language), [ascendant.signIndex, planets, language]);
+    const houseScores = React.useMemo(() => calculateHouseSubathuvamPavathuvam(planets, ascendant.signIndex, language), [planets, ascendant.signIndex, language]);
     const agScores = React.useMemo(() => calculateAdityaGurujiSubathuvam(planets), [planets]);
     const yogaResults = React.useMemo(() => calculateDigbalaAndYogas(planets, ascendant.signIndex, agScores), [planets, ascendant.signIndex, agScores]);
     const functionalNature = React.useMemo(() => getFunctionalNature(ascendant.signIndex, language), [ascendant.signIndex, language]);

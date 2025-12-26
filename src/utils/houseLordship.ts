@@ -44,7 +44,7 @@ export const SIGN_NAMES = [
  * Get houses ruled by a planet in a chart
  */
 export function getHousesRuledByPlanet(planetName: string, chart: any): number[] {
-    const lagna = chart.ascendant?.sign || 0;
+    const lagna = chart.ascendant?.signIndex ?? 0;
     const houses: number[] = [];
 
     // Check each house to see if this planet rules it
@@ -64,7 +64,8 @@ export function getHousesRuledByPlanet(planetName: string, chart: any): number[]
  * Get the lord (ruler) of a specific house
  */
 export function getHouseLord(houseNumber: number, chart: any): string | null {
-    const lagna = chart.ascendant?.sign || 0;
+    // Use signIndex (0-11) not sign which may be undefined
+    const lagna = chart.ascendant?.signIndex ?? 0;
     const signIndex = (lagna + houseNumber - 1) % 12;
     const rulers = SIGN_RULERS[signIndex];
 
@@ -84,39 +85,70 @@ export function getPlanet(chart: any, planetName: string): any {
  * Returns 0-100 score
  */
 export function getHouseLordStrength(houseNumber: number, chart: any): number {
+    console.log(`\n===== HOUSE ${houseNumber} LORD STRENGTH =====`);
     let strength = 50; // Base strength
+    console.log('Base strength:', strength);
 
     const lord = getHouseLord(houseNumber, chart);
-    if (!lord) return strength;
+    console.log('House lord:', lord);
+    if (!lord) {
+        console.log('No lord found, returning base strength:', strength);
+        return strength;
+    }
 
     const lordPlanet = getPlanet(chart, lord);
-    if (!lordPlanet) return strength;
+    console.log('Lord planet full object:', JSON.stringify(lordPlanet, null, 2));
+    if (!lordPlanet) {
+        console.log('Lord planet not found, returning base strength:', strength);
+        return strength;
+    }
 
-    const lordHouse = lordPlanet.house || 1;
+    // Get lord's house position
+    // If house property doesn't exist, calculate from signIndex and ascendant
+    let lordHouse = lordPlanet.house ?? lordPlanet.houseNumber;
+
+    if (lordHouse === undefined && lordPlanet.signIndex !== undefined && chart.ascendant?.signIndex !== undefined) {
+        // Calculate house from sign difference
+        lordHouse = ((lordPlanet.signIndex - chart.ascendant.signIndex + 12) % 12) + 1;
+        console.log('Calculated lordHouse from signIndex:', lordHouse);
+    }
+
+    lordHouse = lordHouse ?? 1; // Final fallback
+
+    console.log('Lord is in house:', lordHouse, '(from lordPlanet.house =', lordPlanet.house, ', lordPlanet.houseNumber =', lordPlanet.houseNumber, ', lordPlanet.signIndex =', lordPlanet.signIndex, ')');
 
     // Lord in Kendra (1,4,7,10) - Strong
     if ([1, 4, 7, 10].includes(lordHouse)) {
         strength += 20;
+        console.log('Lord in Kendra (+20), strength now:', strength);
     }
 
     // Lord in Trikona (1,5,9) - Very Strong
     if ([1, 5, 9].includes(lordHouse)) {
         strength += 25;
+        console.log('Lord in Trikona (+25), strength now:', strength);
     }
 
     // Lord in Dusthana (6,8,12) - Weak
     if ([6, 8, 12].includes(lordHouse)) {
         strength -= 30;
+        console.log('Lord in Dusthana (-30), strength now:', strength);
     }
 
     // Check if lord is in own sign (exalted placement)
     const lordSign = Math.floor(lordPlanet.longitude / 30);
     const lordRulers = SIGN_RULERS[lordSign];
+    console.log('Lord sign:', lordSign, 'Rulers:', lordRulers);
     if (lordRulers && lordRulers.includes(lord)) {
         strength += 15; // Own sign strength
+        console.log('Lord in own sign (+15), strength now:', strength);
     }
 
-    return Math.min(100, Math.max(0, strength));
+    const finalStrength = Math.min(100, Math.max(0, strength));
+    console.log('Final lord strength:', finalStrength);
+    console.log('=====================================\n');
+
+    return finalStrength;
 }
 
 /**

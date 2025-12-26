@@ -368,7 +368,7 @@ const translatePlanetName = (planetName: string, language: 'en' | 'ta'): string 
     return tamilNames[planetName] || planetName;
 };
 
-export const calculateHouseSubathuvamPavathuvam = (ascendantSign: number, allPlanets: any[], language: 'en' | 'ta' = 'en') => {
+export const calculateHouseSubathuvamPavathuvam = (allPlanets: any[], ascendantSign: number, language: 'en' | 'ta' = 'en') => {
     const results: any = {};
     const sun = allPlanets.find(p => p.name === 'Sun');
     const moon = allPlanets.find(p => p.name === 'Moon');

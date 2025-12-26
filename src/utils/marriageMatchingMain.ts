@@ -63,10 +63,16 @@ function generateChartForMatching(person: PersonData) {
     const birthDate = new Date(`${person.date}T${person.time}`);
     const chart = calculatePlanetaryPositions(birthDate, person.birthLat, person.birthLng);
 
+    // Ensure planets is an array
+    let planets = chart.planets || [];
+    if (!Array.isArray(planets) && typeof planets === 'object') {
+        planets = Object.values(planets);
+    }
+
     return {
         ...chart,
         birthDate, // Add for Dasha calculation
-        planets: chart.planets || [] // Ensure planets array exists
+        planets // Now guaranteed to be an array
     };
 }
 

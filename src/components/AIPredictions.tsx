@@ -146,7 +146,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             // Fallback: If no ascendant index, skip House Subathuvam.
             let houseScores = {};
             if (data.ascendant && typeof data.ascendant.signIndex === 'number') {
-                houseScores = calculateHouseSubathuvamPavathuvam(data.ascendant.signIndex, data.planets, language);
+                houseScores = calculateHouseSubathuvamPavathuvam(data.planets, data.ascendant.signIndex, language);
             }
 
             enrichedData = {
