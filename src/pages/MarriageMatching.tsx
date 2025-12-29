@@ -186,19 +186,22 @@ const MarriageMatching: React.FC = () => {
 
         setAnalyzing(true);
         try {
+            console.log('[Marriage Matching] Starting analysis...', { boyDetails, girlDetails });
+
             const result = await analyzeMarriageCompatibility(boyDetails, girlDetails);
+            console.log('[Marriage Matching] Analysis complete:', result);
 
             // Generate charts for display and PDF
             try {
                 const boyBirthDate = new Date(`${boyDetails.date}T${boyDetails.time}`);
                 const girlBirthDate = new Date(`${girlDetails.date}T${girlDetails.time}`);
 
-                console.log('Generating charts...', { boyBirthDate, girlBirthDate, boyDetails, girlDetails });
+                console.log('[Marriage Matching] Generating charts...', { boyBirthDate, girlBirthDate });
 
                 const boyChart = calculatePlanetaryPositions(boyBirthDate, boyDetails.birthLat, boyDetails.birthLng);
                 const girlChart = calculatePlanetaryPositions(girlBirthDate, girlDetails.birthLat, girlDetails.birthLng);
 
-                console.log('Charts generated:', { boyChart, girlChart });
+                console.log('[Marriage Matching] Charts generated successfully');
 
                 // Helper to get sign name from index
                 const SIGNS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
@@ -228,6 +231,8 @@ const MarriageMatching: React.FC = () => {
                     return 'Unknown';
                 };
 
+                console.log('[Marriage Matching] Navigating to results page...');
+
                 // Navigate to results page with chart data
                 navigate('/matching-results', {
                     state: {
@@ -246,9 +251,13 @@ const MarriageMatching: React.FC = () => {
                         }
                     }
                 });
+
+                console.log('[Marriage Matching] Navigation triggered successfully');
+
             } catch (chartError) {
-                console.error('Error generating charts:', chartError);
+                console.error('[Marriage Matching] Error generating charts:', chartError);
                 // Navigate without charts if chart generation fails
+                console.log('[Marriage Matching] Navigating without charts...');
                 navigate('/matching-results', {
                     state: {
                         result,
@@ -260,8 +269,10 @@ const MarriageMatching: React.FC = () => {
                 });
             }
         } catch (error) {
-            console.error('Error analyzing compatibility:', error);
-            alert('Error analyzing compatibility. Please try again.');
+            console.error('[Marriage Matching] Error analyzing compatibility:', error);
+            alert(isTamil
+                ? 'பொருத்தம் பகுப்பாய்வில் பிழை. மீண்டும் முயற்சிக்கவும்.'
+                : 'Error analyzing compatibility. Please try again.');
         } finally {
             setAnalyzing(false);
         }

@@ -424,6 +424,12 @@ const generateSubPeriods = (
     level: 'Bhukti' | 'Antaram' | 'Sookshma' | 'Prana',
     grandParentPlanet?: string
 ): DashaPeriod[] => {
+    // Validate startDate first
+    if (!startDate || isNaN(new Date(startDate).getTime())) {
+        console.error('Invalid startDate in generateSubPeriods:', { parentPlanet, startDate, level });
+        return [];
+    }
+
     const subPeriods: DashaPeriod[] = [];
     let currentSubDate = new Date(startDate);
 
@@ -441,6 +447,12 @@ const generateSubPeriods = (
         durationYears = (parentDuration * DASHA_YEARS[planet]) / 120;
 
         const endDate = addYears(currentSubDate, durationYears);
+
+        // Validate generated endDate
+        if (isNaN(endDate.getTime())) {
+            console.error('Generated invalid endDate:', { planet, currentSubDate, durationYears });
+            continue;
+        }
 
         // Define Next Level
         let nextLevel: 'Sookshma' | 'Prana' | null = null;

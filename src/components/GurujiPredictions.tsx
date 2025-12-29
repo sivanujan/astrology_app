@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, StarHalf, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, StarHalf, RotateCw, GraduationCap, Coins, Activity, Users, Home, Smile } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
@@ -66,7 +66,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
     // Apply AI Refinements if available
     const jobPrediction = aiResponse?.life_guidance?.job_timing ? { ...rawJob, answer: aiResponse.life_guidance.job_timing.answer, reason: aiResponse.life_guidance.job_timing.reason } : rawJob;
-    const foreignTravel = aiResponse?.life_guidance?.foreign_travel ? { ...rawForeign, answer: aiResponse.life_guidance.foreign_travel.answer, reason: aiResponse.life_guidance.foreign_travel.reason } : rawForeign;
+    const foreignTravel = rawForeign; // Strictly use Rule-Based logic for Foreign Travel (User Requirement)
     const marriageTiming = aiResponse?.life_guidance?.marriage_timing ? { ...rawMarriageTime, answer: aiResponse.life_guidance.marriage_timing.answer, reason: aiResponse.life_guidance.marriage_timing.reason } : rawMarriageTime;
     const marriageType = aiResponse?.life_guidance?.marriage_type ? { ...rawMarriageType, answer: aiResponse.life_guidance.marriage_type.answer, reason: aiResponse.life_guidance.marriage_type.reason } : rawMarriageType;
     const careerPath = aiResponse?.life_guidance?.career_path ? { ...rawCareer, answer: aiResponse.life_guidance.career_path.answer, reason: aiResponse.life_guidance.career_path.reason } : rawCareer;
@@ -497,8 +497,24 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 
                     {/* 8 Category Breakdown */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                        {Object.entries(lifeQuality.categories).map(([key, cat]: [string, any]) => {
-                            const score = cat.score;
+                        {Object.entries(lifeQuality.categories).map(([key, scoreVal]: [string, any]) => {
+                            const score = Number(scoreVal);
+
+                            // Config for icons and labels
+                            const categoryConfig: Record<string, { icon: React.ReactNode, labelEn: string, labelTa: string }> = {
+                                education: { icon: <GraduationCap className="w-4 h-4" />, labelEn: "Education", labelTa: "கல்வி" },
+                                wealth: { icon: <Coins className="w-4 h-4" />, labelEn: "Wealth", labelTa: "செல்வம்" },
+                                career: { icon: <Briefcase className="w-4 h-4" />, labelEn: "Career", labelTa: "தொழில்" },
+                                marriage: { icon: <Heart className="w-4 h-4" />, labelEn: "Marriage", labelTa: "திருமணம்" },
+                                health: { icon: <Activity className="w-4 h-4" />, labelEn: "Health", labelTa: "ஆரோக்கியம்" },
+                                family: { icon: <Users className="w-4 h-4" />, labelEn: "Family", labelTa: "குடும்பம்" },
+                                property: { icon: <Home className="w-4 h-4" />, labelEn: "Property", labelTa: "சொத்து" },
+                                happiness: { icon: <Smile className="w-4 h-4" />, labelEn: "Happiness", labelTa: "மகிழ்ச்சி" }
+                            };
+
+                            const config = categoryConfig[key];
+                            if (!config) return null;
+
                             let colorClass = '';
                             if (score >= 81) colorClass = 'text-emerald-400 border-emerald-500';
                             else if (score >= 61) colorClass = 'text-blue-400 border-blue-500';
@@ -508,8 +524,8 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                             return (
                                 <div key={key} className={`bg-slate-800/50 p-3 rounded border-l-2 ${colorClass}`}>
                                     <div className="flex items-center gap-1 mb-1">
-                                        <span className="text-base">{cat.icon}</span>
-                                        <div className="text-xs text-slate-400 leading-tight">{cat.name}</div>
+                                        <span className="text-base">{config.icon}</span>
+                                        <div className="text-xs text-slate-400 leading-tight">{isTamil ? config.labelTa : config.labelEn}</div>
                                     </div>
                                     <div className={`text-lg font-bold ${colorClass.split(' ')[0]}`}>{score}<span className="text-xs text-slate-500">/100</span></div>
                                     {/* Progress bar */}

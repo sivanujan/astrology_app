@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Download, Share2, MessageCircle } from 'lucide-react';
 import { ComprehensiveMatchResult } from '../utils/marriageMatchingMain';
 import { ComprehensiveResultsDisplay } from '../components/ComprehensiveResultsDisplay';
+import { MarriageDasaForecast } from '../components/MarriageDasaForecast';
 import { useLanguage } from '../contexts/LanguageContext';
 import { saveMarriageResult, loadMarriageResult, generateShareableUrl } from '../services/marriageResultService';
 
@@ -42,7 +43,7 @@ const ComprehensiveResultsPage: React.FC = () => {
                 setShareableUrl(generateShareableUrl(id));
             } else {
                 alert(isTamil ? 'முடிவுகள் கிடைக்கவில்லை' : 'Results not found');
-                navigate('/comprehensive-matching');
+                navigate('/marriage-matching');
             }
         } catch (error) {
             console.error('Error loading result:', error);
@@ -78,7 +79,7 @@ const ComprehensiveResultsPage: React.FC = () => {
                 </div>
             );
         }
-        navigate('/comprehensive-matching');
+        navigate('/marriage-matching');
         return null;
     }
 
@@ -133,7 +134,7 @@ const ComprehensiveResultsPage: React.FC = () => {
                 >
                     <div className="flex items-center justify-between mb-6">
                         <button
-                            onClick={() => navigate('/comprehensive-matching')}
+                            onClick={() => navigate('/marriage-matching')}
                             className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
                         >
                             <ArrowLeft className="w-5 h-5" />
@@ -173,6 +174,24 @@ const ComprehensiveResultsPage: React.FC = () => {
                     boyName={boyDetails?.name}
                     girlName={girlDetails?.name}
                 />
+
+                {/* 10-Year Dasa Forecast */}
+                {result && boyDetails && girlDetails && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="mt-8"
+                    >
+                        <MarriageDasaForecast
+                            boyChart={result.boyChart}
+                            girlChart={result.girlChart}
+                            boyBirthDate={result.boyChart.birthDate}
+                            girlBirthDate={result.girlChart.birthDate}
+                            language={isTamil ? 'ta' : 'en'}
+                        />
+                    </motion.div>
+                )}
             </div>
         </div>
     );

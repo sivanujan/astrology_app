@@ -92,8 +92,10 @@ export function getQualityDescription(quality: DasaQuality): { en: string; ta: s
 export function calculateSthanaBala(planet: any, chart: any): number {
     let score = 50; // Base score
 
-    const planetHouse = planet.house;
-    if (!planetHouse) return score;
+    // Calculate house position from planet sign and ascendant sign
+    const planetSign = planet.signIndex ?? Math.floor(planet.longitude / 30);
+    const lagnaSign = chart.ascendant?.signIndex ?? 0;
+    const planetHouse = ((planetSign - lagnaSign + 12) % 12) + 1;
 
     // Kendra houses (1,4,7,10) - Strong
     if ([1, 4, 7, 10].includes(planetHouse)) {
@@ -111,7 +113,6 @@ export function calculateSthanaBala(planet: any, chart: any): number {
     }
 
     // Own sign strength
-    const planetSign = Math.floor(planet.longitude / 30);
     const signLords = SIGN_LORDS[planetSign];
     if (signLords && signLords.includes(planet.name)) {
         score += 15;
@@ -190,22 +191,22 @@ export function calculateSubathuvamScore(planetName: string, planets: any[]): nu
 
     if (!planetScore) return 0;
 
-    const netScore = planetScore.subathuvam - planetScore.pavathuvam;
+    // Use totalScore (0-100 range)
+    // Convert 0-100 to -90 to +40 scale
+    const total = planetScore.totalScore;
 
-    // Scale from -100 to +100 range to -90 to +40
-    // High subathuvam = +40, High pavathuvam = -90
-    if (netScore >= 50) {
-        return 40; // Excellent subathuvam
-    } else if (netScore >= 20) {
-        return Math.round((netScore - 20) / 30 * 20 + 20); // 20 to 40
-    } else if (netScore >= 0) {
-        return Math.round(netScore / 20 * 20); // 0 to 20
-    } else if (netScore >= -20) {
-        return Math.round(netScore / 20 * 30); // 0 to -30
-    } else if (netScore >= -50) {
-        return Math.round((netScore + 20) / 30 * 30 - 30); // -30 to -60
+    if (total >= 80) {
+        return 40; // Excellent
+    } else if (total >= 60) {
+        return Math.round((total - 60) / 20 * 20 + 20); // 20 to 40
+    } else if (total >= 40) {
+        return Math.round((total - 40) / 20 * 20); // 0 to 20
+    } else if (total >= 20) {
+        return Math.round((40 - total) / 20 * -30); // 0 to -30
+    } else if (total >= 10) {
+        return Math.round((20 - total) / 10 * -30 - 30); // -30 to -60
     } else {
-        return -90; // Severe pavathuvam
+        return -90; // Very bad
     }
 }
 

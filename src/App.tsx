@@ -154,28 +154,23 @@ const AppRoutes = () => {
         </ProtectedRoute>
       } />
 
+
       <Route path="/marriage-matching" element={
         <ProtectedRoute requireAuth={false}>
-          <SEO title="Marriage Matching - Compatibility Analysis" />
-          <MarriageMatching />
+          <SEO title="Marriage Matching - 7 Guruji Rules" />
+          <ComprehensiveMarriageMatching />
         </ProtectedRoute>
       } />
-      <Route path="/comprehensive-matching" element={
+      <Route path="/marriage-results" element={
         <ProtectedRoute requireAuth={false}>
-          <SEO title="Comprehensive Marriage Matching - 7 Guruji Rules" />
-          <ComprehensiveMarriageMatching />
+          <SEO title="Marriage Matching Results" />
+          <ComprehensiveResultsPage />
         </ProtectedRoute>
       } />
       <Route path="/comprehensive-results" element={
         <ProtectedRoute requireAuth={false}>
-          <SEO title="Comprehensive Matching Results" />
+          <SEO title="Comprehensive Marriage Results" />
           <ComprehensiveResultsPage />
-        </ProtectedRoute>
-      } />
-      <Route path="/matching-results" element={
-        <ProtectedRoute requireAuth={false}>
-          <SEO title="Marriage Matching Results" />
-          <MatchingResults />
         </ProtectedRoute>
       } />
     </Routes>

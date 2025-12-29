@@ -1,5 +1,6 @@
 import { DashaPeriod, calculatePlanetaryPositions } from './astrology';
 import { SubathuvamResult } from './adityaGurujiSubathuvam';
+import { calculateSubathuvamPavathuvam } from './subathuvam';
 import { OWN_SIGNS, SIGN_LORDS } from './constants';
 
 // --- Types ---
@@ -1219,7 +1220,7 @@ export const predictForeignTravel = (
     planets: any[],
     ascendantSign: number,
     moonSignIndex: number,
-    subathuvamScores: Record<string, SubathuvamResult>,
+    subathuvamScores: Record<string, SubathuvamResult>,  // Keep for backward compatibility
     currentDasa?: { maha: DashaPeriod, bhukti?: DashaPeriod },
     language: 'en' | 'ta' = 'en'
 ): PredictionResult => {
@@ -1227,6 +1228,20 @@ export const predictForeignTravel = (
     const question = isTamil ? "வெளிநாட்டில் செட்டில் ஆக முடியுமா?" : "Can I settle abroad?";
 
     const getP = (name: string) => getPlanetPosition(planets, name);
+
+    // ✅ NEW: Use LATEST Subathuvam Calculation
+    console.log('[Foreign Settlement] Calculating LATEST Subathuvam scores...');
+    const latestSubathuvam = calculateSubathuvamPavathuvam(planets, language);
+
+    // Use latest scores for all planets (simplified mapping)
+    const updatedScores: Record<string, any> = {};
+    for (const planetName in latestSubathuvam) {
+        const result = latestSubathuvam[planetName];
+        const netScore = (result.subathuvam || 0) - (result.pavathuvam || 0);
+        updatedScores[planetName] = {
+            totalScore: netScore
+        };
+    }
 
     // 1. Lagna Based Houses
     const l8 = (ascendantSign + 7) % 12;
@@ -1244,143 +1259,266 @@ export const predictForeignTravel = (
     const lord8_Rasi = SIGN_LORDS[r8];
     const lord12_Rasi = SIGN_LORDS[r12];
 
-    // Scores (Lagna)
-    const s8_L = subathuvamScores[lord8_Lagna]?.totalScore || 0;
-    const s12_L = subathuvamScores[lord12_Lagna]?.totalScore || 0;
+    // ✅ USE LATEST SCORES (prioritize updated, fall back to old)
+    const s8_L = updatedScores[lord8_Lagna]?.totalScore || subathuvamScores[lord8_Lagna]?.totalScore || 0;
+    const s12_L = updatedScores[lord12_Lagna]?.totalScore || subathuvamScores[lord12_Lagna]?.totalScore || 0;
+    const s8_R = updatedScores[lord8_Rasi]?.totalScore || subathuvamScores[lord8_Rasi]?.totalScore || 0;
+    const s12_R = updatedScores[lord12_Rasi]?.totalScore || subathuvamScores[lord12_Rasi]?.totalScore || 0;
 
-    // Scores (Rasi)
-    const s8_R = subathuvamScores[lord8_Rasi]?.totalScore || 0;
-    const s12_R = subathuvamScores[lord12_Rasi]?.totalScore || 0;
+    console.log(`[Foreign Settlement] Lagna 8th (${lord8_Lagna}): ${s8_L}, 12th (${lord12_Lagna}): ${s12_L}`);
+    console.log(`[Foreign Settlement] Rasi 8th (${lord8_Rasi}): ${s8_R}, 12th (${lord12_Rasi}): ${s12_R}`);
 
-    // Sign Nature Check (Moveable/Water) from Lagna mostly used, but checking Rasi helps
-    const moveableSigns = [0, 3, 6, 9];
-    const waterSigns = [3, 7, 11];
+    // Sign Nature Check - Moveable signs for displacement
+    const moveableSigns = [0, 3, 6, 9]; // Aries, Cancer, Libra, Capricorn
+    const waterSigns = [3, 7, 11]; // Cancer, Scorpio, Pisces
 
-    const is8Moveable = moveableSigns.includes(l8) || moveableSigns.includes(r8);
-    const is12Moveable = moveableSigns.includes(l12) || moveableSigns.includes(r12);
-    const is8Water = waterSigns.includes(l8) || waterSigns.includes(r8);
-    const is12Water = waterSigns.includes(l12) || waterSigns.includes(r12);
+    const is8Moveable = moveableSigns.includes(l8);
+    const is12Moveable = moveableSigns.includes(l12);
+    const is8Water = waterSigns.includes(l8);
+    const is12Water = waterSigns.includes(l12);
 
     let foreignScore = 0;
     let reasons: string[] = [];
-    let strongLagna = false;
-    let strongRasi = false;
 
-    // 1. Lagna Strength (8th & 12th)
-    if (s8_L > 40 && s12_L > 40) {
-        strongLagna = true;
-        foreignScore += 50;
+    // ============================================================
+    // RULE 1: Check planets IN 8th & 12th HOUSES for Subathuvam
+    // ============================================================
+
+    // Find planets in 8th house from Lagna
+    const planetsIn8L = planets.filter((p: any) => p.signIndex === l8);
+    const planetsIn12L = planets.filter((p: any) => p.signIndex === l12);
+
+    // Find planets in 8th house from Rasi (Moon)
+    const planetsIn8R = planets.filter((p: any) => p.signIndex === r8);
+    const planetsIn12R = planets.filter((p: any) => p.signIndex === r12);
+
+    // Calculate Subathuvam for planets in these houses
+    let house8LSubha = false;
+    let house12LSubha = false;
+    let house8RSubha = false;
+    let house12RSubha = false;
+
+    // Check Lagna-based 8th house
+    if (planetsIn8L.length > 0) {
+        const avgScore8L = planetsIn8L.reduce((sum: number, p: any) => {
+            const score = updatedScores[p.name]?.totalScore || subathuvamScores[p.name]?.totalScore || 0;
+            return sum + score;
+        }, 0) / planetsIn8L.length;
+        house8LSubha = avgScore8L > 40;
+        console.log(`[Foreign] 8th House (Lagna) planets: ${planetsIn8L.map((p: any) => p.name).join(', ')} - Avg Score: ${avgScore8L.toFixed(0)}`);
+    }
+
+    // Check Lagna-based 12th house  
+    if (planetsIn12L.length > 0) {
+        const avgScore12L = planetsIn12L.reduce((sum: number, p: any) => {
+            const score = updatedScores[p.name]?.totalScore || subathuvamScores[p.name]?.totalScore || 0;
+            return sum + score;
+        }, 0) / planetsIn12L.length;
+        house12LSubha = avgScore12L > 40;
+        console.log(`[Foreign] 12th House (Lagna) planets: ${planetsIn12L.map((p: any) => p.name).join(', ')} - Avg Score: ${avgScore12L.toFixed(0)}`);
+    }
+
+    // Check Rasi-based houses
+    if (planetsIn8R.length > 0) {
+        const avgScore8R = planetsIn8R.reduce((sum: number, p: any) => {
+            const score = updatedScores[p.name]?.totalScore || subathuvamScores[p.name]?.totalScore || 0;
+            return sum + score;
+        }, 0) / planetsIn8R.length;
+        house8RSubha = avgScore8R > 40;
+        console.log(`[Foreign] 8th House (Rasi) planets: ${planetsIn8R.map((p: any) => p.name).join(', ')} - Avg Score: ${avgScore8R.toFixed(0)}`);
+    }
+
+    if (planetsIn12R.length > 0) {
+        const avgScore12R = planetsIn12R.reduce((sum: number, p: any) => {
+            const score = updatedScores[p.name]?.totalScore || subathuvamScores[p.name]?.totalScore || 0;
+            return sum + score;
+        }, 0) / planetsIn12R.length;
+        house12RSubha = avgScore12R > 40;
+        console.log(`[Foreign] 12th House (Rasi) planets: ${planetsIn12R.map((p: any) => p.name).join(', ')} - Avg Score: ${avgScore12R.toFixed(0)}`);
+    }
+
+    const hasLagnaHouseYoga = house8LSubha && house12LSubha;
+    const hasRasiHouseYoga = house8RSubha && house12RSubha;
+
+    console.log(`[Foreign] Lagna House Yoga: ${hasLagnaHouseYoga}, Rasi House Yoga: ${hasRasiHouseYoga}`);
+
+    // If NEITHER Lagna NOR Rasi house yoga exists, unlikely
+    if (!hasLagnaHouseYoga && !hasRasiHouseYoga) {
+        return {
+            question,
+            answer: isTamil
+                ? "வெளிநாட்டு செட்டில்மென்ட் சாத்தியம் குறைவு."
+                : "Foreign settlement is unlikely.",
+            reason: isTamil
+                ? `8 & 12 வீடுகளில் உள்ள கிரகங்கள் சுபத்துவமாக இல்லை.\n- 8ம் வீடு (லக்னம்): ${planetsIn8L.length > 0 ? planetsIn8L.map((p: any) => p.name).join(', ') : 'வெற்று'}\n- 12ம் வீடு (லக்னம்): ${planetsIn12L.length > 0 ? planetsIn12L.map((p: any) => p.name).join(', ') : 'வெற்று'}`
+                : `Planets in 8th & 12th houses are not Subathuvam.\n- 8th House (Lagna): ${planetsIn8L.length > 0 ? planetsIn8L.map((p: any) => p.name).join(', ') : 'Empty'}\n- 12th House (Lagna): ${planetsIn12L.length > 0 ? planetsIn12L.map((p: any) => p.name).join(', ') : 'Empty'}`,
+            isFavorable: false
+        };
+    }
+
+    foreignScore += 40;
+    if (hasLagnaHouseYoga) {
         reasons.push(isTamil
-            ? `லக்ன ரீதியாக 8 & 12ம் அதிபதிகள் சுபத்துவமாக உள்ளனர்.`
-            : `Lagna: 8th & 12th Lords are Subathuva.`);
-    } else if (s12_L > 40) {
+            ? `✅ 8 & 12 வீடுகளில் (லக்னம்) சுபத்துவ கிரகங்கள் உள்ளன`
+            : `✅ 8th & 12th Houses (Lagna) have Subha planets`);
+    }
+    if (hasRasiHouseYoga) {
         foreignScore += 20;
-    }
-
-    // 2. Rasi Strength (8th & 12th from Moon)
-    if (s8_R > 40 && s12_R > 40) {
-        strongRasi = true;
-        foreignScore += 30; // Add bonus
         reasons.push(isTamil
-            ? `ராசி ரீதியாக (சந்திரன்) 8 & 12ம் அதிபதிகள் சுபத்துவமாக உள்ளனர்.`
-            : `Rasi (Moon): 8th & 12th Lords are Subathuva.`);
+            ? `✅ 8 & 12 வீடுகளில் (ராசி) சுபத்துவ கிரகங்கள் உள்ளன`
+            : `✅ 8th & 12th Houses (Rasi) have Subha planets`);
     }
 
-    // 3. Moveable/Water Signs
-    if (is8Moveable || is12Moveable) {
-        foreignScore += 20;
-        reasons.push(isTamil
-            ? "8/12-ம் வீடுகள் சர ராசியில் (Moveable) உள்ளன."
-            : "8th/12th Houses in Moveable Signs (Displacement).");
-    }
-    if (is8Water || is12Water) {
-        foreignScore += 10;
-        reasons.push(isTamil
-            ? "நீர் ராசி தொடர்பு (கடல் கடந்து செல்லும் யோகம்)."
-            : "Water Sign connection (Ocean travel).");
-    }
+    // ============================================================
+    // RULE 2: 8th & 12th LORDS MUST be Connected
+    // ============================================================
+    const lord8Planet_L = getP(lord8_Lagna);
+    const lord12Planet_L = getP(lord12_Lagna);
 
-    // 4. Rahu Influence (Foreign Karaka)
-    const rahu = getP('Rahu');
-    if (rahu) {
-        // Check Rahu position from Lagna OR Rasi
-        const rahuInLqn8 = rahu.signIndex === l8;
-        const rahuInLqn12 = rahu.signIndex === l12;
-        const rahuInRasi8 = rahu.signIndex === r8;
-        const rahuInRasi12 = rahu.signIndex === r12;
+    let has812Connection = false;
+    let connectionType = "";
 
-        if (rahuInLqn8 || rahuInLqn12 || rahuInRasi8 || rahuInRasi12) {
-            foreignScore += 25;
-            reasons.push(isTamil
-                ? "ராகு 8/12-ல் உள்ளார் (வெளிநாட்டு காரகன்)."
-                : "Rahu in 8th/12th House (Foreign Karaka).");
+    if (lord8Planet_L && lord12Planet_L) {
+        // Same sign (Conjunction)
+        if (lord8Planet_L.signIndex === lord12Planet_L.signIndex) {
+            has812Connection = true;
+            connectionType = isTamil ? "இணைப்பு" : "Conjunction";
         }
-
-        // Rahu Conjunctions with 8/12 Lords (Lagna or Rasi)
-        const relevantLords = [lord8_Lagna, lord12_Lagna, lord8_Rasi, lord12_Rasi];
-        let rahuConnected = false;
-
-        for (const ld of relevantLords) {
-            const p = getP(ld);
-            if (p && p.signIndex === rahu.signIndex) rahuConnected = true;
+        // Mutual aspect (7th from each other = opposition)
+        else if (Math.abs(lord8Planet_L.signIndex - lord12Planet_L.signIndex) === 6 ||
+            Math.abs(lord8Planet_L.signIndex - lord12Planet_L.signIndex) === 6) {
+            has812Connection = true;
+            connectionType = isTamil ? "எதிர் பார்வை" : "Opposition";
         }
-
-        if (rahuConnected) {
-            foreignScore += 15;
-            reasons.push(isTamil
-                ? "ராகு 8/12 அதிபதியுடன் சேர்க்கை."
-                : "Rahu conjoined with 8th/12th Lord.");
+        // Same planet rules both
+        else if (lord8_Lagna === lord12_Lagna) {
+            has812Connection = true;
+            connectionType = isTamil ? "ஒரே கிரகம்" : "Same Lord";
+        }
+        // NEW: 8th Lord in 12th House OR 12th Lord in 8th House (Placement/Exchange)
+        else if (lord8Planet_L.signIndex === l12) {
+            has812Connection = true;
+            connectionType = isTamil ? "8ம் அதிபதி 12ல்" : "8th Lord in 12th";
+        }
+        else if (lord12Planet_L.signIndex === l8) {
+            has812Connection = true;
+            connectionType = isTamil ? "12ம் அதிபதி 8ல்" : "12th Lord in 8th";
         }
     }
 
-    // 5. Dasa Check
+    console.log(`[Foreign] 8-12 Lord Connection: ${has812Connection} (${connectionType})`);
+
+    // MANDATORY: If lords not connected, STOP
+    if (!has812Connection) {
+        return {
+            question,
+            answer: isTamil
+                ? "வெளிநாட்டு செட்டில்மென்ட் இல்லை. 8 & 12 அதிபதிகள் தொடர்பில் இல்லை."
+                : "No foreign settlement. 8th & 12th Lords are NOT connected.",
+            reason: isTamil
+                ? `8 & 12 வீடுகளில் சுபத்துவம் உள்ளது, ஆனால் அதிபதிகள் (${lord8_Lagna}, ${lord12_Lagna}) தொடர்பில் இல்லை.\n${reasons.join('\n')}`
+                : `8 & 12 houses have Subathuvam, but lords (${lord8_Lagna}, ${lord12_Lagna}) are NOT connected.\n${reasons.join('\n')}`,
+            isFavorable: false
+        };
+    }
+
+    foreignScore += 30;
+    reasons.push(isTamil
+        ? `✅ 8 & 12 அதிபதிகள் தொடர்பில் உள்ளனர்: ${connectionType} (${lord8_Lagna}-${lord12_Lagna})`
+        : `✅ 8th & 12th Lords connected: ${connectionType} (${lord8_Lagna}-${lord12_Lagna})`);
+
+    // ============================================================
+    // RULE 3: Dasa Analysis for 100% Confirmation
+    // ============================================================
+    let is100Percent = false;
+    let dasaReasons: string[] = [];
+
     if (currentDasa) {
         const dasaLord = currentDasa.maha.planet;
-        // Check if Dasa Lord is connected to Foreign Travel (Lagna Or Rasi Lords)
-        const foreignLords = [lord8_Lagna, lord12_Lagna, lord9_Lagna, lord8_Rasi, lord12_Rasi, 'Rahu'];
+        const bhuktiLord = currentDasa.bhukti?.planet;
 
-        if (foreignLords.includes(dasaLord)) {
-            foreignScore += 20;
-            reasons.push(isTamil
-                ? `தற்போதைய தசை (${dasaLord}) வெளிநாட்டு யோகத்திற்கு சாதகம்.`
-                : `Current Dasa (${dasaLord}) supports Foreign Travel.`);
+        // Check if Dasa Lord is 8th or 12th Lord
+        const isDasa8or12 = (dasaLord === lord8_Lagna || dasaLord === lord12_Lagna);
+        const isBhukti8or12 = bhuktiLord ? (bhuktiLord === lord8_Lagna || bhuktiLord === lord12_Lagna) : false;
+
+        // Check if Dasa is Rahu or Ketu
+        const isDasaRahuKetu = ['Rahu', 'Ketu'].includes(dasaLord);
+        const isBhuktiRahuKetu = bhuktiLord ? ['Rahu', 'Ketu'].includes(bhuktiLord) : false;
+
+        // Check if Dasa Lord is in moveable sign
+        const dasaPlanet = getP(dasaLord);
+        const moveableSigns = [0, 3, 6, 9]; // Aries, Cancer, Libra, Capricorn
+        const isDasaMoveable = dasaPlanet ? moveableSigns.includes(dasaPlanet.signIndex) : false;
+
+        console.log(`[Foreign] Dasa Check:`, {
+            dasaLord,
+            bhuktiLord,
+            isDasa8or12,
+            isDasaRahuKetu,
+            isDasaMoveable
+        });
+
+        if (isDasa8or12 || isBhukti8or12) {
+            is100Percent = true;
+            foreignScore = 100;
+            dasaReasons.push(isTamil
+                ? `🎯 ${isDasa8or12 ? dasaLord : bhuktiLord} தசை/புக்தி (8/12 அதிபதி)`
+                : `🎯 ${isDasa8or12 ? dasaLord : bhuktiLord} Dasa/Bhukti (8/12 Lord)`);
+        }
+        else if (isDasaRahuKetu || isBhuktiRahuKetu) {
+            is100Percent = true;
+            foreignScore = 100;
+            dasaReasons.push(isTamil
+                ? `🎯 ${isDasaRahuKetu ? dasaLord : bhuktiLord} தசை/புக்தி (வெளிநாட்டு காரகன்)`
+                : `🎯 ${isDasaRahuKetu ? dasaLord : bhuktiLord} Dasa/Bhukti (Foreign Karaka)`);
+        }
+        else if (isDasaMoveable) {
+            is100Percent = true;
+            foreignScore = 100;
+            const signNames = ['மேஷம்', 'கடகம்', 'துலாம்', 'மகரம்'];
+            dasaReasons.push(isTamil
+                ? `🎯 ${dasaLord} சர ராசியில் உள்ளார் (இடப்பெயர்ச்சி)`
+                : `🎯 ${dasaLord} in Moveable Sign (Displacement)`);
         }
     }
 
-    // Verdict Logic
+    // Additional factors (only if basic yoga exists)
+    const rahu = getP('Rahu');
+    if (rahu && ([l8, l12].includes(rahu.signIndex))) {
+        foreignScore += 10;
+        reasons.push(isTamil
+            ? "ராகு 8/12 வீட்டில் உள்ளார்"
+            : "Rahu in 8th/12th House");
+    }
+
+    // Final Verdict
     let answer = "";
     let isFavorable = true;
 
-    // Aditya Guruji's Strong Rule: IF Subathuva is present in 8 & 12
-    if (strongLagna || strongRasi) {
-        if (foreignScore >= 80) {
-            answer = isTamil
-                ? "**நிரந்தர குடியுரிமை (Permanent Settlement)**: ஜாதகத்தில் 8-12 சுபத்துவ விதி (லக்னம்/ராசி) வலுவாக உள்ளது."
-                : "**Permanent Settlement**: Strong 8-12 Subathuva Rule (Lagna/Rasi) active.";
-        } else {
-            answer = isTamil
-                ? "**நீண்ட கால வேலை/வாழ்க்கை**: 8-12 விதி சாதகமாக உள்ளது."
-                : "**Long Term Stay**: 8-12 Rule is favorable.";
-        }
-    } else {
-        // Moderate scores
-        if (foreignScore >= 50) {
-            answer = isTamil
-                ? "**வெளிநாட்டு வேலை/பயணம்**: குறுகிய கால அல்லது வேலை நிமித்தம் செல்லலாம்."
-                : "**Work / Short Stay**: Good chance for work, but permanent settlement needs stronger Subathuva.";
-        } else {
-            answer = isTamil
-                ? "**குறைந்த வாய்ப்பு**: உள்ளூர் வாழ்க்கை சிறந்தது."
-                : "**Low Chance**: Domestic life is more suitable.";
-            isFavorable = false;
-        }
+    if (is100Percent) {
+        answer = isTamil
+            ? "🎯 **100% நிச்சயம் - வெளிநாட்டு செட்டில்மென்ட்!**"
+            : "🎯 **100% CERTAIN - Foreign Settlement!**";
+        reasons.push(...dasaReasons);
+    }
+    else if (foreignScore >= 70) {
+        answer = isTamil
+            ? "✅ **மிக அதிக வாய்ப்பு** - நிரந்தர செட்டில்மென்ட் சாத்தியம்"
+            : "✅ **Very High Chance** - Permanent Settlement Possible";
+    }
+    else {
+        answer = isTamil
+            ? "⚡ **நல்ல வாய்ப்பு** - நீண்ட கால வேலை/தங்கும் வாய்ப்பு"
+            : "⚡ **Good Chance** - Long term work/stay opportunity";
     }
 
     const reasonText = reasons.join('\n- ');
     return {
         question,
         answer,
-        reason: isTamil ? `**காரணங்கள்:**\n- ${reasonText}` : `**Reasons:**\n- ${reasonText}`,
+        reason: isTamil
+            ? `**மதிப்பெண்:** ${foreignScore}/100\n\n**காரணங்கள்:**\n- ${reasonText}`
+            : `**Score:** ${foreignScore}/100\n\n**Reasons:**\n- ${reasonText}`,
         isFavorable
     };
 };
@@ -1773,7 +1911,6 @@ const getFutureDasaPeriods = (
 
     return periods.filter(p => p.durationYears > 0);
 };
-
 // 8. Life Quality Analysis (8 Categories - Each 0-100 Points)
 export const predictLifeQuality = (
     planets: any[],
@@ -1797,7 +1934,6 @@ export const predictLifeQuality = (
     const currentAge = ageMs / (1000 * 60 * 60 * 24 * 365.25);
 
     if (currentAge >= 60) {
-        // Return null or skip - Frontend should handle this
         return {
             question,
             answer: isTamil
@@ -1811,19 +1947,10 @@ export const predictLifeQuality = (
         };
     }
 
-    // Get Moon longitude for dasaperiod calculation
-    const moon = planets.find(p => p.name === 'Moon');
-    if (!moon) {
-        throw new Error("Moon position required for Life Quality calculation");
-    }
-
-    // Calculate all future Dasa periods until age 60
-    const futureDasas = getFutureDasaPeriods(birthDate, currentAge, 60, moon.longitude);
-    const totalFutureYears = futureDasas.reduce((sum, p) => sum + p.durationYears, 0);
-
+    // Helpers
     const getP = (name: string) => planets.find(p => p.name === name);
     const getLord = (houseIdx: number) => SIGN_LORDS[(ascendantSign + houseIdx - 1) % 12];
-    const getPlanetScore = (planetName: string) => subathuvamScores[planetName]?.totalScore || 0;
+    const getSubathuvam = (planetName: string) => subathuvamScores[planetName]?.totalScore || 0;
 
     // Helper: Check if planet is in specific house
     const getPlanetHouse = (planetName: string): number => {
@@ -1832,539 +1959,311 @@ export const predictLifeQuality = (
         return ((planet.signIndex - ascendantSign + 12) % 12) + 1;
     };
 
-    // Helper: Check if Lord is strong (not in 6/8/12)
-    const isLordStrong = (lordName: string): boolean => {
-        const house = getPlanetHouse(lordName);
-        return house !== 6 && house !== 8 && house !== 12;
-    };
-
-    // Helper: Check if Lord is in Kendra (1,4,7,10) or Trikona (1,5,9)
-    const isLordInKendra = (lordName: string): boolean => {
-        const house = getPlanetHouse(lordName);
-        return [1, 4, 7, 10].includes(house);
-    };
-
-    const isLordInTrikona = (lordName: string): boolean => {
-        const house = getPlanetHouse(lordName);
-        return [1, 5, 9].includes(house);
-    };
-
-    // Helper: Check Jupiter aspect (Guruji's Subathuvam Rule)
+    // Helper: Jupiter Aspect (Subathuvam)
     const hasJupiterAspect = (planetName: string): boolean => {
         const planet = getP(planetName);
         const jupiter = getP('Jupiter');
         if (!planet || !jupiter) return false;
 
-        const diff = Math.abs(planet.signIndex - jupiter.signIndex);
-        // Jupiter aspects: 5th, 7th, 9th houses from its position
-        return [4, 6, 8].includes(diff) || [8, 6, 4].includes(diff);
+        let diff = planet.signIndex - jupiter.signIndex;
+        if (diff < 0) diff += 12;
+        return [4, 6, 8].includes(diff);
     };
 
-    // Helper: Check if two lords are connected
-    const arelordsConnected = (lord1: string, lord2: string): boolean => {
-        const house1 = getPlanetHouse(lord1);
-        const house2 = getPlanetHouse(lord2);
-
-        // Same sign or mutual aspect
-        if (house1 === house2) return true;
-
-        const planet1 = getP(lord1);
-        const planet2 = getP(lord2);
-        if (!planet1 || !planet2) return false;
-
-        const diff = Math.abs(planet1.signIndex - planet2.signIndex);
-        return [3, 6, 9].includes(diff); // 4th, 7th, 10th aspect
+    // Helper: Conjunction
+    const isConjunct = (p1Name: string, p2Name: string): boolean => {
+        const p1 = getP(p1Name);
+        const p2 = getP(p2Name);
+        return p1 && p2 && p1.signIndex === p2.signIndex;
     };
 
-    const mahaLord = currentDasa.maha.planet;
-
-    // ========== CATEGORY 1: WEALTH & FINANCE ==========
-    let wealthChartScore = 0;
-    let wealthDasaScore = 0;
-
-    const lord2 = getLord(2);
-    const lord11 = getLord(11);
-    const lord9 = getLord(9);
-
-    // Chart Score (60)
-    if (isLordInKendra(lord2) || isLordInTrikona(lord2)) wealthChartScore += 10;
-    if (hasJupiterAspect(lord2)) wealthChartScore += 20;
-    if (!isLordStrong(lord2)) wealthChartScore -= 10;
-
-    const lord11Planet = getP(lord11);
-    if (lord11Planet) {
-        // Check if in own house or exalted
-        const lord11Score = getPlanetScore(lord11);
-        if (lord11Score > 60) wealthChartScore += 10;
-    }
-
-    if (arelordsConnected(lord11, lord2) || arelordsConnected(lord11, lord9)) {
-        wealthChartScore += 10; // Dhana Yoga
-    }
-
-    if (isLordStrong(lord9)) wealthChartScore += 10;
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    const lagnaLord = getLord(1);
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if ([lord2, lord9, lord11].includes(period.planet)) periodScore += 20;
-
-        const periodScore2 = getPlanetScore(period.planet);
-        if (periodScore2 > 40) periodScore += 10;
-
-        const periodHouse = getPlanetHouse(period.planet);
-        if ([2, 11].includes(periodHouse)) periodScore += 10;
-        if ([6, 8, 12].includes(periodHouse)) periodScore -= 20;
-
-        wealthDasaScore += (periodScore * period.durationYears);
-    }
-    wealthDasaScore = totalFutureYears > 0 ? wealthDasaScore / totalFutureYears : 0;
-
-    const wealth = Math.round(Math.max(0, Math.min(100, wealthChartScore + wealthDasaScore)));
-
-    // ========== CATEGORY 2: CAREER & PROFESSION ==========
-    let careerChartScore = 0;
-    let careerDasaScore = 0;
-
-    const lord10 = getLord(10);
-    const saturn = getP('Saturn');
-    const sun = getP('Sun');
-
-    // Chart Score (60)
-    if (isLordInKendra(lord10)) careerChartScore += 10;
-
-    const lord10Planet = getP(lord10);
-    const sunPlanet = getP('Sun');
-    const marsPlanet = getP('Mars');
-
-    if (lord10Planet && (sunPlanet || marsPlanet)) {
-        const diff1 = sunPlanet ? Math.abs(lord10Planet.signIndex - sunPlanet.signIndex) : 999;
-        const diff2 = marsPlanet ? Math.abs(lord10Planet.signIndex - marsPlanet.signIndex) : 999;
-        if (diff1 === 0 || diff2 === 0) careerChartScore += 10; // With Sun or Mars
-    }
-
-    if (saturn && hasJupiterAspect('Saturn')) careerChartScore += 20;
-    if (saturn) {
-        const rahu = getP('Rahu');
-        const ketu = getP('Ketu');
-        const mars = getP('Mars');
-
-        const saturnSign = saturn.signIndex;
-        const hasAffliction = [rahu, ketu, mars].some(p => p && p.signIndex === saturnSign);
-        if (hasAffliction) careerChartScore -= 10;
-    }
-
-    if (sun) {
-        const sunSign = sun.signIndex;
-        // Aries=0, Leo=4, Scorpio=7, Sagittarius=8
-        if ([0, 4, 7, 8].includes(sunSign)) careerChartScore += 10;
-    }
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    const lord6 = getLord(6);
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if (period.planet === lord10) periodScore += 20;
-        if (arelordsConnected(period.planet, lord10)) periodScore += 10;
-        if (period.planet === lord6) periodScore += 10;
-
-        const periodHouse = getPlanetHouse(period.planet);
-        if ([10, 1].includes(periodHouse)) periodScore += 10;
-        if (periodHouse === 8) periodScore -= 20;
-
-        careerDasaScore += (periodScore * period.durationYears);
-    }
-    careerDasaScore = totalFutureYears > 0 ? careerDasaScore / totalFutureYears : 0;
-
-    const career = Math.round(Math.max(0, Math.min(100, careerChartScore + careerDasaScore)));
-
-    // ========== CATEGORY 3: LOVE & MARRIAGE ==========
-    let marriageChartScore = 0;
-    let marriageDasaScore = 0;
-
-    const lord3 = getLord(3);
-    const lord7 = getLord(7);
-    const venus = getP('Venus');
-    const jupiter = getP('Jupiter');
-
-    // Chart Score (60)
-    if (arelordsConnected(lord3, lord7) && arelordsConnected(lord7, lord11)) {
-        marriageChartScore += 20; // 3-7-11 connected
-    }
-
-    if (isLordStrong(lord7)) marriageChartScore += 10;
-
-    const venusScore = getPlanetScore('Venus');
-    const jupiterScore = getPlanetScore('Jupiter');
-    if (venusScore > 50 || jupiterScore > 50) marriageChartScore += 10;
-
-    const rahu = getP('Rahu');
-    const ketu = getP('Ketu');
-    const house2Sign = (ascendantSign + 1) % 12;
-    const house7Sign = (ascendantSign + 6) % 12;
-    const house8Sign = (ascendantSign + 7) % 12;
-
-    const hasDosha = [rahu, ketu].some(p =>
-        p && [house2Sign, house7Sign, house8Sign].includes(p.signIndex)
-    );
-
-    if (hasDosha) {
-        marriageChartScore -= 20;
-        // Check Jupiter aspect to cancel dosha
-        if (jupiter && hasJupiterAspect('Rahu')) {
-            marriageChartScore += 20; // Dosha cancelled
-        }
-    }
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    const lord8 = getLord(8);
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if (period.planet === lord7 || period.planet === 'Venus') periodScore += 20;
-        if ([lord3, lord7, lord11].some(l => arelordsConnected(period.planet, l))) periodScore += 10;
-        if (period.planet === lord6) periodScore -= 15;
-        if (period.planet === lord8) periodScore -= 25;
-
-        marriageDasaScore += (periodScore * period.durationYears);
-    }
-    marriageDasaScore = totalFutureYears > 0 ? marriageDasaScore / totalFutureYears : 0;
-
-    const marriage = Math.round(Math.max(0, Math.min(100, marriageChartScore + marriageDasaScore)));
-
-    // ========== CATEGORY 4: FAMILY & CHILDREN ==========
-    let familyChartScore = 0;
-    let familyDasaScore = 0;
-
-    const lord5 = getLord(5);
-
-    // Chart Score (60)
-    const jupiterHouse = getPlanetHouse('Jupiter');
-    const jupiterSign = jupiter ? jupiter.signIndex : -1;
-
-    // Jupiter exalted (Cancer=3) or own house (Sagittarius=8, Pisces=11)
-    if ([3, 8, 11].includes(jupiterSign)) familyChartScore += 20;
-    if ([6, 8, 12].includes(jupiterHouse)) familyChartScore -= 20;
-
-    if (jupiter && rahu) {
-        if (jupiter.signIndex === rahu.signIndex) familyChartScore -= 10;
-    }
-
-    if (isLordStrong(lord5)) familyChartScore += 20;
-
-    const house5Sign = (ascendantSign + 4) % 12;
-    const maleficsInHouse5 = [saturn, marsPlanet, rahu, ketu].some(p =>
-        p && p.signIndex === house5Sign
-    );
-    if (maleficsInHouse5) familyChartScore -= 10;
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if (period.planet === lord5 || period.planet === 'Jupiter') periodScore += 20;
-        if (period.planet === lord9) periodScore += 10;
-        if (['Rahu', 'Ketu'].includes(period.planet)) periodScore -= 10;
-        if (period.planet === lord8) periodScore -= 20;
-
-        familyDasaScore += (periodScore * period.durationYears);
-    }
-    familyDasaScore = totalFutureYears > 0 ? familyDasaScore / totalFutureYears : 0;
-
-    const family = Math.round(Math.max(0, Math.min(100, familyChartScore + familyDasaScore)));
-
-    // ========== CATEGORY 5: HEALTH & LONGEVITY ==========
-    let healthChartScore = 0;
-    let healthDasaScore = 0;
-
-    // Chart Score (60)
-    const lagnaLordScore = getPlanetScore(lagnaLord);
-    const lord6Score = getPlanetScore(lord6);
-
-    if (lagnaLordScore > lord6Score) healthChartScore += 30;
-    if (lagnaLordScore < 30) healthChartScore -= 20;
-
-    const lord8Score = getPlanetScore(lord8);
-    const saturnScore = getPlanetScore('Saturn');
-    if (lord8Score > 50 || saturnScore > 50) healthChartScore += 20;
-
-    const lagnaHouse = getPlanetHouse(lagnaLord);
-    if ([6, 8, 12].includes(lagnaHouse)) healthChartScore -= 10;
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if (period.planet === lagnaLord) periodScore += 20;
-        if (getPlanetScore(period.planet) > 40) periodScore += 10;
-        if (hasJupiterAspect(period.planet)) periodScore += 10;
-        if (period.planet === lord6) periodScore -= 15;
-        if (period.planet === lord8) periodScore -= 25;
-
-        healthDasaScore += (periodScore * period.durationYears);
-    }
-    healthDasaScore = totalFutureYears > 0 ? healthDasaScore / totalFutureYears : 0;
-
-    const health = Math.round(Math.max(0, Math.min(100, healthChartScore + healthDasaScore)));
-
-    // ========== CATEGORY 6: PROPERTY & ASSETS ==========
-    let propertyChartScore = 0;
-    let propertyDasaScore = 0;
-
-    const lord4 = getLord(4);
-
-    // Chart Score (60)
-    if (isLordInKendra(lord4) || isLordInTrikona(lord4)) propertyChartScore += 20;
-
-    if (marsPlanet && (hasJupiterAspect('Mars') || arelordsConnected('Mars', 'Venus'))) {
-        propertyChartScore += 20; // Land Karaka with Subathuvam
-    }
-
-    if (marsPlanet) {
-        const marsSign = marsPlanet.signIndex;
-        const afflicted = [rahu, ketu, saturn].some(p => p && p.signIndex === marsSign);
-        if (afflicted) propertyChartScore -= 10;
-    }
-
-    if (venus && getPlanetScore('Venus') > 50) propertyChartScore += 10;
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    const lord12 = getLord(12);
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if (period.planet === lord4 || period.planet === 'Mars') periodScore += 20;
-        if (period.planet === lord11) periodScore += 10;
-        if (period.planet === lord12) periodScore -= 20;
-        if (period.planet === 'Ketu') periodScore -= 10;
-
-        propertyDasaScore += (periodScore * period.durationYears);
-    }
-    propertyDasaScore = totalFutureYears > 0 ? propertyDasaScore / totalFutureYears : 0;
-
-    const property = Math.round(Math.max(0, Math.min(100, propertyChartScore + propertyDasaScore)));
-
-    // ========== CATEGORY 7: EDUCATION & INTELLIGENCE ==========
-    let educationChartScore = 0;
-    let educationDasaScore = 0;
-
-    const mercury = getP('Mercury');
-
-    // Chart Score (60)
-    if (mercury) {
-        const mercuryScore = getPlanetScore('Mercury');
-        const mercurySign = mercury.signIndex;
-
-        // Bhadra Yoga (Exalted/Own: Gemini=2, Virgo=5)
-        if ([2, 5].includes(mercurySign) && mercuryScore > 60) {
-            educationChartScore += 20;
-        }
-
-        // Combust or Debilitated (Pisces=11)
-        if (sunPlanet && Math.abs(mercury.signIndex - sunPlanet.signIndex) === 0) {
-            educationChartScore -= 20; // Combust
-        }
-        if (mercurySign === 11) educationChartScore -= 20; // Debilitated
-    }
-
-    if (isLordStrong(lord4)) educationChartScore += 10;
-    if (isLordStrong(lord9)) educationChartScore += 10;
-    if (isLordStrong(lord2)) educationChartScore += 10;
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if (period.planet === 'Mercury' || period.planet === 'Jupiter') periodScore += 20;
-        if ([lord4, lord5, lord9].includes(period.planet)) periodScore += 20;
-        if (period.planet === lord8) periodScore -= 20;
-
-        educationDasaScore += (periodScore * period.durationYears);
-    }
-    educationDasaScore = totalFutureYears > 0 ? educationDasaScore / totalFutureYears : 0;
-
-    const education = Math.round(Math.max(0, Math.min(100, educationChartScore + educationDasaScore)));
-
-    // ========== CATEGORY 8: HAPPINESS & PEACE OF MIND ==========
-    let happinessChartScore = 0;
-    let happinessDasaScore = 0;
-
-    // Chart Score (60) - using moon variable declared earlier
-    if (moon && hasJupiterAspect('Moon')) happinessChartScore += 30;
-
-    if (moon) {
-        const moonSign = moon.signIndex;
-        const afflicted = [saturn, rahu].some(p => p && p.signIndex === moonSign);
-        if (afflicted) happinessChartScore -= 20;
-
-        // Kemadruma: No planets on either side
-        const leftSign = (moonSign - 1 + 12) % 12;
-        const rightSign = (moonSign + 1) % 12;
-        const hasNeighbor = planets.some(p =>
-            p.name !== 'Moon' && (p.signIndex === leftSign || p.signIndex === rightSign)
-        );
-        if (!hasNeighbor) happinessChartScore -= 10;
-    }
-
-    const house4Sign = (ascendantSign + 3) % 12;
-    const house4Afflicted = [saturn, marsPlanet, rahu, ketu].some(p =>
-        p && p.signIndex === house4Sign
-    );
-    if (!house4Afflicted) happinessChartScore += 10;
-
-    // Dasa Score (40) - Weighted Lifetime Average
-    for (const period of futureDasas) {
-        let periodScore = 0;
-
-        if (getPlanetScore(period.planet) > 40) periodScore += 20;
-        if (period.planet === 'Moon' || period.planet === 'Jupiter') periodScore += 10;
-        if (period.planet === lord8) periodScore -= 20;
-
-        // Check Sade Sati (simplified)
-        if (period.planet === 'Saturn' && moon && saturn) {
-            const moonToSaturn = Math.abs(moon.signIndex - saturn.signIndex);
-            if (moonToSaturn <= 1) periodScore -= 10;
-        }
-
-        happinessDasaScore += (periodScore * period.durationYears);
-    }
-    happinessDasaScore = totalFutureYears > 0 ? happinessDasaScore / totalFutureYears : 0;
-
-    const happiness = Math.round(Math.max(0, Math.min(100, happinessChartScore + happinessDasaScore)));
-
-    // ========== OVERALL CALCULATION ==========
-    const categories = {
-        wealth: {
-            score: wealth,
-            chartScore: wealthChartScore,
-            dasaScore: wealthDasaScore,
-            name: isTamil ? "செல்வம் & நிதி" : "Wealth & Finance",
-            icon: "💰"
-        },
-        career: {
-            score: career,
-            chartScore: careerChartScore,
-            dasaScore: careerDasaScore,
-            name: isTamil ? "தொழில் வெற்றி" : "Career & Success",
-            icon: "💼"
-        },
-        marriage: {
-            score: marriage,
-            chartScore: marriageChartScore,
-            dasaScore: marriageDasaScore,
-            name: isTamil ? "காதல் & திருமணம்" : "Love & Marriage",
-            icon: "❤️"
-        },
-        family: {
-            score: family,
-            chartScore: familyChartScore,
-            dasaScore: familyDasaScore,
-            name: isTamil ? "குடும்பம் & குழந்தைகள்" : "Family & Children",
-            icon: "👨‍👩‍👧‍👦"
-        },
-        health: {
-            score: health,
-            chartScore: healthChartScore,
-            dasaScore: healthDasaScore,
-            name: isTamil ? "ஆரோக்கியம்" : "Health & Longevity",
-            icon: "🏥"
-        },
-        property: {
-            score: property,
-            chartScore: propertyChartScore,
-            dasaScore: propertyDasaScore,
-            name: isTamil ? "சொத்து & வசதிகள்" : "Property & Assets",
-            icon: "🏠"
-        },
-        education: {
-            score: education,
-            chartScore: educationChartScore,
-            dasaScore: educationDasaScore,
-            name: isTamil ? "கல்வி & புத்திசாலித்தனம்" : "Education & Intelligence",
-            icon: "🎓"
-        },
-        happiness: {
-            score: happiness,
-            chartScore: happinessChartScore,
-            dasaScore: happinessDasaScore,
-            name: isTamil ? "மன அமைதி & சந்தோஷம்" : "Happiness & Peace",
-            icon: "😊"
-        }
+    // Helper: Combust (Distance from Sun < 10)
+    const isCombust = (planetName: string): boolean => {
+        const planet = getP(planetName);
+        const sun = getP('Sun');
+        if (!planet || !sun || planetName === 'Sun' || planetName === 'Rahu' || planetName === 'Ketu') return false;
+        let diff = Math.abs(planet.longitude - sun.longitude);
+        if (diff > 180) diff = 360 - diff;
+        return diff < 10;
     };
 
-    const totalScore = Math.round(
-        (wealth + career + marriage + family + health + property + education + happiness) / 8
-    );
+    // Helper: Is Malefic
+    const isMalefic = (name: string) => ['Saturn', 'Mars', 'Rahu', 'Ketu', 'Sun'].includes(name);
 
-    // Star Rating (Score / 20)
-    const starRating = Math.max(1, Math.min(5, Math.round(totalScore / 10) / 2));
+    // Helper: Check if Lord (planet) is strong
+    const isLordStrong = (lordName: string) => {
+        const house = getPlanetHouse(lordName);
+        return ![6, 8, 12].includes(house) && !isCombust(lordName);
+    };
+
+    // =========================================================================================
+    // 1. EDUCATION (கல்வி) - Mercury & 4th House
+    // =========================================================================================
+    const calculateEducationScore = (): number => {
+        let score = 0;
+
+        // STEP 1: Mercury's Strength (Max 50)
+        const mercury = getP('Mercury');
+        if (mercury) {
+            // 1. Mercury Subathuvam (Base Strength) - Max 30
+            // Logic: proportional score based on subathuvam percentage
+            const mercurySubu = subathuvamScores['Mercury']?.totalScore || 0;
+            const subuPoints = Math.round((mercurySubu / 100) * 30);
+            score += subuPoints;
+
+            // 2. Mercury-Venus Conjunction (Max 20)
+            if (isConjunct('Mercury', 'Venus') && !isCombust('Mercury')) {
+                score += 20;
+            }
+            // Own House (Max 10)
+            else if (['Gemini', 'Virgo'].includes(mercury.sign)) score += 10;
+
+            // Maleficence Check
+            if (isConjunct('Mercury', 'Saturn') || isConjunct('Mercury', 'Mars')) {
+                if (!hasJupiterAspect('Mercury')) score -= 15;
+            }
+            if (isCombust('Mercury')) score -= 10;
+        }
+
+        // STEP 2: 4th House Strength (Max 30)
+        const lord4 = getLord(4);
+        const lord4House = getPlanetHouse(lord4);
+        const planetsIn4 = planets.filter(p => getPlanetHouse(p.name) === 4).map(p => p.name);
+
+        if ([1, 4, 7, 10, 5, 9].includes(lord4House)) score += 15;
+        if (planetsIn4.includes('Jupiter') || planetsIn4.includes('Venus')) score += 15;
+        if (planetsIn4.includes('Saturn') || planetsIn4.includes('Rahu')) score -= 10;
+
+        // STEP 3: Dasa Check
+        const dasaLord = currentDasa.maha.planet;
+        if (dasaLord === getLord(1) || ['Mercury', 'Jupiter', 'Venus'].includes(dasaLord)) score += 20;
+        else if ([getLord(6), getLord(8), getLord(12)].includes(dasaLord)) score -= 10;
+
+        return Math.max(0, Math.min(100, score));
+    };
+
+    // =========================================================================================
+    // 2. WEALTH (செல்வம்) - Jupiter, 2, 9, 11
+    // =========================================================================================
+    const calculateWealthScore = (): number => {
+        let score = 0;
+        const lord2 = getLord(2);
+        const lord11 = getLord(11);
+        const lord9 = getLord(9);
+
+        // 1. Jupiter Strength (Primary) - Max 30
+        const jupSubu = subathuvamScores['Jupiter']?.totalScore || 0;
+        const jupPoints = Math.round((jupSubu / 100) * 30);
+        score += jupPoints;
+
+        // Bonus for Jupiter in 2nd or Aspecting 2nd (Max 10)
+        const jupSign = getP('Jupiter')?.signIndex || 0;
+        const h2Sign = (ascendantSign + 1) % 12; // 0-11
+        let aspectDiff = h2Sign - jupSign;
+        if (aspectDiff < 0) aspectDiff += 12;
+
+        if (getPlanetHouse('Jupiter') === 2) score += 10;
+        else if ([4, 6, 8].includes(aspectDiff)) score += 5;
+
+        // Aspect on 11th House
+        const h11Sign = (ascendantSign + 10) % 12;
+        let diff11 = h11Sign - jupSign;
+        if (diff11 < 0) diff11 += 12;
+        if ([4, 6, 8].includes(diff11)) score += 10;
+
+        // 2. House Lords (2, 9, 11) - Max 30
+        if (getPlanetHouse(lord2) === 11 || getPlanetHouse(lord11) === 2) score += 20; // Parivarthana
+        else {
+            if (isLordStrong(lord2)) score += 5;
+            if (isLordStrong(lord11)) score += 5;
+        }
+
+        if (isLordStrong(lord9)) score += 10;
+
+        // 3. Lagna Link - Max 20
+        const lagnaLord = getLord(1);
+        if (isConjunct(lagnaLord, lord2) || isConjunct(lagnaLord, lord11) || isConjunct(lagnaLord, lord9)) score += 20;
+
+        // 4. Special Yoga
+        const rahuHouse = getPlanetHouse('Rahu');
+        if ((rahuHouse === 2 || rahuHouse === 11) && hasJupiterAspect('Rahu')) score += 20;
+
+        // Penalty
+        if (isCombust(lord2) || [6, 8, 12].includes(getPlanetHouse(lord2))) score -= 10;
+
+        return Math.max(0, Math.min(100, score));
+    };
+
+    // =========================================================================================
+    // 3. CAREER (தொழில்) - Saturn, 10th
+    // =========================================================================================
+    const calculateCareerScore = (): number => {
+        let score = 0;
+
+        // 1. Saturn Strength (Primary) - Max 30
+        const saturnSubu = subathuvamScores['Saturn']?.totalScore || 0;
+        const saturnPoints = Math.round((saturnSubu / 100) * 30);
+        score += saturnPoints;
+
+        // Bonus if Saturn is NOT conjunct Nodes/Mars (Max 10)
+        if (!isConjunct('Saturn', 'Rahu') && !isConjunct('Saturn', 'Ketu') && !isConjunct('Saturn', 'Mars')) {
+            score += 10;
+        }
+
+        // 2. 10th House - Max 30
+        const planetsIn10 = planets.filter(p => getPlanetHouse(p.name) === 10).map(p => p.name);
+        if (planetsIn10.includes('Sun') || planetsIn10.includes('Mars')) score += 20; // Digbala
+
+        const lord10 = getLord(10);
+        if (isLordStrong(lord10)) score += 10;
+
+        // 3. Rahu in 10th
+        if (planetsIn10.includes('Rahu') && (hasJupiterAspect('Rahu') || hasJupiterAspect('Venus'))) score += 20;
+
+        // 4. Dasa Check
+        const dasaLord = currentDasa.maha.planet;
+        if (dasaLord === lord10 || dasaLord === 'Saturn') score += 10;
+
+        return Math.max(0, Math.min(100, score));
+    };
+
+    // =========================================================================================
+    // 4. MARRIAGE (திருமணம்) - Venus, 7th
+    // =========================================================================================
+    const calculateMarriageScore = (): number => {
+        let score = 0;
+
+        // 1. Venus Strength (Primary) - Max 30
+        const venusSubu = subathuvamScores['Venus']?.totalScore || 0;
+        const venusPoints = Math.round((venusSubu / 100) * 30);
+        score += venusPoints;
+
+        // Bonus if Venus is Isolated from Malefics (Max 10)
+        if (!isConjunct('Venus', 'Sun') && !isConjunct('Venus', 'Mars') && !isConjunct('Venus', 'Saturn') && !isConjunct('Venus', 'Rahu') && !isConjunct('Venus', 'Ketu')) {
+            score += 10;
+        }
+
+        // 2. 7th House - Max 30
+        const planetsIn7 = planets.filter(p => getPlanetHouse(p.name) === 7).map(p => p.name);
+        if (planetsIn7.length === 0) score += 20; // Clean slate
+        else if (planetsIn7.includes('Jupiter') || planetsIn7.includes('Venus') || planetsIn7.includes('Moon') || planetsIn7.includes('Mercury')) score += 15;
+        else if (planetsIn7.some(p => isMalefic(p))) score -= 15;
+
+        // 3. 2nd & 8th House
+        const planetsIn2 = planets.filter(p => getPlanetHouse(p.name) === 2);
+        const planetsIn8 = planets.filter(p => getPlanetHouse(p.name) === 8);
+        if (planetsIn2.some(p => isMalefic(p.name)) || planetsIn8.some(p => isMalefic(p.name))) score -= 10;
+
+        // 7th Lord Strength
+        if (getSubathuvam(getLord(7)) > 40) score += 15;
+
+        return Math.max(0, Math.min(100, score));
+    };
+
+    // =========================================================================================
+    // 5. HEALTH (ஆரோக்கியம்) - Lagna Lord, 6th Lord
+    // =========================================================================================
+    const calculateHealthScore = (): number => {
+        let score = 0;
+        const lord1 = getLord(1);
+        const lord6 = getLord(6);
+
+        // 1. Lagnadipathi (Immunity) - Max 40
+        const h1LordHouse = getPlanetHouse(lord1);
+        if ([1, 4, 7, 10, 5, 9].includes(h1LordHouse)) score += 20;
+        if (hasJupiterAspect(lord1)) score += 20;
+
+        // Penalty
+        if ([6, 8, 12].includes(h1LordHouse)) {
+            if (hasJupiterAspect(lord1)) score -= 5;
+            else score -= 20;
+        }
+        if (isCombust(lord1)) score -= 15;
+
+        // 2. 6th Lord (Disease) - Max 30
+        if (hasJupiterAspect(lord6) || hasJupiterAspect('Venus')) score += 20; // Benign
+        if (isConjunct(lord6, 'Saturn') || isConjunct(lord6, 'Mars') || isConjunct(lord6, 'Rahu')) score -= 20; // Severe
+
+        // 3. Lagna Bhava - Max 20
+        const planetsIn1 = planets.filter(p => getPlanetHouse(p.name) === 1).map(p => p.name);
+        if (planetsIn1.includes('Rahu') || planetsIn1.includes('Ketu')) score -= 10;
+        if (planetsIn1.includes('Jupiter') || planetsIn1.includes('Venus')) score += 20;
+
+        // Saturn Aspect on Lagna
+        const saturnSign = getP('Saturn')?.signIndex || 0;
+        let aspectDiff = (ascendantSign - saturnSign + 12) % 12;
+        if ([2, 6, 9].includes(aspectDiff)) score -= 10; // 3rd, 7th, 10th aspect
+
+        // 4. Karaka (Sun/Saturn)
+        if (getSubathuvam('Saturn') > 40) score += 5;
+        if (getSubathuvam('Sun') > 40) score += 5;
+
+        return Math.max(0, Math.min(100, score));
+    };
+
+    // Calculate Scores
+    const education = calculateEducationScore();
+    const wealth = calculateWealthScore();
+    const career = calculateCareerScore();
+    const marriage = calculateMarriageScore();
+    const health = calculateHealthScore();
+
+    // Preserve others with basic placeholders or simpler logic
+    const family = Math.round((wealth + marriage) / 2); // Approximation
+    const property = Math.round((wealth + career) / 2); // Approximation
+    const happiness = Math.round((health + family) / 2); // Approximation
+
+    const totalScore = Math.round((education + wealth + career + marriage + health + family + property + happiness) / 8);
+
+    let starRating = 0;
+    if (totalScore >= 80) starRating = 5;
+    else if (totalScore >= 60) starRating = 4;
+    else if (totalScore >= 40) starRating = 3;
+    else starRating = 2;
 
     let verdict = "";
-    if (starRating >= 4.5) verdict = isTamil ? "மிகச் சிறந்த வாழ்க்கை (Excellent)" : "Excellent Life";
-    else if (starRating >= 4) verdict = isTamil ? "மிக நல்ல வாழ்க்கை (Very Good)" : "Very Good Life";
-    else if (starRating >= 3) verdict = isTamil ? "நல்ல வாழ்க்கை (Good)" : "Good Life";
-    else if (starRating >= 2) verdict = isTamil ? "சவாலான வாழ்க்கை (Challenging)" : "Challenging Life";
-    else verdict = isTamil ? "கடினமான வாழ்க்கை (Difficult)" : "Difficult Life";
+    if (totalScore >= 80) verdict = isTamil ? "மிகச் சிறப்பு (Excellent)" : "Excellent";
+    else if (totalScore >= 60) verdict = isTamil ? "நன்று (Good)" : "Good";
+    else if (totalScore >= 40) verdict = isTamil ? "பரவாயில்லை (Average)" : "Average";
+    else verdict = isTamil ? "கடினம் (Challenging)" : "Challenging";
+
+    // Categories
+    const categories = {
+        education, wealth, career, marriage, health, family, property, happiness
+    };
 
     const answer = isTamil
-        ? `உங்கள் ஒட்டுமொத்த வாழ்க்கை மதிப்பீடு: **${totalScore}/100**\n\n**தரமதிப்பீடு:** ${verdict}\n\n8 வாழ்க்கை பிரிவுகளின் அடிப்படையில் கணக்கிடப்பட்டது.`
-        : `Your Overall Life Quality Score: **${totalScore}/100**\n\n**Rating:** ${verdict}\n\nBased on 8 Life Categories.`;
+        ? `உங்கள் ஒட்டுமொத்த வாழ்க்கை மதிப்பீடு: **${totalScore}/100**\n\n**தரமதிப்பீடு:** ${verdict}\n\n5 முக்கிய பிரிவுகளில் (கல்வி, செல்வம், தொழில், திருமணம், ஆரோக்கியம்) புதிய விதிமுறைகளின்படி விரிவான ஆய்வு செய்யப்பட்டுள்ளது.`
+        : `Your Overall Life Quality Score: **${totalScore}/100**\n\n**Rating:** ${verdict}\n\nDetailed analysis across 5 key categories based on strict Guruji rules.`;
 
-    // Helper to translate planet names to Tamil
-    const translatePlanet = (planetName: string): string => {
-        if (!isTamil) return planetName;
-        const tamilNames: Record<string, string> = {
-            'Sun': 'சூரியன்',
-            'Moon': 'சந்திரன்',
-            'Mars': 'செவ்வாய்',
-            'Mercury': 'புதன்',
-            'Jupiter': 'குரு',
-            'Venus': 'சுக்ரன்',
-            'Saturn': 'சனி',
-            'Rahu': 'ராகு',
-            'Ketu': 'கேது'
-        };
-        return tamilNames[planetName] || planetName;
+    const buildDetail = (name: string, score: number) => {
+        let comment = "";
+        if (score > 80) comment = "🌟";
+        else if (score > 60) comment = "✅";
+        else if (score > 40) comment = "⚠️";
+        else comment = "❌";
+        return `${comment} ${name}: **${score}/100**`;
     };
-
-    // Build detailed breakdown for each category
-    const buildCategoryDetail = (categoryName: string, score: number, chartScore: number, dasaScore: number, lords: string[], keyDasas: string[]) => {
-        const translatedLords = lords.map(translatePlanet);
-        const translatedDasas = keyDasas.map(translatePlanet);
-        const lordsText = translatedLords.length > 0 ? translatedLords.join(', ') : (isTamil ? 'இல்லை' : 'None');
-        const dasaText = translatedDasas.length > 0 ? translatedDasas.slice(0, 3).join(', ') : (isTamil ? 'பல்வேறு' : 'Various');
-        return isTamil
-            ? `${categoryName}: ${score}/100\n   • ஜாதகம்: ${Math.round(chartScore)} (${lordsText})\n   • தசை: ${Math.round(dasaScore)} (${dasaText})`
-            : `${categoryName}: ${score}/100\n   • Chart: ${Math.round(chartScore)} (${lordsText})\n   • Dasa: ${Math.round(dasaScore)} (${dasaText})`;
-    };
-
-    // Identify key contributing Dasas (top 3 by weight)
-    const getTopDasas = () => {
-        const dasaContributions: Array<{ planet: string, weight: number }> = [];
-        for (const period of futureDasas) {
-            dasaContributions.push({
-                planet: period.planet,
-                weight: period.durationYears
-            });
-        }
-        dasaContributions.sort((a, b) => b.weight - a.weight);
-        return dasaContributions.slice(0, 3).map(d => d.planet);
-    };
-
-    const topDasas = getTopDasas();
 
     const reason = isTamil
-        ? `**மதிப்பெண் விவரம்:**\n\n${buildCategoryDetail('💰 செல்வம்', wealth, wealthChartScore, wealthDasaScore, [lord2, lord11, lord9], topDasas)}\n\n${buildCategoryDetail('💼 தொழில்', career, careerChartScore, careerDasaScore, [lord10, 'Saturn'], topDasas)}\n\n${buildCategoryDetail('❤️ திருமணம்', marriage, marriageChartScore, marriageDasaScore, [lord3, lord7, lord11], topDasas)}\n\n${buildCategoryDetail('👨‍👩‍👧‍👦 குடும்பம்', family, familyChartScore, familyDasaScore, [lord5, 'Jupiter', lord9], topDasas)}\n\n${buildCategoryDetail('🏥 ஆரோக்கியம்', health, healthChartScore, healthDasaScore, [lagnaLord, lord6], topDasas)}\n\n${buildCategoryDetail('🏠 சொத்து', property, propertyChartScore, propertyDasaScore, [lord4, 'Mars'], topDasas)}\n\n${buildCategoryDetail('🎓 கல்வி', education, educationChartScore, educationDasaScore, ['Mercury', lord5, lord9], topDasas)}\n\n${buildCategoryDetail('😊 சந்தோஷம்', happiness, happinessChartScore, happinessDasaScore, ['Moon', 'Jupiter'], topDasas)}`
-        : `**Score Breakdown:**\n\n${buildCategoryDetail('💰 Wealth', wealth, wealthChartScore, wealthDasaScore, [lord2, lord11, lord9], topDasas)}\n\n${buildCategoryDetail('💼 Career', career, careerChartScore, careerDasaScore, [lord10, 'Saturn'], topDasas)}\n\n${buildCategoryDetail('❤️ Marriage', marriage, marriageChartScore, marriageDasaScore, [lord3, lord7, lord11], topDasas)}\n\n${buildCategoryDetail('👨‍👩‍👧‍👦 Family', family, familyChartScore, familyDasaScore, [lord5, 'Jupiter', lord9], topDasas)}\n\n${buildCategoryDetail('🏥 Health', health, healthChartScore, healthDasaScore, [lagnaLord, lord6], topDasas)}\n\n${buildCategoryDetail('🏠 Property', property, propertyChartScore, propertyDasaScore, [lord4, 'Mars'], topDasas)}\n\n${buildCategoryDetail('🎓 Education', education, educationChartScore, educationDasaScore, ['Mercury', lord5, lord9], topDasas)}\n\n${buildCategoryDetail('😊 Happiness', happiness, happinessChartScore, happinessDasaScore, ['Moon', 'Jupiter'], topDasas)}`;
+        ? `**மதிப்பெண் விவரம் (புதிய விதிகள்):**\n\n` +
+        `${buildDetail('🎓 கல்வி (Education)', education)}\n` +
+        `${buildDetail('💰 செல்வம் (Wealth)', wealth)}\n` +
+        `${buildDetail('💼 தொழில் (Career)', career)}\n` +
+        `${buildDetail('❤️ திருமணம் (Marriage)', marriage)}\n` +
+        `${buildDetail('🏥 ஆரோக்கியம் (Health)', health)}\n`
+        : `**Score Breakdown (New Guruji Rules):**\n\n` +
+        `${buildDetail('🎓 Education', education)}\n` +
+        `${buildDetail('💰 Wealth', wealth)}\n` +
+        `${buildDetail('💼 Career', career)}\n` +
+        `${buildDetail('❤️ Marriage', marriage)}\n` +
+        `${buildDetail('🏥 Health', health)}\n`;
 
     return {
         question,
         answer,
         reason,
-        isFavorable: totalScore > 60,
+        isFavorable: totalScore > 45,
         totalScore,
         starRating,
         categories
