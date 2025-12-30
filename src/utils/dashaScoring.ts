@@ -5,7 +5,7 @@
 
 import { calculateAdityaGurujiSubathuvam } from './adityaGurujiSubathuvam';
 import { getHouseLordStrength, getHousesRuledByPlanet } from './houseLordship';
-import { SIGN_LORDS } from './constants';
+import { SIGN_LORDS, PLANET_RELATIONSHIPS, MOOLA_TRIKONA, EXALTATION_POINTS, DEBILITATION_POINTS } from './constants';
 
 // ============================================================================
 // ENUMS & INTERFACES
@@ -22,6 +22,7 @@ export enum DasaQuality {
 
 export interface DasaScoreBreakdown {
     sthanaBala: number;           // House strength (0-100)
+    sthanaBalaDetails: string;    // Explanation for Sthana Bala
     lordshipScore: number;        // Lordship score (+40 to -30)
     subathuvamScore: number;      // Subathuvam score (+40 to -90)
     aspectScore: number;          // Aspect score (+20 to -15)
@@ -46,11 +47,11 @@ export interface BhuktiScore {
 // ============================================================================
 
 export function classifyDasaQuality(score: number): DasaQuality {
-    if (score >= 150) return DasaQuality.EXCELLENT;
-    if (score >= 100) return DasaQuality.VERY_GOOD;
-    if (score >= 60) return DasaQuality.GOOD;
+    if (score >= 75) return DasaQuality.EXCELLENT;
+    if (score >= 60) return DasaQuality.VERY_GOOD;
+    if (score >= 45) return DasaQuality.GOOD;
     if (score >= 30) return DasaQuality.AVERAGE;
-    if (score >= 0) return DasaQuality.BAD;
+    if (score >= 15) return DasaQuality.BAD;
     return DasaQuality.VERY_BAD;
 }
 
@@ -89,8 +90,73 @@ export function getQualityDescription(quality: DasaQuality): { en: string; ta: s
 // COMPONENT 1: STHANA BALA (HOUSE STRENGTH) - 0 to 100
 // ============================================================================
 
-export function calculateSthanaBala(planet: any, chart: any): number {
+function getSignStrength(planet: any, planetSignIndex: number, chart?: any): { score: number, type: string } {
+    const name = planet.name;
+    const degree = planet.longitude % 30;
+
+    // 1. Exaltation (Ucha) - +20
+    const exaltation = EXALTATION_POINTS[name as keyof typeof EXALTATION_POINTS];
+    if (exaltation && exaltation.sign === planetSignIndex) {
+        return { score: 20, type: 'Exalted (உச்சம்)' };
+    }
+
+    // 2. Debilitation (Neecha) & Neecha Bhanga
+    const debilitation = DEBILITATION_POINTS[name as keyof typeof DEBILITATION_POINTS];
+    if (debilitation && debilitation.sign === planetSignIndex) {
+        // Neecha Bhanga Check
+        // 1. Retrograde
+        if (planet.isRetro) {
+            return { score: 30, type: 'Neecha Bhanga (நீச பங்கம்) - Retrograde' };
+        }
+
+        // 2. Lord of Debilitated Sign in Kendra
+        if (chart && chart.planets && chart.ascendant) {
+            const signOwner = SIGN_LORDS[planetSignIndex];
+            const ownerPlanet = chart.planets.find((p: any) => p.name === signOwner);
+            if (ownerPlanet) {
+                const ownerSign = ownerPlanet.signIndex ?? Math.floor(ownerPlanet.longitude / 30);
+                const lagnaSign = chart.ascendant.signIndex ?? 0;
+                const ownerHouse = ((ownerSign - lagnaSign + 12) % 12) + 1;
+
+                if ([1, 4, 7, 10].includes(ownerHouse)) {
+                    return { score: 30, type: `Neecha Bhanga (Sign Lord ${signOwner} in Kendra)` };
+                }
+            }
+        }
+
+        return { score: -50, type: 'Debilitated (நீசம்)' };
+    }
+
+    // 3. Moola Trikona - +18
+    const moolaTrikona = MOOLA_TRIKONA[name as keyof typeof MOOLA_TRIKONA];
+    if (moolaTrikona && moolaTrikona.sign === planetSignIndex) {
+        if (degree >= moolaTrikona.startDegree && degree <= moolaTrikona.endDegree) {
+            return { score: 18, type: 'Moola Trikona (மூலத்திரிகோணம்)' };
+        }
+    }
+
+    // 4. Own Sign (Swakshetra) - +15
+    const signOwner = SIGN_LORDS[planetSignIndex];
+    if (signOwner === name) {
+        return { score: 15, type: 'Own Sign (ஆட்சி)' };
+    }
+
+    // 5. Friend/Enemy/Neutral
+    const planetRels = PLANET_RELATIONSHIPS[name as keyof typeof PLANET_RELATIONSHIPS];
+    if (planetRels) {
+        if (planetRels.friends.includes(signOwner)) {
+            return { score: 10, type: 'Friend Sign (நட்பு)' };
+        } else if (planetRels.enemies.includes(signOwner)) {
+            return { score: -15, type: 'Enemy Sign (பகை)' };
+        }
+    }
+
+    return { score: 0, type: 'Neutral Sign (சமம்)' }; // Neutral
+}
+
+export function calculateSthanaBala(planet: any, chart: any): { score: number, details: string } {
     let score = 50; // Base score
+    const details = [];
 
     // Calculate house position from planet sign and ascendant sign
     const planetSign = planet.signIndex ?? Math.floor(planet.longitude / 30);
@@ -100,55 +166,61 @@ export function calculateSthanaBala(planet: any, chart: any): number {
     // Kendra houses (1,4,7,10) - Strong
     if ([1, 4, 7, 10].includes(planetHouse)) {
         score += 20;
+        details.push('Kendra (+20)');
     }
-
     // Trikona houses (1,5,9) - Very Strong
-    if ([1, 5, 9].includes(planetHouse)) {
+    else if ([5, 9].includes(planetHouse)) { // 1 is covered in Kendra
         score += 25;
+        details.push('Trikona (+25)');
+    }
+    // Dusthana houses (6,8,12) - Special Guruji Logic
+    else if ([6, 8, 12].includes(planetHouse)) {
+        // Initial Score Low
+        let dusthanaScore = -30;
+        details.push('Dusthana (Initial: -30)');
+
+        // APPLY GURUJI SUBATHUVAM FILTER
+        // Check if planet has Subathuvam (Beneficence)
+        const subathuvamData = calculateAdityaGurujiSubathuvam(chart.planets || []);
+        const pSubathuvam = subathuvamData[planet.name];
+
+        if (pSubathuvam && pSubathuvam.totalScore > 0) {
+            const subScore = pSubathuvam.totalScore;
+
+            if (subScore >= 60) {
+                // High Subathuvam: Transforms Dusthana to "Hidden Strength"
+                dusthanaScore = 20; // Flip to positive
+                details.push(`Guruji Rule: High Subathuvam in Dusthana (+20)`);
+                details.push(`(Benefic Influence: ${Math.round(subScore)}%)`);
+            } else if (subScore >= 40) {
+                // Medium Subathuvam: Neutralizes bad effect
+                dusthanaScore = 0;
+                details.push(`Guruji Rule: Moderate Subathuvam (Neutralized)`);
+            } else {
+                // Low Subathuvam: Remains Bad
+                details.push(`Low Subathuvam (${Math.round(subScore)}%)`);
+            }
+        } else {
+            details.push('No Subathuvam Protection');
+        }
+
+        score += dusthanaScore;
     }
 
-    // Dusthana houses (6,8,12) - Weak
-    if ([6, 8, 12].includes(planetHouse)) {
-        score -= 30;
-    }
+    // Sign Strength (Ucha, Neecha, Moola Trikona, Own, Friend, Enemy)
+    const signStrength = getSignStrength(planet, planetSign, chart);
+    score += signStrength.score;
+    details.push(`${signStrength.type} (${signStrength.score > 0 ? '+' : ''}${signStrength.score})`);
 
-    // Own sign strength
-    const signLords = SIGN_LORDS[planetSign];
-    if (signLords && signLords.includes(planet.name)) {
-        score += 15;
-    }
+    // Check Neecha Bhanga explicit override if score is Debilitated (-50)
+    // Only if checkNeechaBhanga logic is external, but here we handled simple retro case. 
+    // For full Neecha Bhanga, we need more complex logic. 
+    // Assuming simple check embedded in getSignStrength is sufficient for now based on available data.
 
-    // Exaltation
-    const exaltationSigns: Record<string, number> = {
-        'Sun': 0,      // Aries
-        'Moon': 1,     // Taurus
-        'Mars': 9,     // Capricorn
-        'Mercury': 5,  // Virgo
-        'Jupiter': 3,  // Cancer
-        'Venus': 11,   // Pisces
-        'Saturn': 6    // Libra
+    return {
+        score: Math.min(100, Math.max(0, score)),
+        details: details.join(', ')
     };
-
-    if (exaltationSigns[planet.name] === planetSign) {
-        score += 20;
-    }
-
-    // Debilitation
-    const debilitationSigns: Record<string, number> = {
-        'Sun': 6,      // Libra
-        'Moon': 7,     // Scorpio
-        'Mars': 3,     // Cancer
-        'Mercury': 11, // Pisces
-        'Jupiter': 9,  // Capricorn
-        'Venus': 5,    // Virgo
-        'Saturn': 0    // Aries
-    };
-
-    if (debilitationSigns[planet.name] === planetSign) {
-        score -= 50;
-    }
-
-    return Math.min(100, Math.max(0, score));
 }
 
 // ============================================================================
@@ -307,6 +379,7 @@ export function calculateDasaScore(planetName: string, chart: any): DasaScoreBre
     if (!planet) {
         return {
             sthanaBala: 0,
+            sthanaBalaDetails: 'N/A',
             lordshipScore: 0,
             subathuvamScore: 0,
             aspectScore: 0,
@@ -317,22 +390,42 @@ export function calculateDasaScore(planetName: string, chart: any): DasaScoreBre
         };
     }
 
-    const sthanaBala = calculateSthanaBala(planet, chart);
+    const sthanaBalaObj = calculateSthanaBala(planet, chart);
     const lordshipScore = calculateLordshipScore(planetName, chart);
     const subathuvamScore = calculateSubathuvamScore(planetName, chart.planets);
     const aspectScore = calculateAspectScore(planet, chart.planets);
     const nakshatraScore = calculateNakshatraScore(planet, chart);
 
-    const totalScore = sthanaBala + lordshipScore + subathuvamScore + aspectScore + nakshatraScore;
-    const quality = classifyDasaQuality(totalScore);
+    const totalRawScore = sthanaBalaObj.score + lordshipScore + subathuvamScore + aspectScore + nakshatraScore;
+
+    // Normalize to 0-100 scale
+    // Original Range: -55 to 225
+    // Target Range: 0 to 100
+    // Simple scaling: (Score / 2.25) approx. 
+    // Scaling Factor: 100 / 225 = 0.444
+    const SCALING_FACTOR = 0.444;
+
+    const normalize = (val: number) => Math.round(val * SCALING_FACTOR * 10) / 10;
+
+    const totalScore = Math.min(100, Math.max(0, normalize(totalRawScore + 55))); // Shift positive to avoid negatives? No, user wants simple conversion.
+
+    // Let's use simple scaling but handle min/max mapping better
+    // Map -55..225 -> 0..100
+    // Total Range = 280
+    // ((Score + 55) / 280) * 100
+
+    const finalScore = Math.min(100, Math.max(0, Math.round(((totalRawScore + 55) / 280) * 100)));
+
+    const quality = classifyDasaQuality(finalScore);
 
     return {
-        sthanaBala,
-        lordshipScore,
-        subathuvamScore,
-        aspectScore,
-        nakshatraScore,
-        totalScore,
+        sthanaBala: normalize(sthanaBalaObj.score),
+        sthanaBalaDetails: sthanaBalaObj.details,
+        lordshipScore: normalize(lordshipScore),
+        subathuvamScore: normalize(subathuvamScore),
+        aspectScore: normalize(aspectScore),
+        nakshatraScore: normalize(nakshatraScore),
+        totalScore: finalScore,
         quality,
         description: getQualityDescription(quality)
     };

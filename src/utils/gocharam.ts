@@ -678,14 +678,57 @@ export const calculateJupiterTransit = (rasiSign: number, lagnaSign: number, cur
     return result;
 };
 
-export const calculateSaturnTransit = (rasiSign: number, currentSign: number, transitPlanets: { name: string, signIndex: number }[], lang: Language = 'en'): GocharamResult => {
+export const calculateSaturnTransit = (
+    rasiSign: number,
+    currentSign: number,
+    transitPlanets: { name: string, signIndex: number }[],
+    lang: Language = 'en',
+    saturnLongitude?: number,
+    birthMoonLongitude?: number
+): GocharamResult => {
     const result = calculatePlanetTransit('Saturn', rasiSign, currentSign, transitPlanets, [3, 6, 11], [1, 2, 4, 5, 7, 8, 9, 10, 12], lang);
 
     const houseFromRasi = getHouse(rasiSign, currentSign);
 
     let rawStatus: GocharamResult['status'] = result.status;
+    let specialMessage = "";
 
-    if ([12, 1, 2].includes(houseFromRasi)) {
+    // GURUJI RULE 2: JANMA NAKSHATRA SANI in Own House (Kumbha/Makara)
+    // Check if Saturn is in Birth Star
+    let isJanmaSani = false;
+    let isSaturnDignified = false;
+
+    if (saturnLongitude !== undefined && birthMoonLongitude !== undefined) {
+        // Calculate Nakshatras
+        const starSpan = 13.333333;
+        const saturnStarIndex = Math.floor(saturnLongitude / starSpan);
+        const birthStarIndex = Math.floor(birthMoonLongitude / starSpan);
+
+        if (saturnStarIndex === birthStarIndex) {
+            isJanmaSani = true;
+            // Check Dignity (Capricorn=9, Aquarius=10)
+            if (currentSign === 9 || currentSign === 10) {
+                isSaturnDignified = true;
+            }
+        }
+    }
+
+    if (isJanmaSani && isSaturnDignified) {
+        // OVERRIDE FOR DIGNIFIED JANMA SANI
+        rawStatus = 'Good'; // Guruji says he won't destroy
+        result.isFavorable = true;
+
+        // Custom Description based on Guruji Advice
+        const msg = lang === 'ta'
+            ? "கும்ப/மகர ராசியில் சனி ஜென்ம நட்சத்திரத்தில் செல்கிறார். இவர் கெடுதல் செய்ய மாட்டார். ஆனால் அதிக வேலைப்பளுவை (Workload) கொடுப்பார். வேலை பாதுகாப்பானது."
+            : "Saturn transits your birth star in his own house. He will not cause harm but will increase workload significantly. Job is safe.";
+
+        result.description = msg;
+        specialMessage = " (Janma Sani - Dignified)";
+
+        // Append specific scoring context if possible or just rely on description
+        // result.aspects could be used to show flags? Let's just use description.
+    } else if ([12, 1, 2].includes(houseFromRasi)) {
         rawStatus = 'Sade Sati';
         result.description = houseFromRasi === 1
             ? getStr(lang, "gocharam.descriptions.sadeSatiJanma")
@@ -705,7 +748,7 @@ export const calculateSaturnTransit = (rasiSign: number, currentSign: number, tr
 
     result.status = rawStatus;
     // @ts-ignore
-    result.statusLabel = getStr(lang, `gocharam.status.${rawStatus.replace(' ', '')}`) || getStr(lang, `gocharam.status.${rawStatus}`);
+    result.statusLabel = (getStr(lang, `gocharam.status.${rawStatus.replace(' ', '')}`) || getStr(lang, `gocharam.status.${rawStatus}`)) + specialMessage;
 
     return result;
 };
@@ -725,8 +768,17 @@ export const getDailySnapshot = (
 
     const getP = (name: string) => transits.find(p => p.name === name)?.signIndex || 0;
 
+    // Extract Longitudes if available (assuming transits has 'longitude' property hidden by type)
+    const saturnObj = transits.find(p => p.name === 'Saturn');
+    // @ts-ignore
+    const saturnLong = saturnObj?.longitude;
+
+    // Extract Birth Moon Longitude
+    const moon = birthDataForForecast?.planets?.find((p: any) => p.name === 'Moon');
+    const birthMoonLong = moon?.longitude;
+
     const jupiter = calculateJupiterTransit(rasiSign, lagnaSign, getP('Jupiter'), transits, lang);
-    const saturn = calculateSaturnTransit(rasiSign, getP('Saturn'), transits, lang);
+    const saturn = calculateSaturnTransit(rasiSign, getP('Saturn'), transits, lang, saturnLong, birthMoonLong);
 
     const sun = calculatePlanetTransit('Sun', rasiSign, getP('Sun'), transits, [3, 6, 10, 11], [1, 2, 4, 5, 7, 8, 9, 12], lang);
     const mars = calculatePlanetTransit('Mars', rasiSign, getP('Mars'), transits, [3, 6, 11], [1, 2, 4, 5, 7, 8, 9, 10, 12], lang);

@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import DasaAnalysis from './DasaAnalysis';
 import { calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
 import { calculateDasaScore, DasaQuality } from '../utils/dashaScoring';
-import { DasaScoreSummary } from './DasaScoreSummary';
+
 
 interface DashaPeriodsProps {
     data: any;
@@ -123,6 +123,7 @@ const DashaPeriods: React.FC<DashaPeriodsProps> = ({ data }) => {
                 </div>
             )}
 
+
             {/* Comprehensive Dasa Analysis */}
             {currentDasha && data.planets && data.ascendant && (
                 <motion.div
@@ -156,12 +157,7 @@ const DashaPeriods: React.FC<DashaPeriodsProps> = ({ data }) => {
                         }}
                         agScores={calculateAdityaGurujiSubathuvam(data.planets)}
                     />
-                    <div className="mt-8">
-                        <DasaScoreSummary
-                            chart={{ planets: data.planets, ascendant: data.ascendant }}
-                            language={language}
-                        />
-                    </div>
+
                 </motion.div>
             )}
 

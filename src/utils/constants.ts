@@ -126,3 +126,13 @@ export const PLANET_RELATIONSHIPS = {
         enemies: ["Sun", "Moon", "Mercury"]
     }
 };
+
+export const MOOLA_TRIKONA = {
+    Sun: { sign: 4, startDegree: 0, endDegree: 20 },      // Leo 0-20
+    Moon: { sign: 1, startDegree: 3, endDegree: 30 },     // Taurus 3-30
+    Mars: { sign: 0, startDegree: 0, endDegree: 12 },     // Aries 0-12
+    Mercury: { sign: 5, startDegree: 15, endDegree: 20 }, // Virgo 15-20
+    Jupiter: { sign: 8, startDegree: 0, endDegree: 10 },  // Sagittarius 0-10
+    Venus: { sign: 6, startDegree: 0, endDegree: 15 },    // Libra 0-15
+    Saturn: { sign: 10, startDegree: 0, endDegree: 20 }   // Aquarius 0-20
+};

@@ -162,6 +162,114 @@ export const predictJobTiming = (
         isFavorable: false
     };
 };
+// Helper to get house number (1-12)
+const getHouse = (planetSign: number, ascendantSign: number): number => {
+    return (planetSign - ascendantSign + 12) % 12 + 1;
+};
+
+// 7. Jupiter Career logic (Guru)
+const predictJupiterCareer = (
+    planets: any[],
+    ascendantSign: number,
+    moonSignIndex: number,
+    subathuvamScores: Record<string, SubathuvamResult>,
+    language: 'en' | 'ta' = 'en'
+): { prediction: string, reason: string } | null => {
+    const isTamil = language === 'ta';
+    const jupiter = planets.find(p => p.name === 'Jupiter');
+    const mercury = planets.find(p => p.name === 'Mercury');
+    const venus = planets.find(p => p.name === 'Venus');
+
+    if (!jupiter) return null;
+
+    const jupiterScore = subathuvamScores['Jupiter']?.totalScore || 0;
+    const mercuryScore = subathuvamScores['Mercury']?.totalScore || 0;
+    const venusScore = subathuvamScores['Venus']?.totalScore || 0;
+
+    let predictions: string[] = [];
+    let reasons: string[] = [];
+
+    // Check from Lagna & Rasi (Moon)
+    const ascendants = [
+        { name: isTamil ? 'லக்னம்' : 'Lagna', sign: ascendantSign },
+        { name: isTamil ? 'ராசி' : 'Rasi', sign: moonSignIndex }
+    ];
+
+    // House Based Rules
+    for (const asc of ascendants) {
+        const jupiterHouse = getHouse(jupiter.signIndex, asc.sign);
+
+        // Rule 1: Jupiter in 2nd House
+        if (jupiterHouse === 2) {
+            predictions.push(isTamil
+                ? "நிதி, வங்கி, கற்பித்தல், சட்டம் (குரு 2-ல்)."
+                : "Finance, Banking, Teaching, Law (Jupiter in 2nd).");
+            reasons.push(isTamil
+                ? `${asc.name}-லிருந்து குரு 2-ம் வீட்டில்: சிறந்த நிதி ஆலோசகர், ஆசிரியர் அல்லது வழக்கறிஞர் ஆகலாம்.`
+                : `Jupiter in 2nd from ${asc.name}: Potential for Financial Advisor, Teacher, or Lawyer.`);
+        }
+
+        // Rule 2: Jupiter in 10th House
+        if (jupiterHouse === 10) {
+            predictions.push(isTamil
+                ? "உயர் வங்கி பதவி, பேராசிரியர், கல்வித் துறை தலைவர் (குரு 10-ல்)."
+                : "High-level Banking, Professor, Head of Education (Jupiter in 10th).");
+            reasons.push(isTamil
+                ? `${asc.name}-லிருந்து குரு 10-ம் வீட்டில்: வங்கி அல்லது கல்வியில் மிக உயர்ந்த பதவி.`
+                : `Jupiter in 10th from ${asc.name}: High position in Banking or Education.`);
+        }
+
+        // Rule 3: 10th Lord in 2nd House (Specific check for Guru as 10th Lord)
+        // Guru is 10th Lord for Gemini (2) and Pisces (11) Lagnas
+        const house10Sign = (asc.sign + 9) % 12;
+        const lord10 = SIGN_LORDS[house10Sign];
+
+        if (lord10 === 'Jupiter' && jupiterHouse === 2) {
+            predictions.push(isTamil
+                ? "பயிற்சி, வழிகாட்டுதல், மேலாண்மை (10-ம் அதிபதி குரு 2-ல்)."
+                : "Training, Guiding, Management (10th Lord Jupiter in 2nd).");
+            reasons.push(isTamil
+                ? `${asc.name}-லிருந்து 10-ம் அதிபதி குரு 2-ம் வீட்டில்: சிறந்த பயிற்சியாளர் அல்லது மேலாளர் ஆகலாம்.`
+                : `10th Lord Jupiter in 2nd from ${asc.name}: Excellent Trainer or Manager.`);
+        }
+    }
+
+    // Combination Rules (If Jupiter is Dominant or Strong > 60)
+    // Only apply if Jupiter has decent strength
+    if (jupiterScore > 50) {
+
+        // Jupiter + Mercury (2nd Strongest)
+        if (mercuryScore > 50 && mercuryScore < jupiterScore) { // Mercury is strong but secondary to Jupiter
+            predictions.push(isTamil
+                ? "வங்கி கணக்காளர், ஆடிட்டர், பதிப்பகம், விளம்பரம் (குரு + புதன்)."
+                : "Bank Accountant, Auditor, Publishing, Marketing (Jupiter + Mercury).");
+            reasons.push(isTamil
+                ? "குரு (முதன்மை) + புதன் சேர்க்கை: நிதி மற்றும் வணிக அறிவு."
+                : "Jupiter (Primary) + Mercury combination: Finance and Business acumen.");
+        }
+
+        // Jupiter + Venus (2nd Strongest)
+        if (venusScore > 50 && venusScore < jupiterScore) {
+            predictions.push(isTamil
+                ? "கூட்டுறவு, சமூக நிறுவனம், திருமண ஆலோசகர், ஆடம்பர வணிகம் (குரு + சுக்ரன்)."
+                : "Co-operatives, Social Ent., Marriage Counselor, Luxury Biz (Jupiter + Venus).");
+            reasons.push(isTamil
+                ? "குரு (முதன்மை) + சுக்ரன் சேர்க்கை: சமூக சேவை மற்றும் கலை/ஆடம்பர வணிகம்."
+                : "Jupiter (Primary) + Venus combination: Social Service and Arts/Luxury business.");
+        }
+    }
+
+    if (predictions.length === 0) return null;
+
+    // Deduplicate
+    const uniquePreds = Array.from(new Set(predictions));
+    const uniqueReasons = Array.from(new Set(reasons));
+
+    return {
+        prediction: uniquePreds.join("\n"),
+        reason: uniqueReasons.join("\n- ")
+    };
+};
 
 // Helper to get favorable Sun Transit months
 const getSunTransitMonths = (ascendantSign: number): string[] => {
@@ -1121,20 +1229,20 @@ export const predictCareerPath = (
     if (isBusiness) {
         careerType = isTamil ? "சொந்த தொழில் (Business)" : "Business / Self-Employment";
         reasons.push(isTamil
-            ? `புதன் (${mercuryScore.toFixed(0)}) சனியை விட வலுவாக உள்ளார் (வியாபார சிந்தனை).`
-            : `Mercury (${mercuryScore.toFixed(0)}) is stronger than Saturn (Business aptitude).`);
+            ? `கணக்கீடு: புதன் (${mercuryScore.toFixed(0)}) > சனி (${saturnScore.toFixed(0)}).\n- புதன் சனியை விட வலுவாக உள்ளார் (வியாபார சிந்தனை).`
+            : `Calculation: Mercury (${mercuryScore.toFixed(0)}) > Saturn (${saturnScore.toFixed(0)}).\n- Mercury is stronger than Saturn (Business aptitude).`);
     } else {
         const diff = saturnScore - mercuryScore;
         if (diff > 10) {
             careerType = isTamil ? "அரசு/தனியார் வேலை (Job/Service)" : "Job / Service (Employment)";
             reasons.push(isTamil
-                ? `சனி (${saturnScore.toFixed(0)}) புதனை விட வலுவாக உள்ளார் (உழைப்பு/சேவை).`
-                : `Saturn (${saturnScore.toFixed(0)}) is stronger than Mercury (Service oriented).`);
+                ? `கணக்கீடு: சனி (${saturnScore.toFixed(0)}) > புதன் (${mercuryScore.toFixed(0)}).\n- சனி புதனை விட வலுவாக உள்ளார் (உழைப்பு/சேவை).`
+                : `Calculation: Saturn (${saturnScore.toFixed(0)}) > Mercury (${mercuryScore.toFixed(0)}).\n- Saturn is stronger than Mercury (Service oriented).`);
         } else {
             careerType = isTamil ? "வேலை அல்லது தொழில் (இரண்டும் சாத்தியம்)" : "Job or Business (Mixed Potential)";
             reasons.push(isTamil
-                ? "சனியும் புதனும் சம பலத்தில் உள்ளனர்."
-                : "Saturn and Mercury have comparable strength.");
+                ? `கணக்கீடு: சனி (${saturnScore.toFixed(0)}) ≈ புதன் (${mercuryScore.toFixed(0)}).\n- சனியும் புதனும் சம பலத்தில் உள்ளனர்.`
+                : `Calculation: Saturn (${saturnScore.toFixed(0)}) ≈ Mercury (${mercuryScore.toFixed(0)}).\n- Saturn and Mercury have comparable strength.`);
         }
     }
 
@@ -1204,7 +1312,16 @@ export const predictCareerPath = (
         }
     }
 
-    const answer = `**${careerType}**\n${domainText}\n\n**${currentFocus}**`;
+    // 4. Detailed Jupiter Analysis (Requested Feature)
+    const jupiterAnalysis = predictJupiterCareer(planets, ascendantSign, (planets.find(p => p.name === 'Moon')?.signIndex || 0), subathuvamScores, language);
+
+    let jupiterText = "";
+    if (jupiterAnalysis) {
+        jupiterText = `\n\n**${isTamil ? "குரு (Jupiter) சிறப்பு பலன்கள்:" : "Jupiter Specific Career Insights:"}**\n${jupiterAnalysis.prediction}`;
+        reasons.push(`**${isTamil ? "குருவின் பங்களிப்பு" : "Jupiter's Contribution"}:**\n- ${jupiterAnalysis.reason}`);
+    }
+
+    const answer = `**${careerType}**\n${domainText}\n\n**${currentFocus}**${jupiterText}`;
     const reasonText = reasons.join('\n- ');
 
     return {

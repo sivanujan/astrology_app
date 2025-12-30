@@ -652,26 +652,21 @@ export const calculateFullTransitChart = () => {
     const date = new Date();
     const observer = new Observer(13.0827, 80.2707, 0); // Chennai (Default)
 
+    // Get Ayanamsa
+    const ayanamsa = getLahiriAyanamsa(date);
+
     const getSignAndDegree = (body: Body) => {
         const equator = Equator(body, date, observer, false, true);
-        // Ecliptic accepts Vector, but Equator returns EquatorialCoordinates.
-        // We need to convert or use a different function.
-        // Actually, looking at astronomy-engine docs/types:
-        // Ecliptic(equator) -> EclipticCoordinates { elon, elat, range }
-        // But Equator returns { ra, dec, dist, vec: {x,y,z} }?
-        // Let's use HelioVector or GeoVector if needed, but usually Ecliptic takes a vector.
-        // Let's try a simpler approach using library functions if available, or just fix the property names if that's the only issue.
-        // The error said 'lon' does not exist, did you mean 'elon'? So 'elon' is correct.
-        // The error said 'EquatorialCoordinates' is not assignable to 'Vector'.
-        // We can use equator.vec if it exists, or create a Vector.
-        // Let's try using the 'elon' property directly if we can get Ecliptic coords differently.
+        const ecliptic = Astronomy.Ecliptic(equator.vec);
 
-        // Alternative: Use 'Ecliptic' directly from body? No.
-        // Let's try:
-        const ecliptic = Astronomy.Ecliptic(equator.vec); // Pass the vector part
+        // Convert Tropical to Sidereal
+        let lon = ecliptic.elon - ayanamsa;
+        if (lon < 0) lon += 360;
+
         return {
-            signIndex: Math.floor(ecliptic.elon / 30),
-            degree: ecliptic.elon % 30
+            signIndex: Math.floor(lon / 30),
+            degree: lon % 30,
+            longitude: lon // Added logic needs this if we want it later
         };
     };
 

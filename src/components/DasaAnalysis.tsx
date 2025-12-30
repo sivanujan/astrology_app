@@ -10,7 +10,6 @@ import {
     generateDosAndDonts,
     getLuckyFactors
 } from '../utils/dasaPredictions';
-import DasaPeriodCard from './DasaPeriodCard';
 import DasaScoreBreakdown from './DasaScoreBreakdown';
 import DasaPredictionsComponent from './DasaPredictions';
 
@@ -229,16 +228,7 @@ const DasaAnalysis: React.FC<DasaAnalysisProps> = ({ chart, currentDasa, agScore
 
 
 
-            {/* Current Period Card */}
-            <DasaPeriodCard
-                planetName={selectedPlanetName}
-                periodType={selectedPeriod === 'maha' ? 'Maha' : selectedPeriod === 'antar' ? 'Antar' : 'Pratyantar'}
-                startDate={selectedPeriod === 'maha' ? currentDasa.maha.startDate : selectedPeriod === 'antar' ? currentDasa.bhukti.startDate : currentDasa.antaram?.startDate || ''}
-                endDate={selectedPeriod === 'maha' ? currentDasa.maha.endDate : selectedPeriod === 'antar' ? currentDasa.bhukti.endDate : currentDasa.antaram?.endDate || ''}
-                dasaScore={selectedAnalysis}
-                effectPercentage={selectedPeriod === 'maha' ? 60 : selectedPeriod === 'antar' ? 30 : 10}
-                onViewDetails={() => setShowPredictions(!showPredictions)}
-            />
+
 
 
             {/* Predictions (Toggle) */}

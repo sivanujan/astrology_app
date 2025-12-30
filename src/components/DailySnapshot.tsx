@@ -110,7 +110,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
             <div className="flex justify-center">
                 <div className="w-full max-w-md">
                     <ChartGrid
-                        title="Current Transit Chart (Gocharam)"
+                        title={`Current Transit Chart (Gocharam) - ${new Date().toLocaleDateString('en-GB')}`}
                         planets={fullTransitChart}
                         ascendant={ascendant}
                     />

@@ -1,14 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, StarHalf, RotateCw, GraduationCap, Coins, Activity, Users, Home, Smile } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, StarHalf, RotateCw, GraduationCap, Coins, Activity, Users, Home, Smile, ArrowRight, Clock, X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
     getCurrentDasha,
-    calculateCurrentTransits
+    calculateCurrentTransits,
+    DashaPeriod, PLANET_COLORS
 } from '../utils/astrology';
+import { format } from 'date-fns';
 import { calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
+import { TAMIL_PLANET_NAMES } from '../utils/translations';
+import { DasaScoreSummary } from './DasaScoreSummary';
+import DasaPeriodCard from './DasaPeriodCard';
+import { generatePDF } from '../utils/pdfGenerator';
 import {
     predictJobTiming,
     predictDetailedMarriageTiming,
@@ -16,13 +22,17 @@ import {
     predictCareerPath,
     predictForeignTravel,
     predictCurrentLoveStatus,
-    predictMarriageStatus, // New Import
-    predictLifeQuality // New Import
+    predictMarriageStatus,
+    predictLifeQuality
 } from '../utils/predictionRules';
 import { queryAstrologyOrchestrator, OrchestratorResponse, translateAnalysisReport } from '../utils/aiOrchestrator';
 import { useAuth } from '../contexts/AuthContext';
 import { predictionService, generateChartId } from '../services/predictionService';
-import { generatePDF } from '../utils/pdfGenerator';
+import { calculateDasaScore } from '../utils/dashaScoring';
+import { generateDasaPrediction } from '../utils/dasaPredictionGenerator';
+
+
+
 import DasaAnalysis from './DasaAnalysis';
 
 interface GurujiPredictionsProps {
@@ -33,8 +43,16 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const { t, language } = useLanguage();
     const { user } = useAuth();
     const navigate = useNavigate();
-    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [selectedPeriod, setSelectedPeriod] = useState<'Maha' | 'Bhukti' | 'Antaram'>('Maha');
+    const [viewingSpecificDetails, setViewingSpecificDetails] = useState<{
+        planet: string,
+        score: any,
+        type: string,
+        prediction: string
+    } | null>(null);
+    const [viewingDasa, setViewingDasa] = useState<{ maha: any, bhukti: any, antaram: any } | null>(null);
     const [aiResponse, setAiResponse] = useState<OrchestratorResponse | null>(null);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [progress, setProgress] = useState(0); // Progress counter state
     const [error, setError] = useState('');
@@ -54,7 +72,29 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const transits = calculateCurrentTransits();
     const agScores = calculateAdityaGurujiSubathuvam(planets);
 
+    // Calculate Current Dasa Score
+    const currentMahaPlanet = planets.find((p: any) => p.name === currentDasha?.maha?.planet);
+
+    const currentDasaScore = currentMahaPlanet ? calculateDasaScore(
+        currentMahaPlanet.name,
+        data // Pass full data as chart
+    ) : null;
+
     if (!currentDasha) return <div className="text-center p-8 text-slate-400">{isTamil ? "தசை காலங்களை கணக்கிட முடியவில்லை." : "Unable to calculate Dasa periods."}</div>;
+
+    // Helper Functions
+    const getPlanetName = (name: string) => {
+        return language === 'ta' ? TAMIL_PLANET_NAMES[name] : name;
+    };
+
+    const formatDate = (date: Date) => {
+        try {
+            if (!date || isNaN(date.getTime())) return 'Invalid Date';
+            return format(date, 'dd MMM yyyy');
+        } catch (e) {
+            return 'Invalid Date';
+        }
+    };
 
     // --- Rule Based Answers (Enriched by AI) ---
     const rawJob = predictJobTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, language);
@@ -239,6 +279,45 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             fetchAnalysis();
         }
     }, [language, user]);
+
+    // Initialize viewingDasa with currentDasha when calculated
+    useEffect(() => {
+        if (currentDasha && !viewingDasa) {
+            setViewingDasa(currentDasha);
+        }
+    }, [currentDasha]);
+
+    const handleMahaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedMahaPlanet = e.target.value;
+        const maha = dashaPeriods.find(d => d.planet === selectedMahaPlanet);
+        if (maha && maha.subPeriods && maha.subPeriods.length > 0) {
+            const bhukti = maha.subPeriods[0];
+            const antaram = bhukti.subPeriods && bhukti.subPeriods.length > 0 ? bhukti.subPeriods[0] : undefined;
+            setViewingDasa({ maha, bhukti, antaram });
+            setSelectedPeriod('Maha'); // Reset view to Maha to avoid confusion
+        }
+    };
+
+    const handleBhuktiChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        if (!viewingDasa) return;
+        const selectedBhuktiPlanet = e.target.value;
+        const bhukti = viewingDasa.maha.subPeriods.find((d: any) => d.planet === selectedBhuktiPlanet);
+        if (bhukti) {
+            const antaram = bhukti.subPeriods && bhukti.subPeriods.length > 0 ? bhukti.subPeriods[0] : undefined;
+            setViewingDasa({ ...viewingDasa, bhukti, antaram });
+            setSelectedPeriod('Bhukti');
+        }
+    };
+
+    const handleAntaramChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        if (!viewingDasa) return;
+        const selectedAntaramPlanet = e.target.value;
+        const antaram = viewingDasa.bhukti.subPeriods.find((d: any) => d.planet === selectedAntaramPlanet);
+        if (antaram) {
+            setViewingDasa({ ...viewingDasa, antaram });
+            setSelectedPeriod('Antaram');
+        }
+    };
 
     const toggleExpand = (id: number) => {
         setExpandedId(expandedId === id ? null : id);
@@ -720,6 +799,191 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                         </div>
                     </motion.div>
                 </div>
+
+                {/* Current Dasa Interactive Status */}
+                {viewingDasa && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="glass-panel p-6 relative overflow-hidden mt-8"
+                    >
+                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-purple-500 to-blue-500"></div>
+
+                        {/* Header with Selectors */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 relative z-10">
+                            <div className="flex items-center gap-3">
+                                <Clock className="w-6 h-6 text-purple-400 animate-pulse" />
+                                <h3 className="text-xl font-bold">{t.dasha.current} (Analysis)</h3>
+                            </div>
+
+                            {/* Period Selectors */}
+                            <div className="flex flex-wrap gap-2">
+                                {/* Maha Selector */}
+                                <select
+                                    value={viewingDasa.maha.planet}
+                                    onChange={handleMahaChange}
+                                    className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                                >
+                                    {dashaPeriods.map(d => (
+                                        <option key={d.planet} value={d.planet}>
+                                            {getPlanetName(d.planet)}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {/* Bhukti Selector */}
+                                <select
+                                    value={viewingDasa.bhukti.planet}
+                                    onChange={handleBhuktiChange}
+                                    className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                                >
+                                    {viewingDasa.maha.subPeriods?.map((d: any) => (
+                                        <option key={d.planet} value={d.planet}>
+                                            {getPlanetName(d.planet)}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {/* Antaram Selector */}
+                                <select
+                                    value={viewingDasa.antaram?.planet}
+                                    onChange={handleAntaramChange}
+                                    className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                                >
+                                    {viewingDasa.bhukti.subPeriods?.map((d: any) => (
+                                        <option key={d.planet} value={d.planet}>
+                                            {getPlanetName(d.planet)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Interactive Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center mb-8">
+                            {/* Maha Dasha */}
+                            <div
+                                onClick={() => setSelectedPeriod('Maha')}
+                                className={`rounded-lg p-4 border cursor-pointer transition-all ${selectedPeriod === 'Maha'
+                                    ? 'bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-900/20'
+                                    : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
+                                    }`}
+                            >
+                                <div className="text-sm text-slate-400 mb-1">{t.dasha.maha}</div>
+                                <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[viewingDasa.maha.planet] }}>
+                                    {getPlanetName(viewingDasa.maha.planet)}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                    {formatDate(viewingDasa.maha.startDate)} - {formatDate(viewingDasa.maha.endDate)}
+                                </div>
+                            </div>
+
+                            {/* Bhukti */}
+                            <div
+                                onClick={() => setSelectedPeriod('Bhukti')}
+                                className={`rounded-lg p-4 border cursor-pointer transition-all relative ${selectedPeriod === 'Bhukti'
+                                    ? 'bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-900/20'
+                                    : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
+                                    }`}
+                            >
+                                <ArrowRight className="absolute -left-3 top-1/2 -translate-y-1/2 text-slate-700 hidden md:block" />
+                                <div className="text-sm text-slate-400 mb-1">{t.dasha.bhukti}</div>
+                                <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[viewingDasa.bhukti?.planet || 'Sun'] }}>
+                                    {viewingDasa.bhukti ? getPlanetName(viewingDasa.bhukti.planet) : '-'}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                    {viewingDasa.bhukti ? `${formatDate(viewingDasa.bhukti.startDate)} - ${formatDate(viewingDasa.bhukti.endDate)}` : ''}
+                                </div>
+                            </div>
+
+                            {/* Antaram */}
+                            <div
+                                onClick={() => setSelectedPeriod('Antaram')}
+                                className={`rounded-lg p-4 border cursor-pointer transition-all relative ${selectedPeriod === 'Antaram'
+                                    ? 'bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-900/20'
+                                    : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
+                                    }`}
+                            >
+                                <ArrowRight className="absolute -left-3 top-1/2 -translate-y-1/2 text-slate-700 hidden md:block" />
+                                <div className="text-sm text-slate-400 mb-1">{t.dasha.antaram}</div>
+                                <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[viewingDasa.antaram?.planet || 'Sun'] }}>
+                                    {viewingDasa.antaram ? getPlanetName(viewingDasa.antaram.planet) : '-'}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                    {viewingDasa.antaram ? `${formatDate(viewingDasa.antaram.startDate)} - ${formatDate(viewingDasa.antaram.endDate)}` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Detailed Score Card for Selected Period */}
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={selectedPeriod}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                            >
+                                {(() => {
+                                    const periodData = selectedPeriod === 'Maha'
+                                        ? viewingDasa.maha
+                                        : selectedPeriod === 'Bhukti'
+                                            ? viewingDasa.bhukti
+                                            : viewingDasa.antaram;
+
+                                    if (!periodData) return null;
+
+
+
+                                    const selectedScore = calculateDasaScore(
+                                        periodData.planet,
+                                        data // Pass full data as chart
+                                    );
+
+                                    const periodType = selectedPeriod === 'Maha' ? 'Maha' :
+                                        selectedPeriod === 'Bhukti' ? 'Bhukti' : 'Antaram';
+
+                                    return (
+                                        <DasaPeriodCard
+                                            planetName={periodData.planet}
+                                            periodType={
+                                                selectedPeriod === 'Maha' ? 'Maha' :
+                                                    selectedPeriod === 'Bhukti' ? 'Antar' : 'Pratyantar'
+                                            }
+                                            startDate={periodData.startDate.toString()}
+                                            endDate={periodData.endDate.toString()}
+                                            dasaScore={selectedScore}
+                                            effectPercentage={selectedPeriod === 'Maha' ? 60 : selectedPeriod === 'Bhukti' ? 30 : 10}
+                                            onViewDetails={() => {
+                                                const prediction = generateDasaPrediction(
+                                                    periodData.planet,
+                                                    selectedScore,
+                                                    periodType,
+                                                    language
+                                                );
+                                                setViewingSpecificDetails({
+                                                    planet: periodData.planet,
+                                                    score: selectedScore,
+                                                    type: periodType,
+                                                    prediction
+                                                });
+                                            }}
+                                        />
+                                    );
+                                })()}
+                            </motion.div>
+                        </AnimatePresence>
+                    </motion.div>
+                )}
+
+
+
+                {/* Dasa Score Summary */}
+                <div className="mt-8">
+                    <DasaScoreSummary
+                        chart={{ planets, ascendant }}
+                        language={language}
+                    />
+                </div>
             </div>
 
             {/* Comprehensive Dasa Analysis */}
@@ -757,6 +1021,79 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             </motion.div>
 
             {/* Ask AI Button */}
+            {/* AI Prediction Modal */}
+            <AnimatePresence>
+                {viewingSpecificDetails && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                        onClick={() => setViewingSpecificDetails(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-6">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div>
+                                        <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+                                            {isTamil ? `${getPlanetName(viewingSpecificDetails.planet)} தசை பலன்கள்` : `${getPlanetName(viewingSpecificDetails.planet)} Period Analysis`}
+                                        </h3>
+                                        <p className="text-slate-400 mt-1">
+                                            {isTamil ? 'AI ஜோதிட கணிப்பு' : 'AI Astrological Prediction'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setViewingSpecificDetails(null)}
+                                        className="p-2 hover:bg-slate-800 rounded-full transition-colors"
+                                    >
+                                        <X className="w-6 h-6 text-slate-400" />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {/* Score Summary */}
+                                    <div className="bg-purple-900/20 rounded-xl p-4 border border-purple-500/20 flex gap-4 items-center">
+                                        <div className="p-3 bg-purple-500/20 rounded-full">
+                                            <Sparkles className="w-6 h-6 text-purple-400" />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm text-purple-300 font-medium">
+                                                {isTamil ? 'மொத்த மதிப்பெண்' : 'Total Score'}
+                                            </div>
+                                            <div className="text-2xl font-bold text-white">
+                                                {viewingSpecificDetails.score.totalScore}<span className="text-base font-normal text-slate-400">/100</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Prediction Text */}
+                                    <div className="prose prose-invert max-w-none">
+                                        <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 leading-relaxed whitespace-pre-line text-slate-200 text-lg">
+                                            {viewingSpecificDetails.prediction}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex justify-end">
+                                    <button
+                                        onClick={() => setViewingSpecificDetails(null)}
+                                        className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
+                                    >
+                                        {isTamil ? 'மூடு' : 'Close'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -786,3 +1123,5 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 };
 
 export default GurujiPredictions;
+
+
