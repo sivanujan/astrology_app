@@ -653,7 +653,7 @@ export const calculateNavamsa = (longitude: number) => {
 };
 
 export const getNavamsaChartData = (rasiData: any) => {
-    if (!rasiData) return null;
+    if (!rasiData || !rasiData.planets) return null;
 
     const navamsaPlanets = rasiData.planets.map((p: any) => {
         const navamsa = calculateNavamsa(p.longitude);

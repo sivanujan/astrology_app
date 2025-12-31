@@ -219,17 +219,24 @@ const Dashboard: React.FC = () => {
     };
 
     const handleViewChart = (chart: SavedChart) => {
-        setChartData({
-            name: chart.name,
-            dob: chart.dob.toISOString().split('T')[0],
-            time: chart.dob.toTimeString().slice(0, 5),
-            place: chart.place,
-            latitude: chart.latitude,
-            longitude: chart.longitude,
-            timezone: 5.5 // Default to India for now or store it? Assuming stored charts are mostly India. 
-            // In a real app we should store timezone.
-        });
-        navigate('/chart');
+        try {
+            const calculatedData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
+            setChartData({
+                ...calculatedData,
+                userDetails: {
+                    name: chart.name,
+                    date: chart.dob.toISOString().split('T')[0],
+                    time: chart.dob.toTimeString().slice(0, 5),
+                    place: chart.place,
+                    lat: chart.latitude,
+                    lng: chart.longitude,
+                    city: chart.place // Add city for consistency
+                }
+            });
+            navigate('/chart');
+        } catch (e) {
+            console.error("Failed to calculate chart", e);
+        }
     };
 
     const handleShowPrediction = (chart: SavedChart) => {

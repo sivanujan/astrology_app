@@ -1645,11 +1645,11 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
         },
         Star: moon ? getNakshatra(moon.longitude) : "Unknown",
         CurrentDasa: currentDasa ? (() => {
-            const dasaLordFunc = getFunctionalNature(ascSignIndex, language)[currentDasa.maha.planet];
+            const dasaLordFunc = currentDasa.maha?.planet ? getFunctionalNature(ascSignIndex, language)[currentDasa.maha.planet] : null;
             const bhuktiLordFunc = currentDasa.bhukti ? getFunctionalNature(ascSignIndex, language)[currentDasa.bhukti.planet] : null;
 
             return {
-                lord: currentDasa.maha.planet,
+                lord: currentDasa.maha?.planet || "Unknown",
                 functional_nature: dasaLordFunc?.nature || "Neutral",
                 lord_of_houses: dasaLordFunc?.lordOfHouses || [],
                 natural_significations: dasaLordFunc?.karakatvam || [],
@@ -1660,8 +1660,8 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
                 bhukti_affected_persons: bhuktiLordFunc?.affectedPersons || [],
                 bhukti_combined_interpretation: bhuktiLordFunc?.combinedEffect || "",
                 antaram: currentDasa.antaram?.planet,
-                start_date: currentDasa.maha.startDate ? new Date(currentDasa.maha.startDate).toLocaleDateString() : "Unknown",
-                end_date: currentDasa.maha.endDate ? new Date(currentDasa.maha.endDate).toLocaleDateString() : "Unknown",
+                start_date: currentDasa.maha?.startDate ? new Date(currentDasa.maha.startDate).toLocaleDateString() : "Unknown",
+                end_date: currentDasa.maha?.endDate ? new Date(currentDasa.maha.endDate).toLocaleDateString() : "Unknown",
                 bhukti_end_date: currentDasa.bhukti?.endDate ? new Date(currentDasa.bhukti.endDate).toLocaleDateString() : "Unknown",
                 timeline_summary: "See 'dasa_schedule' below for full timeline."
             };

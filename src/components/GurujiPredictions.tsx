@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, StarHalf, RotateCw, GraduationCap, Coins, Activity, Users, Home, Smile, ArrowRight, Clock, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader, Briefcase, Heart, MessageCircle, Globe, Star, StarHalf, RotateCw, GraduationCap, Coins, Activity, Users, Home, Smile, ArrowRight, Clock, Zap, X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     calculateDashaPeriods,
@@ -56,6 +56,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [progress, setProgress] = useState(0); // Progress counter state
     const [error, setError] = useState('');
+    const [activeTab, setActiveTab] = useState<'houses' | 'questions' | 'dasha'>('questions'); // Default to questions or houses
     const isFetchingRef = useRef(false);
 
     if (!data) return null;
@@ -373,6 +374,31 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </div>
             </motion.div>
 
+            {/* --- Tab Navigation --- */}
+            <div className="flex flex-wrap justify-center gap-2 md:gap-4 mb-8 sticky top-4 z-40 bg-slate-950/80 backdrop-blur-xl p-2 rounded-2xl border border-white/5 mx-auto max-w-fit shadow-2xl">
+                <button
+                    onClick={() => setActiveTab('houses')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'houses' ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Home className="w-4 h-4" />
+                    {isTamil ? "பாவக பலன்கள்" : "Houses"}
+                </button>
+                <button
+                    onClick={() => setActiveTab('questions')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'questions' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <MessageCircle className="w-4 h-4" />
+                    {isTamil ? "வாழ்க்கை வழிகாட்டி" : "Life Guidance"}
+                </button>
+                <button
+                    onClick={() => setActiveTab('dasha')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'dasha' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    <Clock className="w-4 h-4" />
+                    {isTamil ? "தசை & காலம்" : "Dasha & Timeline"}
+                </button>
+            </div>
+
             {/* --- Loading State with Progress --- */}
             {isLoading && (
                 <div className="text-center p-12 glass-panel mt-8">
@@ -423,9 +449,8 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </div>
             )}
 
-            {/* --- AI Analysis (Lagna + Houses) --- */}
-            {aiResponse?.bava_analysis_report && (
-                <div className="space-y-8 mb-12">
+            {activeTab === 'houses' && aiResponse?.bava_analysis_report && (
+                <div className="space-y-8 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Lagna Summary */}
                     <div className="glass-panel p-6 border border-purple-800/30 bg-purple-900/10">
                         <h3 className="text-xl font-bold text-purple-300 mb-3 flex items-center gap-2">
@@ -444,7 +469,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                             {isTamil ? "பாவக பலன்கள் (12 வீடுகள்)" : "House-by-House Analysis"}
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {aiResponse.bava_analysis_report.house_predictions.map((house, idx) => (
+                            {aiResponse.bava_analysis_report.house_predictions.map((house: any, idx: number) => (
                                 <motion.div
                                     key={house.house_number}
                                     initial={{ opacity: 0, y: 10 }}
@@ -512,516 +537,509 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                 </div>
             )}
 
-            {/* --- Key Life Answers (Rule Based) --- */}
-            <div>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-slate-200 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-blue-400" />
-                        {isTamil ? "வாழ்க்கை வழிகாட்டி (Questions)" : "Life Guidance (Questions)"}
-                    </h3>
-                    <button
-                        onClick={() => fetchAnalysis(true)}
-                        disabled={isLoading}
-                        className="text-xs flex items-center gap-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 px-3 py-1.5 rounded-full border border-blue-500/30 transition"
-                    >
-                        <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                        {isTamil ? "மீண்டும் ஆய்வு செய்" : "Check Again"}
-                    </button>
-                </div>
-
-                {/* 0. NEW: Life Quality Analysis (The First Card) */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.1 }}
-                    className="glass-panel p-6 border-l-4 border-yellow-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition mb-6"
-                >
-                    <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                        <Star className="w-32 h-32 text-yellow-400" />
-                    </div>
-                    <h3 className="text-xl font-bold text-yellow-200 mb-2 flex items-center gap-2">
-                        <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
-                        {lifeQuality.question}
-                    </h3>
-
-                    {/* Score & Verdict Header */}
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className="text-4xl font-bold text-white">
-                            {lifeQuality.totalScore}<span className="text-lg text-slate-400 font-normal">/100</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <div className="flex text-yellow-400">
-                                {[...Array(5)].map((_, i) => {
-                                    const rating = lifeQuality.starRating;
-                                    const isFull = i < Math.floor(rating);
-                                    const isHalf = i === Math.floor(rating) && rating % 1 !== 0;
-
-                                    return (
-                                        <div key={i} className="relative w-4 h-4">
-                                            {/* Base empty star */}
-                                            <Star className="w-4 h-4 text-yellow-400 opacity-30 absolute top-0 left-0" />
-
-                                            {/* Full or Half Overlay */}
-                                            {isFull && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
-                                            {isHalf && <StarHalf className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <span className={`text-sm font-bold ${lifeQuality.totalScore >= 60 ? 'text-emerald-400' : 'text-orange-400'}`}>
-                                {lifeQuality.answer.split('\n\n')[1]?.replace('**Rating:** ', '').replace('**தரமதிப்பீடு:** ', '')}
-                            </span>
-                        </div>
+            {activeTab === 'questions' && (
+                <div className="space-y-6 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl font-bold text-slate-200 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-blue-400" />
+                            {isTamil ? "வாழ்க்கை வழிகாட்டி (Questions)" : "Life Guidance (Questions)"}
+                        </h3>
+                        <button
+                            onClick={() => fetchAnalysis(true)}
+                            disabled={isLoading}
+                            className="text-xs flex items-center gap-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 px-3 py-1.5 rounded-full border border-blue-500/30 transition"
+                        >
+                            <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                            {isTamil ? "மீண்டும் ஆய்வு செய்" : "Check Again"}
+                        </button>
                     </div>
 
-                    {/* 8 Category Breakdown */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                        {Object.entries(lifeQuality.categories).map(([key, scoreVal]: [string, any]) => {
-                            const score = Number(scoreVal);
-
-                            // Config for icons and labels
-                            const categoryConfig: Record<string, { icon: React.ReactNode, labelEn: string, labelTa: string }> = {
-                                education: { icon: <GraduationCap className="w-4 h-4" />, labelEn: "Education", labelTa: "கல்வி" },
-                                wealth: { icon: <Coins className="w-4 h-4" />, labelEn: "Wealth", labelTa: "செல்வம்" },
-                                career: { icon: <Briefcase className="w-4 h-4" />, labelEn: "Career", labelTa: "தொழில்" },
-                                marriage: { icon: <Heart className="w-4 h-4" />, labelEn: "Marriage", labelTa: "திருமணம்" },
-                                health: { icon: <Activity className="w-4 h-4" />, labelEn: "Health", labelTa: "ஆரோக்கியம்" },
-                                family: { icon: <Users className="w-4 h-4" />, labelEn: "Family", labelTa: "குடும்பம்" },
-                                property: { icon: <Home className="w-4 h-4" />, labelEn: "Property", labelTa: "சொத்து" },
-                                happiness: { icon: <Smile className="w-4 h-4" />, labelEn: "Happiness", labelTa: "மகிழ்ச்சி" }
-                            };
-
-                            const config = categoryConfig[key];
-                            if (!config) return null;
-
-                            let colorClass = '';
-                            if (score >= 81) colorClass = 'text-emerald-400 border-emerald-500';
-                            else if (score >= 61) colorClass = 'text-blue-400 border-blue-500';
-                            else if (score >= 41) colorClass = 'text-orange-400 border-orange-500';
-                            else colorClass = 'text-red-400 border-red-500';
-
-                            return (
-                                <div key={key} className={`bg-slate-800/50 p-3 rounded border-l-2 ${colorClass}`}>
-                                    <div className="flex items-center gap-1 mb-1">
-                                        <span className="text-base">{config.icon}</span>
-                                        <div className="text-xs text-slate-400 leading-tight">{isTamil ? config.labelTa : config.labelEn}</div>
-                                    </div>
-                                    <div className={`text-lg font-bold ${colorClass.split(' ')[0]}`}>{score}<span className="text-xs text-slate-500">/100</span></div>
-                                    {/* Progress bar */}
-                                    <div className="w-full bg-slate-700/50 rounded-full h-1 mt-1">
-                                        <div
-                                            className={`h-1 rounded-full ${colorClass.includes('emerald') ? 'bg-emerald-500' : colorClass.includes('blue') ? 'bg-blue-500' : colorClass.includes('orange') ? 'bg-orange-500' : 'bg-red-500'}`}
-                                            style={{ width: `${score}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Detailed Reasoning */}
-                    <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line text-sm">
-                        {lifeQuality.answer.split('\n\n').slice(2).join('\n\n')}
-                    </p>
-
-                    <div className="text-xs text-yellow-400/80 italic border-t border-yellow-900/30 pt-2">
-                        <pre className="whitespace-pre-wrap mt-1 font-sans opacity-80">{lifeQuality.reason}</pre>
-                    </div>
-                </motion.div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-
-                    {/* 1. Job Timing */}
+                    {/* 0. NEW: Life Quality Analysis (The First Card) */}
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.1 }}
-                        className="glass-panel p-6 border-l-4 border-blue-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                        className="glass-panel p-6 border-l-4 border-yellow-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition mb-6"
                     >
                         <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                            <Briefcase className="w-24 h-24 text-blue-400" />
+                            <Star className="w-32 h-32 text-yellow-400" />
                         </div>
-                        <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
-                            <Briefcase className="w-5 h-5" />
-                            {jobPrediction.question}
+                        <h3 className="text-xl font-bold text-yellow-200 mb-2 flex items-center gap-2">
+                            <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
+                            {lifeQuality.question}
                         </h3>
-                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                            {jobPrediction.answer}
+
+                        {/* Score & Verdict Header */}
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="text-4xl font-bold text-white">
+                                {lifeQuality.totalScore}<span className="text-lg text-slate-400 font-normal">/100</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <div className="flex text-yellow-400">
+                                    {[...Array(5)].map((_, i) => {
+                                        const rating = lifeQuality.starRating;
+                                        const isFull = i < Math.floor(rating);
+                                        const isHalf = i === Math.floor(rating) && rating % 1 !== 0;
+
+                                        return (
+                                            <div key={i} className="relative w-4 h-4">
+                                                {/* Base empty star */}
+                                                <Star className="w-4 h-4 text-yellow-400 opacity-30 absolute top-0 left-0" />
+
+                                                {/* Full or Half Overlay */}
+                                                {isFull && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
+                                                {isHalf && <StarHalf className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <span className={`text-sm font-bold ${lifeQuality.totalScore >= 60 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                                    {lifeQuality.answer.split('\n\n')[1]?.replace('**Rating:** ', '').replace('**தரமதிப்பீடு:** ', '')}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* 8 Category Breakdown */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                            {Object.entries(lifeQuality.categories).map(([key, scoreVal]: [string, any]) => {
+                                const score = Number(scoreVal);
+
+                                // Config for icons and labels
+                                const categoryConfig: Record<string, { icon: React.ReactNode, labelEn: string, labelTa: string }> = {
+                                    education: { icon: <GraduationCap className="w-4 h-4" />, labelEn: "Education", labelTa: "கல்வி" },
+                                    wealth: { icon: <Coins className="w-4 h-4" />, labelEn: "Wealth", labelTa: "செல்வம்" },
+                                    career: { icon: <Briefcase className="w-4 h-4" />, labelEn: "Career", labelTa: "தொழில்" },
+                                    marriage: { icon: <Heart className="w-4 h-4" />, labelEn: "Marriage", labelTa: "திருமணம்" },
+                                    health: { icon: <Activity className="w-4 h-4" />, labelEn: "Health", labelTa: "ஆரோக்கியம்" },
+                                    family: { icon: <Users className="w-4 h-4" />, labelEn: "Family", labelTa: "குடும்பம்" },
+                                    property: { icon: <Home className="w-4 h-4" />, labelEn: "Property", labelTa: "சொத்து" },
+                                    happiness: { icon: <Smile className="w-4 h-4" />, labelEn: "Happiness", labelTa: "மகிழ்ச்சி" }
+                                };
+
+                                const config = categoryConfig[key];
+                                if (!config) return null;
+
+                                let colorClass = '';
+                                if (score >= 81) colorClass = 'text-emerald-400 border-emerald-500';
+                                else if (score >= 61) colorClass = 'text-blue-400 border-blue-500';
+                                else if (score >= 41) colorClass = 'text-orange-400 border-orange-500';
+                                else colorClass = 'text-red-400 border-red-500';
+
+                                return (
+                                    <div key={key} className={`bg-slate-800/50 p-3 rounded border-l-2 ${colorClass}`}>
+                                        <div className="flex items-center gap-1 mb-1">
+                                            <span className="text-base">{config.icon}</span>
+                                            <div className="text-xs text-slate-400 leading-tight">{isTamil ? config.labelTa : config.labelEn}</div>
+                                        </div>
+                                        <div className={`text-lg font-bold ${colorClass.split(' ')[0]}`}>{score}<span className="text-xs text-slate-500">/100</span></div>
+                                        {/* Progress bar */}
+                                        <div className="w-full bg-slate-700/50 rounded-full h-1 mt-1">
+                                            <div
+                                                className={`h-1 rounded-full ${colorClass.includes('emerald') ? 'bg-emerald-500' : colorClass.includes('blue') ? 'bg-blue-500' : colorClass.includes('orange') ? 'bg-orange-500' : 'bg-red-500'}`}
+                                                style={{ width: `${score}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Detailed Reasoning */}
+                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line text-sm">
+                            {lifeQuality.answer.split('\n\n').slice(2).join('\n\n')}
                         </p>
-                        <div className="text-xs text-blue-400 italic border-t border-blue-900/30 pt-2 flex justify-between items-center">
-                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {jobPrediction.reason}</span>
-                            <button
-                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Job Timing prediction is wrong. ${jobPrediction.answer}` } })}
-                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                            >
-                                {isTamil ? "தவறா?" : "Wrong?"}
-                            </button>
+
+                        <div className="text-xs text-yellow-400/80 italic border-t border-yellow-900/30 pt-2">
+                            <pre className="whitespace-pre-wrap mt-1 font-sans opacity-80">{lifeQuality.reason}</pre>
                         </div>
                     </motion.div>
 
-                    {/* 2. Foreign Settlement (New - Top Right) */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.12 }}
-                        className="glass-panel p-6 border-l-4 border-indigo-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                    >
-                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                            <Globe className="w-24 h-24 text-indigo-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-indigo-200 mb-2 flex items-center gap-2">
-                            <Globe className="w-5 h-5" />
-                            {foreignTravel.question}
-                        </h3>
-                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                            {foreignTravel.answer}
-                        </p>
-                        <div className="text-xs text-indigo-400 italic border-t border-indigo-900/30 pt-2 flex justify-between items-center">
-                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {foreignTravel.reason}</span>
-                            <button
-                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Foreign Travel prediction is wrong. ${foreignTravel.answer}` } })}
-                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                            >
-                                {isTamil ? "தவறா?" : "Wrong?"}
-                            </button>
-                        </div>
-                    </motion.div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
 
-                    {/* 3. Career Path */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.15 }}
-                        className="glass-panel p-6 border-l-4 border-cyan-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                    >
-                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                            <Briefcase className="w-24 h-24 text-cyan-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-cyan-200 mb-2 flex items-center gap-2">
-                            <Briefcase className="w-5 h-5" />
-                            {careerPath.question}
-                        </h3>
-                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                            {careerPath.answer}
-                        </p>
-                        <div className="text-xs text-cyan-400 italic border-t border-cyan-900/30 pt-2 flex justify-between items-center">
-                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {careerPath.reason}</span>
-                            <button
-                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Career Path prediction is wrong. ${careerPath.answer}` } })}
-                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                            >
-                                {isTamil ? "தவறா?" : "Wrong?"}
-                            </button>
-                        </div>
-                    </motion.div>
+                        {/* 1. Job Timing */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.1 }}
+                            className="glass-panel p-6 border-l-4 border-blue-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                        >
+                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                                <Briefcase className="w-24 h-24 text-blue-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
+                                <Briefcase className="w-5 h-5" />
+                                {jobPrediction.question}
+                            </h3>
+                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                                {jobPrediction.answer}
+                            </p>
+                            <div className="text-xs text-blue-400 italic border-t border-blue-900/30 pt-2 flex justify-between items-center">
+                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {jobPrediction.reason}</span>
+                                <button
+                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Job Timing prediction is wrong. ${jobPrediction.answer}` } })}
+                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                                >
+                                    {isTamil ? "தவறா?" : "Wrong?"}
+                                </button>
+                            </div>
+                        </motion.div>
 
-                    {/* 4. Current Love Status */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.18 }}
-                        className="glass-panel p-6 border-l-4 border-rose-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                    >
-                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                            <Heart className="w-24 h-24 text-rose-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
-                            <Heart className="w-5 h-5" />
-                            {loveStatus.question}
-                        </h3>
-                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                            {loveStatus.answer}
-                        </p>
-                        <div className="text-xs text-rose-400 italic border-t border-rose-900/30 pt-2 flex justify-between items-center">
-                            <span className="whitespace-pre-line">{isTamil ? "காரணம்:" : "Reasoning:"} {loveStatus.reason}</span>
-                            <button
-                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Current Love Status prediction is wrong. ${loveStatus.answer}` } })}
-                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                            >
-                                {isTamil ? "தவறா?" : "Wrong?"}
-                            </button>
-                        </div>
-                    </motion.div>
+                        {/* 2. Foreign Settlement */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.12 }}
+                            className="glass-panel p-6 border-l-4 border-indigo-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                        >
+                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                                <Globe className="w-24 h-24 text-indigo-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-indigo-200 mb-2 flex items-center gap-2">
+                                <Globe className="w-5 h-5" />
+                                {foreignTravel.question}
+                            </h3>
+                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                                {foreignTravel.answer}
+                            </p>
+                            <div className="text-xs text-indigo-400 italic border-t border-indigo-900/30 pt-2 flex justify-between items-center">
+                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {foreignTravel.reason}</span>
+                                <button
+                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Foreign Travel prediction is wrong. ${foreignTravel.answer}` } })}
+                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                                >
+                                    {isTamil ? "தவறா?" : "Wrong?"}
+                                </button>
+                            </div>
+                        </motion.div>
 
-                    {/* 5. Marriage Timing */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.2 }}
-                        className="glass-panel p-6 border-l-4 border-pink-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                    >
-                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                            <Heart className="w-24 h-24 text-pink-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-pink-200 mb-2 flex items-center gap-2">
-                            <Heart className="w-5 h-5" />
-                            {marriageTiming.question}
-                        </h3>
-                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                            {marriageTiming.answer}
-                        </p>
-                        <div className="text-xs text-pink-400 italic border-t border-pink-900/30 pt-2 flex justify-between items-center">
-                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageTiming.reason}</span>
-                            <button
-                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Timing prediction is wrong. ${marriageTiming.answer}. My Age is ${new Date().getFullYear() - new Date(birthDate).getFullYear()}` } })}
-                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                            >
-                                {isTamil ? "தவறா?" : "Wrong?"}
-                            </button>
-                        </div>
-                    </motion.div>
+                        {/* 3. Career Path */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.15 }}
+                            className="glass-panel p-6 border-l-4 border-cyan-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                        >
+                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                                <Briefcase className="w-24 h-24 text-cyan-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-cyan-200 mb-2 flex items-center gap-2">
+                                <Briefcase className="w-5 h-5" />
+                                {careerPath.question}
+                            </h3>
+                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                                {careerPath.answer}
+                            </p>
+                            <div className="text-xs text-cyan-400 italic border-t border-cyan-900/30 pt-2 flex justify-between items-center">
+                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {careerPath.reason}</span>
+                                <button
+                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Career Path prediction is wrong. ${careerPath.answer}` } })}
+                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                                >
+                                    {isTamil ? "தவறா?" : "Wrong?"}
+                                </button>
+                            </div>
+                        </motion.div>
 
-                    {/* 5. Marriage Type */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.3 }}
-                        className="glass-panel p-6 border-l-4 border-purple-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                    >
-                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                            <Sparkles className="w-24 h-24 text-purple-400" />
-                        </div>
-                        <h3 className="text-lg font-bold text-purple-200 mb-2 flex items-center gap-2">
-                            <Sparkles className="w-5 h-5" />
-                            {marriageType.question}
-                        </h3>
-                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                            {marriageType.answer}
-                        </p>
-                        <div className="text-xs text-purple-400 italic border-t border-purple-900/30 pt-2 flex justify-between items-center">
-                            <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageType.reason}</span>
-                            <button
-                                onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Type prediction is wrong. ${marriageType.answer}` } })}
-                                className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                            >
-                                {isTamil ? "தவறா?" : "Wrong?"}
-                            </button>
-                        </div>
-                    </motion.div>
+                        {/* 4. Current Love Status */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.18 }}
+                            className="glass-panel p-6 border-l-4 border-rose-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                        >
+                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                                <Heart className="w-24 h-24 text-rose-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
+                                <Heart className="w-5 h-5" />
+                                {loveStatus.question}
+                            </h3>
+                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                                {loveStatus.answer}
+                            </p>
+                            <div className="text-xs text-rose-400 italic border-t border-rose-900/30 pt-2 flex justify-between items-center">
+                                <span className="whitespace-pre-line">{isTamil ? "காரணம்:" : "Reasoning:"} {loveStatus.reason}</span>
+                                <button
+                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Current Love Status prediction is wrong. ${loveStatus.answer}` } })}
+                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                                >
+                                    {isTamil ? "தவறா?" : "Wrong?"}
+                                </button>
+                            </div>
+                        </motion.div>
+
+                        {/* 5. Marriage Timing */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className="glass-panel p-6 border-l-4 border-pink-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                        >
+                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                                <Heart className="w-24 h-24 text-pink-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-pink-200 mb-2 flex items-center gap-2">
+                                <Heart className="w-5 h-5" />
+                                {marriageTiming.question}
+                            </h3>
+                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                                {marriageTiming.answer}
+                            </p>
+                            <div className="text-xs text-pink-400 italic border-t border-pink-900/30 pt-2 flex justify-between items-center">
+                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageTiming.reason}</span>
+                                <button
+                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Timing prediction is wrong. ${marriageTiming.answer}. My Age is ${new Date().getFullYear() - new Date(birthDate).getFullYear()}` } })}
+                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                                >
+                                    {isTamil ? "தவறா?" : "Wrong?"}
+                                </button>
+                            </div>
+                        </motion.div>
+
+                        {/* 6. Marriage Type */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.3 }}
+                            className="glass-panel p-6 border-l-4 border-purple-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
+                        >
+                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
+                                <Sparkles className="w-24 h-24 text-purple-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-purple-200 mb-2 flex items-center gap-2">
+                                <Sparkles className="w-5 h-5" />
+                                {marriageType.question}
+                            </h3>
+                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
+                                {marriageType.answer}
+                            </p>
+                            <div className="text-xs text-purple-400 italic border-t border-purple-900/30 pt-2 flex justify-between items-center">
+                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageType.reason}</span>
+                                <button
+                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Type prediction is wrong. ${marriageType.answer}` } })}
+                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
+                                >
+                                    {isTamil ? "தவறா?" : "Wrong?"}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 </div>
+            )}
 
-                {/* Current Dasa Interactive Status */}
-                {viewingDasa && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="glass-panel p-6 relative overflow-hidden mt-8"
-                    >
-                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-purple-500 to-blue-500"></div>
-
-                        {/* Header with Selectors */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 relative z-10">
-                            <div className="flex items-center gap-3">
-                                <Clock className="w-6 h-6 text-purple-400 animate-pulse" />
-                                <h3 className="text-xl font-bold">{t.dasha.current} (Analysis)</h3>
-                            </div>
-
-                            {/* Period Selectors */}
-                            <div className="flex flex-wrap gap-2">
-                                {/* Maha Selector */}
-                                <select
-                                    value={viewingDasa.maha.planet}
-                                    onChange={handleMahaChange}
-                                    className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
-                                >
-                                    {dashaPeriods.map(d => (
-                                        <option key={d.planet} value={d.planet}>
-                                            {getPlanetName(d.planet)}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                {/* Bhukti Selector */}
-                                <select
-                                    value={viewingDasa.bhukti.planet}
-                                    onChange={handleBhuktiChange}
-                                    className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
-                                >
-                                    {viewingDasa.maha.subPeriods?.map((d: any) => (
-                                        <option key={d.planet} value={d.planet}>
-                                            {getPlanetName(d.planet)}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                {/* Antaram Selector */}
-                                <select
-                                    value={viewingDasa.antaram?.planet}
-                                    onChange={handleAntaramChange}
-                                    className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
-                                >
-                                    {viewingDasa.bhukti.subPeriods?.map((d: any) => (
-                                        <option key={d.planet} value={d.planet}>
-                                            {getPlanetName(d.planet)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+            {activeTab === 'dasha' && viewingDasa && (
+                <div className="space-y-6 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
+                        <div className="flex items-center gap-3">
+                            <Clock className="w-6 h-6 text-purple-400 animate-pulse" />
+                            <h3 className="text-xl font-bold">{t.dasha.current} (Analysis)</h3>
                         </div>
 
-                        {/* Interactive Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center mb-8">
-                            {/* Maha Dasha */}
-                            <div
-                                onClick={() => setSelectedPeriod('Maha')}
-                                className={`rounded-lg p-4 border cursor-pointer transition-all ${selectedPeriod === 'Maha'
-                                    ? 'bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-900/20'
-                                    : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
-                                    }`}
+                        {/* Period Selectors */}
+                        <div className="flex flex-wrap gap-2">
+                            {/* Maha Selector */}
+                            <select
+                                value={viewingDasa.maha.planet}
+                                onChange={handleMahaChange}
+                                className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
                             >
-                                <div className="text-sm text-slate-400 mb-1">{t.dasha.maha}</div>
-                                <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[viewingDasa.maha.planet] }}>
-                                    {getPlanetName(viewingDasa.maha.planet)}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                    {formatDate(viewingDasa.maha.startDate)} - {formatDate(viewingDasa.maha.endDate)}
-                                </div>
-                            </div>
+                                {dashaPeriods.map(d => (
+                                    <option key={d.planet} value={d.planet}>
+                                        {getPlanetName(d.planet)}
+                                    </option>
+                                ))}
+                            </select>
 
-                            {/* Bhukti */}
-                            <div
-                                onClick={() => setSelectedPeriod('Bhukti')}
-                                className={`rounded-lg p-4 border cursor-pointer transition-all relative ${selectedPeriod === 'Bhukti'
-                                    ? 'bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-900/20'
-                                    : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
-                                    }`}
+                            {/* Bhukti Selector */}
+                            <select
+                                value={viewingDasa.bhukti.planet}
+                                onChange={handleBhuktiChange}
+                                className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
                             >
-                                <ArrowRight className="absolute -left-3 top-1/2 -translate-y-1/2 text-slate-700 hidden md:block" />
-                                <div className="text-sm text-slate-400 mb-1">{t.dasha.bhukti}</div>
-                                <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[viewingDasa.bhukti?.planet || 'Sun'] }}>
-                                    {viewingDasa.bhukti ? getPlanetName(viewingDasa.bhukti.planet) : '-'}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                    {viewingDasa.bhukti ? `${formatDate(viewingDasa.bhukti.startDate)} - ${formatDate(viewingDasa.bhukti.endDate)}` : ''}
-                                </div>
-                            </div>
+                                {viewingDasa.maha.subPeriods?.map((d: any) => (
+                                    <option key={d.planet} value={d.planet}>
+                                        {getPlanetName(d.planet)}
+                                    </option>
+                                ))}
+                            </select>
 
-                            {/* Antaram */}
-                            <div
+                            {/* Antaram Selector */}
+                            <select
+                                value={viewingDasa.antaram?.planet || ''}
+                                onChange={handleAntaramChange}
+                                className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                            >
+                                {viewingDasa.bhukti.subPeriods?.map((d: any) => (
+                                    <option key={d.planet} value={d.planet}>
+                                        {getPlanetName(d.planet)}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Timeline Visual (Interactive Steps) */}
+                    <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-4 scrollbar-hide">
+                        {/* Maha Step */}
+                        <button
+                            onClick={() => setSelectedPeriod('Maha')}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-r-full rounded-l-lg relative group transition-all min-w-fit ${selectedPeriod === 'Maha'
+                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20 z-30'
+                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 z-10'
+                                }`}
+                        >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${selectedPeriod === 'Maha' ? 'bg-white/20' : 'bg-slate-900'
+                                }`}>
+                                {viewingDasa.maha.planet.substring(0, 2)}
+                            </div>
+                            <div className="text-left">
+                                <span className="text-xs opacity-70 block uppercase tracking-wider">Maha Dasa</span>
+                                <span className="font-bold">{getPlanetName(viewingDasa.maha.planet)}</span>
+                            </div>
+                            <ArrowRight className={`w-4 h-4 ml-2 ${selectedPeriod === 'Maha' ? 'text-white' : 'text-slate-600'}`} />
+                        </button>
+
+                        {/* Bhukti Step */}
+                        <button
+                            onClick={() => setSelectedPeriod('Bhukti')}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-r-full rounded-l-lg relative group transition-all min-w-fit -ml-2 ${selectedPeriod === 'Bhukti'
+                                ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20 z-30'
+                                : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 z-20'
+                                }`}
+                        >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${selectedPeriod === 'Bhukti' ? 'bg-white/20' : 'bg-slate-900'
+                                }`}>
+                                {viewingDasa.bhukti.planet.substring(0, 2)}
+                            </div>
+                            <div className="text-left">
+                                <span className="text-xs opacity-70 block uppercase tracking-wider">Bhukti</span>
+                                <span className="font-bold">{getPlanetName(viewingDasa.bhukti.planet)}</span>
+                            </div>
+                            <ArrowRight className={`w-4 h-4 ml-2 ${selectedPeriod === 'Bhukti' ? 'text-white' : 'text-slate-600'}`} />
+                        </button>
+
+                        {/* Antaram Step */}
+                        {viewingDasa.antaram && (
+                            <button
                                 onClick={() => setSelectedPeriod('Antaram')}
-                                className={`rounded-lg p-4 border cursor-pointer transition-all relative ${selectedPeriod === 'Antaram'
-                                    ? 'bg-purple-900/50 border-purple-500 shadow-lg shadow-purple-900/20'
-                                    : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
+                                className={`flex items-center gap-2 px-4 py-3 rounded-r-full rounded-l-lg relative group transition-all min-w-fit -ml-2 ${selectedPeriod === 'Antaram'
+                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 z-30'
+                                    : 'bg-slate-800/60 text-slate-400 hover:bg-slate-700 z-10'
                                     }`}
                             >
-                                <ArrowRight className="absolute -left-3 top-1/2 -translate-y-1/2 text-slate-700 hidden md:block" />
-                                <div className="text-sm text-slate-400 mb-1">{t.dasha.antaram}</div>
-                                <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[viewingDasa.antaram?.planet || 'Sun'] }}>
-                                    {viewingDasa.antaram ? getPlanetName(viewingDasa.antaram.planet) : '-'}
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${selectedPeriod === 'Antaram' ? 'bg-white/20' : 'bg-slate-900'
+                                    }`}>
+                                    {viewingDasa.antaram.planet.substring(0, 2)}
                                 </div>
-                                <div className="text-xs text-slate-500">
-                                    {viewingDasa.antaram ? `${formatDate(viewingDasa.antaram.startDate)} - ${formatDate(viewingDasa.antaram.endDate)}` : ''}
+                                <div className="text-left">
+                                    <span className="text-xs opacity-70 block uppercase tracking-wider">Antaram</span>
+                                    <span className="font-bold">{getPlanetName(viewingDasa.antaram.planet)}</span>
+                                </div>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Content Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Period Details Card */}
+                        <div className="lg:col-span-2">
+                            {(() => {
+                                const currentP = viewingDasa[selectedPeriod.toLowerCase() as 'maha' | 'bhukti' | 'antaram'];
+                                if (!currentP) return null;
+                                const scoreData = calculateDasaScore(currentP.planet, data);
+                                const periodTypeMap = { 'Maha': 'Maha', 'Bhukti': 'Antar', 'Antaram': 'Pratyantar' } as const;
+
+                                return (
+                                    <DasaPeriodCard
+                                        planetName={currentP.planet}
+                                        periodType={periodTypeMap[selectedPeriod]}
+                                        startDate={currentP.startDate}
+                                        endDate={currentP.endDate}
+                                        dasaScore={scoreData}
+                                        effectPercentage={selectedPeriod === 'Maha' ? 100 : selectedPeriod === 'Bhukti' ? 40 : 15}
+                                        onViewDetails={() => {
+                                            const prediction = generateDasaPrediction(
+                                                currentP.planet,
+                                                scoreData,
+                                                selectedPeriod === 'Antaram' ? 'Antaram' : periodTypeMap[selectedPeriod] === 'Antar' ? 'Bhukti' : 'Maha',
+                                                language
+                                            );
+                                            setViewingSpecificDetails({
+                                                planet: currentP.planet,
+                                                score: scoreData,
+                                                type: selectedPeriod,
+                                                prediction
+                                            });
+                                        }}
+                                    />
+                                );
+                            })()}
+                        </div>
+
+                        {/* Scores & Quick Analysis */}
+                        <div className="space-y-6">
+                            {(() => {
+                                const currentP = viewingDasa[selectedPeriod.toLowerCase() as 'maha' | 'bhukti' | 'antaram'];
+                                if (!currentP) return null;
+                                const scoreData = calculateDasaScore(currentP.planet, data);
+
+                                return (
+                                    <div className="glass-panel p-6 border border-purple-500/30 bg-purple-900/10">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="p-2 bg-purple-500/20 rounded-lg">
+                                                <Activity className="w-5 h-5 text-purple-400" />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs text-purple-300 uppercase tracking-wider font-bold">
+                                                    {isTamil ? "மொத்த வலிமை" : "Total Strength"}
+                                                </div>
+                                                <div className="text-2xl font-bold text-white">
+                                                    {scoreData.totalScore}<span className="text-sm text-slate-400 font-normal">/100</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="w-full bg-slate-800 rounded-full h-1.5">
+                                                <div
+                                                    className={`h-1.5 rounded-full ${scoreData.totalScore > 75 ? 'bg-green-500' : scoreData.totalScore > 50 ? 'bg-blue-500' : 'bg-orange-500'}`}
+                                                    style={{ width: `${Math.min(100, Math.max(0, scoreData.totalScore))}%` }}
+                                                ></div>
+                                            </div>
+                                            <p className="text-xs text-slate-400 text-right">
+                                                {scoreData.totalScore > 75 ? (isTamil ? "மிகச்சிறப்பு" : "Excellent") : scoreData.totalScore > 50 ? (isTamil ? "நன்று" : "Good") : (isTamil ? "சராசரி" : "Average")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Upchaya / Kendra Check Helper */}
+                            <div className="glass-panel p-4 border border-slate-800">
+                                <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                                    <Zap className="w-4 h-4 text-yellow-400" />
+                                    {isTamil ? "விரைவான பார்வை" : "Quick Insight"}
+                                </h4>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">{isTamil ? "இயற்கை சுபர்?" : "Benefic?"}</span>
+                                        <span className={['Jupiter', 'Venus', 'Mercury', 'Moon'].includes(viewingDasa[selectedPeriod.toLowerCase() as keyof typeof viewingDasa]?.planet) ? "text-green-400" : "text-orange-400"}>
+                                            {['Jupiter', 'Venus', 'Mercury', 'Moon'].includes(viewingDasa[selectedPeriod.toLowerCase() as keyof typeof viewingDasa]?.planet) ? "Yes" : "No (Malefic)"}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs border-t border-slate-800 pt-2">
+                                        <span className="text-slate-400">{isTamil ? "ஆட்சி/உச்சம்?" : "Positional Strength"}</span>
+                                        <span className="text-blue-400">
+                                            {Math.round(calculateDasaScore(viewingDasa[selectedPeriod.toLowerCase() as keyof typeof viewingDasa]?.planet, data).sthanaBala)}%
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-
-                        {/* Detailed Score Card for Selected Period */}
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={selectedPeriod}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                            >
-                                {(() => {
-                                    const periodData = selectedPeriod === 'Maha'
-                                        ? viewingDasa.maha
-                                        : selectedPeriod === 'Bhukti'
-                                            ? viewingDasa.bhukti
-                                            : viewingDasa.antaram;
-
-                                    if (!periodData) return null;
-
-
-
-                                    const selectedScore = calculateDasaScore(
-                                        periodData.planet,
-                                        data // Pass full data as chart
-                                    );
-
-                                    const periodType = selectedPeriod === 'Maha' ? 'Maha' :
-                                        selectedPeriod === 'Bhukti' ? 'Bhukti' : 'Antaram';
-
-                                    return (
-                                        <DasaPeriodCard
-                                            planetName={periodData.planet}
-                                            periodType={
-                                                selectedPeriod === 'Maha' ? 'Maha' :
-                                                    selectedPeriod === 'Bhukti' ? 'Antar' : 'Pratyantar'
-                                            }
-                                            startDate={periodData.startDate.toString()}
-                                            endDate={periodData.endDate.toString()}
-                                            dasaScore={selectedScore}
-                                            effectPercentage={selectedPeriod === 'Maha' ? 60 : selectedPeriod === 'Bhukti' ? 30 : 10}
-                                            onViewDetails={() => {
-                                                const prediction = generateDasaPrediction(
-                                                    periodData.planet,
-                                                    selectedScore,
-                                                    periodType,
-                                                    language
-                                                );
-                                                setViewingSpecificDetails({
-                                                    planet: periodData.planet,
-                                                    score: selectedScore,
-                                                    type: periodType,
-                                                    prediction
-                                                });
-                                            }}
-                                        />
-                                    );
-                                })()}
-                            </motion.div>
-                        </AnimatePresence>
-                    </motion.div>
-                )}
-
-
-
-                {/* Dasa Score Summary */}
-                <div className="mt-8">
-                    <DasaScoreSummary
-                        chart={{ planets, ascendant }}
-                        language={language}
-                    />
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* Comprehensive Dasa Analysis */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="mt-12"
-            >
-                <DasaAnalysis
-                    chart={{
-                        planets,
-                        ascendant,
-                        birthDate
-                    }}
-                    currentDasa={{
-                        maha: {
-                            planet: currentDasha?.maha?.planet || 'Unknown',
-                            startDate: currentDasha?.maha?.startDate || '',
-                            endDate: currentDasha?.maha?.endDate || ''
-                        },
-                        bhukti: {
-                            planet: currentDasha?.bhukti?.planet || 'Unknown',
-                            startDate: currentDasha?.bhukti?.startDate || '',
-                            endDate: currentDasha?.bhukti?.endDate || ''
-                        },
-                        antaram: currentDasha?.antaram ? {
-                            planet: currentDasha.antaram.planet,
-                            startDate: currentDasha.antaram.startDate || '',
-                            endDate: currentDasha.antaram.endDate || ''
-                        } : undefined
-                    }}
-                    agScores={agScores}
-                />
-            </motion.div>
-
-            {/* Ask AI Button */}
-            {/* AI Prediction Modal */}
             <AnimatePresence>
                 {viewingSpecificDetails && (
                     <motion.div
@@ -1123,5 +1141,3 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
 };
 
 export default GurujiPredictions;
-
-

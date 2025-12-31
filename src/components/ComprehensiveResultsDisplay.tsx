@@ -56,9 +56,11 @@ const getBirthDetails = (chart: any) => {
     if (moon && chart.birthDate) {
         try {
             const currentDasha = getCurrentDasha(moon.longitude, chart.birthDate, new Date());
-            dashaInfo = `${currentDasha.maha.planet} Maha Dasha`;
-            if (currentDasha.bhukti) {
-                dashaInfo += `, ${currentDasha.bhukti.planet} Bhukti`;
+            if (currentDasha?.maha?.planet) {
+                dashaInfo = `${currentDasha.maha.planet} Maha Dasha`;
+                if (currentDasha.bhukti) {
+                    dashaInfo += `, ${currentDasha.bhukti.planet} Bhukti`;
+                }
             }
         } catch (e) {
             console.error('Dasha calculation error:', e);

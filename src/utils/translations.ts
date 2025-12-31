@@ -248,10 +248,7 @@ export const translations = {
                 paramaMitra: "Parama Mitra (Supreme Friend)"
             }
         },
-        forecast: {
-            title: "Next 15 Days Forecast (Dasa + Gocharam)",
-            dasaContext: "Current Dasa Context"
-        }
+
     },
     ta: {
         appTitle: "சிவா அஸ்ட்ரோ",

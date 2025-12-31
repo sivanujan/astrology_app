@@ -95,8 +95,10 @@ export const predictJobTiming = (
     const saturn = getPlanetPosition(planets, 'Saturn');
     const planetsIn10 = planets.filter(p => p.signIndex === house10Sign).map(p => p.name);
 
-    const dasaLord = currentDasa.maha.planet;
-    const bukthiLord = currentDasa.bhukti?.planet;
+    const dasaLord = currentDasa?.maha?.planet;
+    const bukthiLord = currentDasa?.bhukti?.planet;
+
+    if (!dasaLord) return { question, answer: "Data Missing", reason: "", isFavorable: false };
 
     const isJobDasa =
         dasaLord === lord10 ||
@@ -319,8 +321,10 @@ export const predictDetailedMarriageTimingDeprecated = (
     const lord7 = SIGN_LORDS[house7Sign];
     const lord11 = SIGN_LORDS[house11Sign];
 
-    const dasaLordName = currentDasa.maha.planet;
-    const bukthiLordName = currentDasa.bhukti?.planet;
+    const dasaLordName = currentDasa?.maha?.planet;
+    const bukthiLordName = currentDasa?.bhukti?.planet;
+
+    if (!dasaLordName) return { question, answer: "Data Missing", reason: "", isFavorable: false };
 
     const dasaLordPlanet = getPlanetPosition(planets, dasaLordName);
     const bukthiLordPlanet = getPlanetPosition(planets, bukthiLordName || '');
@@ -562,7 +566,7 @@ const predictCareerPath_Old = (
     let dominantScore = uniqueCandidates[0].score;
     let overrideReason = "";
 
-    if (currentDasa) {
+    if (currentDasa && currentDasa.maha) {
         const dasaLord = currentDasa.maha.planet;
 
         console.log("DEBUG: Dasa Override Check", {
@@ -711,7 +715,7 @@ const predictCareerPath_Old = (
     }
 
     // DEBUG: Add debug info to reason for troubleshooting
-    reason += `\n\n[DEBUG: Dasa=${currentDasa?.maha.planet}, L6=${lord6}, L8=${lord8}, Dom=${dominantPlanet}, Cands=${uniqueCandidates.map(c => c.name).join(',')}]`;
+    reason += `\n\n[DEBUG: Dasa=${currentDasa?.maha?.planet || 'None'}, L6=${lord6}, L8=${lord8}, Dom=${dominantPlanet}, Cands=${uniqueCandidates.map(c => c.name).join(',')}]`;
 
     return {
         question,
@@ -834,6 +838,16 @@ export const predictDetailedMarriageTiming = (
 ): PredictionResult => {
     const isTamil = language === 'ta';
     const question = isTamil ? "எனக்கு எப்போது திருமணம் நடக்கும்?" : "When will I get married?";
+
+    // Guard against null currentDasa
+    if (!currentDasa?.maha?.planet) {
+        return {
+            question,
+            answer: isTamil ? "தசை தகவல் கிடைக்கவில்லை" : "Dasa data not available",
+            reason: "",
+            isFavorable: false
+        };
+    }
 
     // --- Step A: Identify Key Planets (The Triangle 3-7-11) ---
     const house2Sign = (ascendantSign + 1) % 12;
@@ -981,38 +995,58 @@ export const predictDetailedMarriageTiming = (
 
         isFavorable = true;
     } else {
-        // No immediate future. Check Past.
+        // No immediate future. Check Past and provide next best future years.
         if (hasStrongPast) {
-            // User likely missed the periods or is already married (but asking "when").
-            // Or delay due to heavy Paabathuvam.
             const pastTop = sortedPastYears.slice(0, 3).join(", ");
-            if (currentAge > 35) {
-                answer = isTamil
-                    ? `ஜாதகப்படி **${pastTop}** ஆகிய ஆண்டுகளில் வலுவான திருமண யோகம் இருந்தது. \n\nதற்போது குறிப்பிடத்தகுந்த யோகம் அருகில் இல்லை. (பரிகாரம் தேவை).`
-                    : `According to the chart, strong marriage yogas occurred in **${pastTop}**. \n\nCurrently, there are no immediate strong indications in the near future.`;
-            } else {
-                // Young but no near future?
-                answer = isTamil
-                    ? `அடுத்த 5-7 ஆண்டுகளில் வலுவான யோகம் இல்லை. (${now.getFullYear() + 7}-க்கு பிறகு வாய்ப்பு).`
-                    : `No strong yoga found in the immediate 5-7 years timeline.`;
-            }
+
+            // Always show next possible future years, not just past
             if (farFutureYears.length > 0) {
-                answer += isTamil ? `\n\nஅடுத்த சாத்தியம்: ${farFutureYears[0]}` : `\n\nNext possibility: ${farFutureYears[0]}`;
+                const nextYears = farFutureYears.slice(0, 3).join(", ");
+                if (currentAge > 35) {
+                    answer = isTamil
+                        ? `முன்பு **${pastTop}** ஆண்டுகளில் வலுவான யோகம் இருந்தது, ஆனால் அவை கடந்துவிட்டன.\n\n**அடுத்த வாய்ப்பு:** ${nextYears}\n\n(பரிகாரங்கள் செய்வது சிறந்தது)`
+                        : `Previous strong periods were in **${pastTop}**, but those have passed.\n\n**Next Opportunities:** ${nextYears}\n\n(Remedies recommended)`;
+                } else {
+                    answer = isTamil
+                        ? `அடுத்த நல்ல காலம்: **${nextYears}**\n\n(தற்போது 5-7 ஆண்டுகளில் வலுவான யோகம் இல்லை)`
+                        : `Next favorable period: **${nextYears}**\n\n(No strong indication in immediate 5-7 years)`;
+                }
+                isFavorable = true; // Changed to true since we're giving future years
+            } else {
+                // Truly no future years at all
+                if (currentAge > 35) {
+                    answer = isTamil
+                        ? `ஜாதகப்படி **${pastTop}** ஆண்டுகளில் வலுவான யோகம் இருந்தது.\n\nதற்போது அடுத்த 15 ஆண்டுகளில் தெளிவான யோகம் இல்லை. பரிகாரங்கள் அவசியம்.`
+                        : `Strong periods were in **${pastTop}**.\n\nNo clear indications in the next 15 years. Remedies strongly recommended.`;
+                } else {
+                    answer = isTamil
+                        ? `அடுத்த 15 ஆண்டுகளில் குறிப்பிடத்தக்க யோகம் தெரியவில்லை.\n\nபரிகாரங்கள் மூலம் சாதகமாக்கலாம்.`
+                        : `No significant indications in the next 15 years.\n\nRemedies can help create favorable conditions.`;
+                }
+                isFavorable = false;
             }
-            isFavorable = false;
         } else {
-            // No past, no future?? Strange chart or strict filter.
-            answer = isTamil
-                ? "ஜாதகத்தில் திருமண யோகம் தாமதமாக உள்ளது. பரிகாரங்களை மேற்கொள்ளவும்."
-                : "Marriage indications are delayed/weak in this chart. Remedies recommended.";
-            isFavorable = false;
+            // No past, but check if there are far future years
+            if (farFutureYears.length > 0) {
+                const nextYears = farFutureYears.slice(0, 3).join(", ");
+                answer = isTamil
+                    ? `திருமணம் நடக்க வாய்ப்புள்ள ஆண்டுகள்: **${nextYears}**\n\n(தற்போது அருகில் வலுவான யோகம் இல்லை, ஆனால் எதிர்காலத்தில் வாய்ப்பு உள்ளது)`
+                    : `Likely Marriage Years: **${nextYears}**\n\n(No immediate strong periods, but future opportunities exist)`;
+                isFavorable = true;
+            } else {
+                // Truly weak chart for marriage
+                answer = isTamil
+                    ? "ஜாதகத்தில் திருமண யோகம் தாமதமாக உள்ளது.\n\nபரிகாரங்கள் மற்றும் ஜோதிடர் ஆலோசனை பெறுவது நல்லது."
+                    : "Marriage indications are delayed in this chart.\n\nRemedies and astrologer consultation recommended.";
+                isFavorable = false;
+            }
         }
     }
 
     if (isTamil) {
-        reason = `விதி: 3, 7, 11 (திருமண முக்கோணம்) மற்றும் சுக்ரன், குரு தசை/புத்திகள்.\n- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n- தற்போதைய தசை: ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
+        reason = `விதி: 3, 7, 11 (திருமண முக்கோணம்) மற்றும் சுக்ரன், குரு தசை/புத்திகள்.\n- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n- தற்போதைய தசை: ${currentDasa?.maha?.planet || 'Unknown'}/${currentDasa.bhukti?.planet || 'Unknown'}`;
     } else {
-        reason = `Rule: 3-7-11 Marriage Triangle Logic (Initiative, Marriage, Fulfillment). Timing matches with Jupiter/Sun Transits.\n- Key Planets Checked: ${keyPlanets.join(', ')}\n- Current Status: Running ${currentDasa.maha.planet}/${currentDasa.bhukti?.planet}`;
+        reason = `Rule: 3-7-11 Marriage Triangle Logic (Initiative, Marriage, Fulfillment). Timing matches with Jupiter/Sun Transits.\n- Key Planets Checked: ${keyPlanets.join(', ')}\n- Current Status: Running ${currentDasa?.maha?.planet || 'Unknown'}/${currentDasa.bhukti?.planet || 'Unknown'}`;
     }
 
     return {
@@ -1119,7 +1153,8 @@ export const predictMarriageType = (
     // 4. Dasa/Bhukti Check (Timing Rule)
     // "check dasa buthi and check Venus realted"
     if (currentDasa) {
-        const dasaLord = currentDasa.maha.planet;
+        const dasaLord = currentDasa?.maha?.planet;
+        if (!dasaLord) return { question: "Marriage Type?", answer: "Data Missing", reason: "", isFavorable: false };
         const bhuktiLord = currentDasa.bhukti?.planet;
 
         // Is Dasa Lord Venus or 5th/7th/Rahu?
@@ -1462,7 +1497,8 @@ export const predictCareerPath = (
 
     // 3. Current Dasa Focus
     if (currentDasa) {
-        const dasaLord = currentDasa.maha.planet;
+        const dasaLord = currentDasa?.maha?.planet;
+        if (!dasaLord) return { question: "Foreign Travel?", answer: "Data Missing", reason: "", isFavorable: false };
         // Find Dasa Lord's Domain
         const dasaPlanetInfo = scores.find(s => s.planet === dasaLord);
         if (dasaPlanetInfo && dasaPlanetInfo.val > 10) {
@@ -1744,8 +1780,10 @@ export const predictForeignTravel = (
     let is100Percent = false;
     let dasaReasons: string[] = [];
 
-    if (currentDasa) {
+    if (currentDasa && currentDasa.maha?.planet) {
         const dasaLord = currentDasa.maha.planet;
+        // Logic continues...
+
         const bhuktiLord = currentDasa.bhukti?.planet;
 
         // Check if Dasa Lord is 8th or 12th Lord
@@ -1909,7 +1947,10 @@ export const predictCurrentLoveStatus = (
 
     // --- Part 2: Dasa Bhukti Analysis (Current Status) ---
     let dasaScore = 0;
-    const mahaPlanet = currentDasa.maha.planet;
+    const mahaPlanet = currentDasa?.maha?.planet;
+    const bukthiLord = currentDasa?.bhukti?.planet;
+
+    if (!mahaPlanet) return { question: "Love Status?", answer: "Data Missing", reason: "", isFavorable: false };
     const bhuktiPlanet = currentDasa.bhukti?.planet || "";
 
     const lovePlanets = ['Venus', 'Mars', 'Rahu', 'Moon', 'Mercury'];
@@ -2077,7 +2118,8 @@ export const predictMarriageStatus = (
 
     // --- Step 2: Dasa Score ---
     let dasaScore = 0;
-    const dasaLord = currentDasa.maha.planet;
+    const dasaLord = currentDasa?.maha?.planet;
+    if (!dasaLord) return { isMarried: false, confidence: 0, statusText: "Data Missing", reason: "" };
     const bhuktiLord = currentDasa.bhukti?.planet;
 
     // Q1: Maha Dasa Planet
@@ -2239,6 +2281,18 @@ export const predictLifeQuality = (
     const isTamil = language === 'ta';
     const question = isTamil ? "வாழ்க்கை எப்படி இருக்கும்?" : "How Will Life Be?";
 
+    if (!currentDasa?.maha?.planet) {
+        return {
+            question,
+            answer: "Dasa Data Missing",
+            reason: "",
+            isFavorable: false,
+            totalScore: 0,
+            starRating: 0,
+            categories: {}
+        };
+    }
+
     // Age check: Skip for people over 60
     const now = new Date();
     const ageMs = now.getTime() - birthDate.getTime();
@@ -2346,8 +2400,8 @@ export const predictLifeQuality = (
         if (planetsIn4.includes('Saturn') || planetsIn4.includes('Rahu')) score -= 10;
 
         // STEP 3: Dasa Check
-        const dasaLord = currentDasa.maha.planet;
-        if (dasaLord === getLord(1) || ['Mercury', 'Jupiter', 'Venus'].includes(dasaLord)) score += 20;
+        const dasaLord = currentDasa?.maha?.planet || '';
+        if (dasaLord && (dasaLord === getLord(1) || ['Mercury', 'Jupiter', 'Venus'].includes(dasaLord))) score += 20;
         else if ([getLord(6), getLord(8), getLord(12)].includes(dasaLord)) score -= 10;
 
         return Math.max(0, Math.min(100, score));
@@ -2432,8 +2486,8 @@ export const predictLifeQuality = (
         if (planetsIn10.includes('Rahu') && (hasJupiterAspect('Rahu') || hasJupiterAspect('Venus'))) score += 20;
 
         // 4. Dasa Check
-        const dasaLord = currentDasa.maha.planet;
-        if (dasaLord === lord10 || dasaLord === 'Saturn') score += 10;
+        const dasaLord = currentDasa?.maha?.planet || '';
+        if (dasaLord && (dasaLord === lord10 || dasaLord === 'Saturn')) score += 10;
 
         return Math.max(0, Math.min(100, score));
     };

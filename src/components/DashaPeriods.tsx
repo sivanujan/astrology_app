@@ -84,11 +84,11 @@ const DashaPeriods: React.FC<DashaPeriodsProps> = ({ data }) => {
                         {/* Maha Dasha */}
                         <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800">
                             <div className="text-sm text-slate-400 mb-1">{t.dasha.maha}</div>
-                            <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[currentDasha.maha.planet] }}>
-                                {getPlanetName(currentDasha.maha.planet)}
+                            <div className="text-2xl font-bold mb-2" style={{ color: PLANET_COLORS[currentDasha.maha?.planet || 'Sun'] }}>
+                                {currentDasha.maha ? getPlanetName(currentDasha.maha.planet) : '-'}
                             </div>
                             <div className="text-xs text-slate-500">
-                                {formatDate(currentDasha.maha.startDate)} - {formatDate(currentDasha.maha.endDate)}
+                                {currentDasha.maha ? `${formatDate(currentDasha.maha.startDate)} - ${formatDate(currentDasha.maha.endDate)}` : ''}
                             </div>
                         </div>
 

@@ -34,7 +34,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
     let dasaStatus: 'Good' | 'Bad' | 'Neutral' = 'Neutral';
     let dasaDescription = "Neutral Period";
 
-    if (currentDasha) {
+    if (currentDasha && currentDasha.maha) {
         const dasaLord = currentDasha.maha.planet;
         const functionalNature = getFunctionalNature(ascendant.signIndex);
         const nature = functionalNature[dasaLord]?.nature;

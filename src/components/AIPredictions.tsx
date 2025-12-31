@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Send, Bot, User, AlertCircle, BrainCircuit } from 'lucide-react';
-import { useLocation } from 'react-router-dom'; // Import useLocation
+import { Sparkles, Send, Bot, User, AlertCircle, BrainCircuit, Clock, Heart, Briefcase, Shield, Star, Users, BarChart2, Zap, FileText } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom'; // Import useLocation, useNavigate
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -15,6 +15,8 @@ interface AIPredictionsProps {
 
 const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const { t, language } = useLanguage();
+    const isTamil = language === 'ta';
+    const navigate = useNavigate();
     const location = useLocation(); // Hook to get navigation state
     const [prediction, setPrediction] = useState<OrchestratorResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -215,10 +217,119 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             <div className="flex-1 glass-panel flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     {chatHistory.length === 0 && (
-                        <div className="text-center text-slate-500 mt-10">
-                            <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                            <p>Ask a question to start the AI analysis.</p>
-                            <p className="text-sm mt-2">Examples: "When will I get married?", "Is government job possible?"</p>
+                        <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto px-4 py-8">
+
+                            {/* Welcome Message */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-center mb-8"
+                            >
+                                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-purple-500/20">
+                                    <Sparkles className="w-8 h-8 text-white" />
+                                </div>
+                                <h3 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300 mb-2">
+                                    {isTamil ? "வணக்கம்! உங்கள் ஜோதிட கேள்விகளை கேளுங்கள் 🔮" : "Namaste! Ask me your astrology questions 🔮"}
+                                </h3>
+                                <p className="text-slate-400">
+                                    {isTamil
+                                        ? "உங்கள் ஜாதகத்தின் அடிப்படையில் துல்லியமான பதில்களைப் பெறுங்கள்."
+                                        : "Get accurate predictions based on your unique birth chart."}
+                                </p>
+                            </motion.div>
+
+                            {/* Trust Elements */}
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.2 }}
+                                className="flex flex-wrap justify-center gap-3 mb-8"
+                            >
+                                <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50 text-xs text-slate-400">
+                                    <Star className="w-3 h-3 text-yellow-400" />
+                                    <span>{t.predictions.subtitle}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50 text-xs text-slate-400">
+                                    <Users className="w-3 h-3 text-blue-400" />
+                                    <span>100+ Happy Users</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50 text-xs text-slate-400">
+                                    <Shield className="w-3 h-3 text-emerald-400" />
+                                    <span>100% Confidential</span>
+                                </div>
+                            </motion.div>
+
+                            {/* Feature Highlights Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full mb-8">
+                                {[
+                                    { icon: Zap, label: "Instant Answer", labelTa: "உடனடி பதில்", color: "text-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20" },
+                                    { icon: BrainCircuit, label: "Deep Analysis", labelTa: "ஆழமான ஆய்வு", color: "text-purple-400", bg: "bg-purple-400/10", border: "border-purple-400/20" },
+                                    { icon: BarChart2, label: "Dasa Check", labelTa: "தசா கணிப்பு", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20" },
+                                    { icon: Heart, label: "Match Check", labelTa: "பொருத்தம்", color: "text-pink-400", bg: "bg-pink-400/10", border: "border-pink-400/20" }
+                                ].map((feature, i) => (
+                                    <motion.div
+                                        key={i}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.3 + (i * 0.05) }}
+                                        className={`p-3 rounded-xl border ${feature.border} ${feature.bg} flex flex-col items-center justify-center gap-2 text-center`}
+                                    >
+                                        <feature.icon className={`w-5 h-5 ${feature.color}`} />
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${feature.color.replace('text-', 'text-opacity-80-')}`}>
+                                            {isTamil ? feature.labelTa : feature.label}
+                                        </span>
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            {/* Suggested Questions Grid */}
+                            <div className="w-full">
+                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 text-center">
+                                    {isTamil ? "பரிந்துரைக்கப்பட்ட கேள்விகள்" : "Suggested Questions"}
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {[
+                                        { qEn: "When will I get married?", qTa: "எப்போது திருமணம் நடக்கும்?", icon: Heart, color: "text-pink-400" },
+                                        { qEn: "When will I get a job?", qTa: "எப்போது வேலை கிடைக்கும்?", icon: Briefcase, color: "text-blue-400" },
+                                        { qEn: "How is my current Dasa?", qTa: "எனது தற்போதைய தசா புத்தி எப்படி உள்ளது?", icon: Clock, color: "text-purple-400" },
+                                        { qEn: "Rahu Ketu Transit effects?", qTa: "ராகு கேது பெயர்ச்சி பலன்கள்?", icon: AlertCircle, color: "text-orange-400" }
+                                    ].map((item, i) => (
+                                        <motion.button
+                                            key={i}
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: 0.5 + (i * 0.05) }}
+                                            onClick={() => {
+                                                setQuestion(isTamil ? item.qTa : item.qEn);
+                                                // Ideally auto-submit, but setState is async. 
+                                                // We can just set it and let user press send, or trigger submit logic.
+                                                // For now, just set. User can hit enter.
+                                            }}
+                                            className="group flex items-center gap-3 p-4 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-purple-500/30 transition-all text-left"
+                                        >
+                                            <div className={`p-2 rounded-lg bg-slate-900 group-hover:bg-slate-800 transition-colors ${item.color}`}>
+                                                <item.icon className="w-5 h-5" />
+                                            </div>
+                                            <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
+                                                {isTamil ? item.qTa : item.qEn}
+                                            </span>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Quick Actions (Footer of empty state) */}
+                            <div className="flex flex-wrap justify-center gap-2 mt-8 pt-6 border-t border-slate-800/50 w-full opacity-60 hover:opacity-100 transition-opacity">
+                                <button onClick={() => navigate('/chart')} className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+                                    <FileText className="w-3 h-3" /> {isTamil ? "ஜாதகம் பார்" : "Show Chart"}
+                                </button>
+                                <button onClick={() => navigate('/dasha')} className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+                                    <Clock className="w-3 h-3" /> {isTamil ? "தசா காலங்கள்" : "Dasa Periods"}
+                                </button>
+                                <button onClick={() => navigate('/predictions-faq')} className="text-xs flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+                                    <Sparkles className="w-3 h-3" /> {isTamil ? "பொது பலன்கள்" : "Predictions"}
+                                </button>
+                            </div>
                         </div>
                     )}
 
