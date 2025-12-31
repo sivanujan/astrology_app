@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart, ChevronDown, FileText, Activity } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,17 +16,25 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
     const [showFeaturePopup, setShowFeaturePopup] = React.useState(false);
 
-    const steps = [
-        { path: '/', label: t.nav.birthDetails, icon: MapPin, protected: false },
-        { path: '/chart', label: t.nav.chart, icon: Moon, protected: false },
-        { path: '/dasha', label: t.dasha.title, icon: Clock, protected: false },
-        { path: '/analysis', label: t.nav.analysis, icon: Sun, protected: true },
-        { path: '/predictions', label: t.nav.predictions, icon: Sparkles, protected: true },
-        { path: '/daily-snapshot', label: "Next 15 Days Forecast", icon: Sun, protected: true },
-        { path: '/marriage-matching', label: language === 'ta' ? 'திருமணப் பொருத்தம்' : 'Marriage Matching', icon: Heart, protected: false },
+    const navItems = [
+        { type: 'link', path: '/', label: t.nav.birthDetails, icon: MapPin, color: 'text-blue-400' },
+        {
+            type: 'dropdown',
+            label: t.nav.analysis,
+            icon: Activity,
+            color: 'text-purple-400',
+            items: [
+                { path: '/chart', label: t.nav.chart, icon: Moon, color: 'text-yellow-300' },
+                { path: '/dasha', label: t.dasha.title, icon: Clock, color: 'text-green-400' },
+                { path: '/daily-snapshot', label: t.nav.dailySnapshot, icon: Sun, color: 'text-orange-400', protected: true },
+                { path: '/analysis', label: t.analysis.title, icon: FileText, color: 'text-pink-400', protected: true }
+            ]
+        },
+        { type: 'link', path: '/predictions', label: t.nav.predictions, icon: Sparkles, color: 'text-teal-400', protected: true },
+        { type: 'link', path: '/marriage-matching', label: language === 'ta' ? 'திருமணப் பொருத்தம்' : 'Marriage Matching', icon: Heart, color: 'text-red-400' }
     ];
 
-    const currentStepIndex = steps.findIndex(s => s.path === location.pathname);
+
 
     return (
         <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950 text-white selection:bg-purple-500/30">
@@ -95,32 +103,63 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             </div>
                         </div>
 
-                        <div className="hidden md:flex items-center gap-4">
-                            {steps.map((step, idx) => {
-                                const Icon = step.icon;
-                                const isActive = location.pathname === step.path;
-                                const isCompleted = idx < currentStepIndex;
-                                const isLocked = step.protected && !user;
-
-                                return (
-                                    <div
-                                        key={step.path}
-                                        className={`flex items-center gap-2 text-sm font-medium transition-colors duration-300 cursor-pointer ${isActive ? 'text-purple-400' :
-                                            isLocked ? 'text-slate-600 cursor-not-allowed' :
-                                                isCompleted ? 'text-blue-400' : 'text-slate-500'
-                                            }`}
-                                        onClick={() => {
-                                            if (isLocked) {
-                                                setShowFeaturePopup(true);
-                                            } else {
-                                                navigate(step.path);
-                                            }
-                                        }}
-                                    >
-                                        {isLocked ? <Lock className="w-3 h-3" /> : <Icon className={`w-4 h-4 ${isActive ? 'animate-pulse' : ''}`} />}
-                                        {step.label}
-                                    </div>
-                                );
+                        <div className="hidden md:flex items-center gap-8">
+                            {navItems.map((item, idx) => {
+                                if (item.type === 'dropdown') {
+                                    const isActive = item.items?.some(sub => sub.path === location.pathname);
+                                    return (
+                                        <div key={idx} className="relative group z-50">
+                                            <button className={`flex items-center gap-2.5 text-sm font-medium transition-all duration-300 py-2 outline-none ${isActive ? 'text-white' : 'text-slate-400 hover:text-white'}`}>
+                                                <item.icon className={`w-5 h-5 ${item.color} ${isActive ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : ''}`} />
+                                                {item.label}
+                                                <ChevronDown className={`w-4 h-4 transition-transform duration-300 group-hover:rotate-180 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                                            </button>
+                                            <div className="absolute top-full left-0 w-64 pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto">
+                                                <div className="bg-slate-900/95 backdrop-blur-2xl border border-slate-700/50 rounded-2xl shadow-2xl p-2 flex flex-col gap-1">
+                                                    {item.items?.map((subItem) => {
+                                                        const isLocked = subItem.protected && !user;
+                                                        const isSubActive = location.pathname === subItem.path;
+                                                        return (
+                                                            <div
+                                                                key={subItem.path}
+                                                                onClick={() => {
+                                                                    if (isLocked) setShowFeaturePopup(true);
+                                                                    else navigate(subItem.path);
+                                                                }}
+                                                                className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer ${isSubActive ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                                                                    }`}
+                                                            >
+                                                                <subItem.icon className={`w-5 h-5 ${subItem.color}`} />
+                                                                <span className="font-medium">{subItem.label}</span>
+                                                                {isLocked && <Lock className="w-3 h-3 ml-auto opacity-50" />}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                            {isActive && <div className="absolute -bottom-[21px] left-0 right-0 h-[2px] bg-purple-500 shadow-[0_0_10px_#a855f7]" />}
+                                        </div>
+                                    );
+                                } else {
+                                    const isActive = location.pathname === item.path;
+                                    const isLocked = item.protected && !user;
+                                    return (
+                                        <div
+                                            key={item.path}
+                                            onClick={() => {
+                                                if (isLocked) setShowFeaturePopup(true);
+                                                else navigate(item.path!);
+                                            }}
+                                            className={`relative flex items-center gap-2.5 text-sm font-medium transition-all duration-300 cursor-pointer py-2 ${isActive ? 'text-white font-semibold' : isLocked ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400 hover:text-white'
+                                                }`}
+                                        >
+                                            <item.icon className={`w-5 h-5 ${item.color} ${isActive ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : ''}`} />
+                                            {item.label}
+                                            {isLocked && <Lock className="w-3 h-3" />}
+                                            {isActive && <div className="absolute -bottom-[21px] left-0 right-0 h-[2px] bg-purple-500 shadow-[0_0_10px_#a855f7]" />}
+                                        </div>
+                                    );
+                                }
                             })}
                         </div>
 
@@ -220,32 +259,63 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                         )}
                                     </div>
 
-                                    {steps.map((step, idx) => {
-                                        const Icon = step.icon;
-                                        const isActive = location.pathname === step.path;
-                                        const isLocked = step.protected && !user;
+                                    {navItems.map((item, idx) => {
+                                        if (item.type === 'dropdown') {
+                                            return (
+                                                <div key={idx} className="space-y-2 bg-slate-900/50 rounded-lg p-2 border border-white/5">
+                                                    <div className="flex items-center gap-2 px-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+                                                        <item.icon className={`w-4 h-4 ${item.color}`} />
+                                                        {item.label}
+                                                    </div>
+                                                    <div className="pl-4 space-y-1">
+                                                        {item.items?.map((subItem) => {
+                                                            const isLocked = subItem.protected && !user;
+                                                            const isActive = location.pathname === subItem.path;
+                                                            return (
+                                                                <button
+                                                                    key={subItem.path}
+                                                                    onClick={() => {
+                                                                        if (isLocked) setShowFeaturePopup(true);
+                                                                        else navigate(subItem.path);
+                                                                        setIsMenuOpen(false);
+                                                                    }}
+                                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive ? 'bg-purple-500/20 text-white border border-purple-500/30' : 'text-slate-400 hover:text-white'
+                                                                        }`}
+                                                                >
+                                                                    <subItem.icon className={`w-4 h-4 ${subItem.color}`} />
+                                                                    {subItem.label}
+                                                                    {isLocked && <Lock className="w-3 h-3 ml-auto opacity-50" />}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
 
+                                        const isActive = item.path === location.pathname;
+                                        const isLocked = item.protected && !user;
                                         return (
                                             <button
-                                                key={step.path}
+                                                key={item.path}
                                                 onClick={() => {
                                                     if (isLocked) {
                                                         setShowFeaturePopup(true);
                                                         setIsMenuOpen(false);
                                                     } else {
-                                                        navigate(step.path);
+                                                        navigate(item.path!);
                                                         setIsMenuOpen(false);
                                                     }
                                                 }}
                                                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
-                                                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                                    ? 'bg-purple-500/10 text-white border border-purple-500/20'
                                                     : isLocked
                                                         ? 'text-slate-600 cursor-not-allowed'
                                                         : 'text-slate-300 hover:bg-white/5 hover:text-white'
                                                     }`}
                                             >
-                                                {isLocked ? <Lock className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
-                                                {step.label}
+                                                {isLocked ? <Lock className="w-4 h-4" /> : <item.icon className={`w-5 h-5 ${item.color}`} />}
+                                                {item.label}
                                             </button>
                                         );
                                     })}

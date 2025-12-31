@@ -23,6 +23,7 @@ const ChartGrid: React.FC<ChartGridProps> = ({ title, planets, ascendant, onCent
         // User overrides
         if (planetName === 'Sun') return 'text-orange-400';
         if (planetName === 'Venus') return 'text-green-400';
+        if (planetName === 'Mars') return 'text-red-400';
         if (planetName === 'Mercury') {
             const planet = planets.find((p: any) => p.name === 'Mercury');
             if (planet) {

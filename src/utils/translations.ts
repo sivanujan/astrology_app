@@ -5,7 +5,8 @@ export const translations = {
             birthDetails: "Birth Details",
             chart: "Vedic Chart",
             analysis: "Analysis",
-            predictions: "AI Astrologer",
+            predictions: "AI Chat",
+            dailySnapshot: "Next 15 Days Forecast",
             dashboard: "Dashboard",
             login: "Login",
             signup: "Sign Up"
@@ -243,6 +244,10 @@ export const translations = {
                 mitra: "Mitra (Friendly)",
                 paramaMitra: "Parama Mitra (Supreme Friend)"
             }
+        },
+        forecast: {
+            title: "Next 15 Days Forecast (Dasa + Gocharam)",
+            dasaContext: "Current Dasa Context"
         }
     },
     ta: {
@@ -251,7 +256,8 @@ export const translations = {
             birthDetails: "பிறப்பு விவரங்கள்",
             chart: "ஜாதக கட்டம்",
             analysis: "பலன்கள்",
-            predictions: "AI கணிப்புகள்",
+            predictions: "AI உரையாடல்",
+            dailySnapshot: "அடுத்த 15 நாட்கள் கணிப்பு",
             dashboard: "முகப்பு",
             login: "உள்நுழைய",
             signup: "பதிவு செய்ய"
