@@ -19,6 +19,7 @@ import { calculateAdityaGurujiSubathuvam, calculateDigbalaAndYogas, getFunctiona
 // predictionRules imports removed as they are used in RuleBasedPredictions.tsx
 import { useLanguage } from '../contexts/LanguageContext';
 import { TAMIL_PLANET_NAMES, TAMIL_NAKSHATRAS } from '../utils/translations';
+import GurujiPersonaModal from './GurujiPersonaModal';
 
 
 interface ChartAnalysisProps {
@@ -37,6 +38,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
 
     const { planets, ascendant } = data;
     const [expandedSection, setExpandedSection] = useState<string | null>('planets');
+    const [isGurujiModalOpen, setIsGurujiModalOpen] = useState(false);
 
     // Use shared logic for Yogas
     // 'calculateYogas' is imported at top level.
@@ -83,6 +85,23 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                 <p className="text-slate-400 mb-4">{t.analysis.subtitle}</p>
 
             </motion.div>
+
+            <div className="flex justify-center mb-6">
+                <button
+                    onClick={() => setIsGurujiModalOpen(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl shadow-lg shadow-purple-900/40 transition-all font-bold border border-white/10 animate-shimmer"
+                >
+                    <Activity className="w-5 h-5" />
+                    {language === 'ta' ? 'நான் யார்? (குருஜி ஆய்வு)' : 'Who Am I? (Guruji Analysis)'}
+                </button>
+            </div>
+
+            <GurujiPersonaModal
+                isOpen={isGurujiModalOpen}
+                onClose={() => setIsGurujiModalOpen(false)}
+                chartData={data}
+                birthDetails={data.birthDetails}
+            />
 
             {/* Planetary Positions Table */}
             <div className="glass-panel overflow-hidden">

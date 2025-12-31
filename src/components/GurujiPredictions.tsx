@@ -109,7 +109,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     const foreignTravel = rawForeign; // Strictly use Rule-Based logic for Foreign Travel (User Requirement)
     const marriageTiming = aiResponse?.life_guidance?.marriage_timing ? { ...rawMarriageTime, answer: aiResponse.life_guidance.marriage_timing.answer, reason: aiResponse.life_guidance.marriage_timing.reason } : rawMarriageTime;
     const marriageType = aiResponse?.life_guidance?.marriage_type ? { ...rawMarriageType, answer: aiResponse.life_guidance.marriage_type.answer, reason: aiResponse.life_guidance.marriage_type.reason } : rawMarriageType;
-    const careerPath = aiResponse?.life_guidance?.career_path ? { ...rawCareer, answer: aiResponse.life_guidance.career_path.answer, reason: aiResponse.life_guidance.career_path.reason } : rawCareer;
+    const careerPath = rawCareer; // Strictly use Rule-Based logic (New Guruji Rules Update)
     // Note: AI support for loveStatus is not yet in OrchestratorResponse interface, using raw for now or if user expands schema later.
     const loveStatus = rawLoveStatus;
     const marriageStatus = predictMarriageStatus(planets, ascendant.signIndex, currentDasha, new Date(birthDate), language);

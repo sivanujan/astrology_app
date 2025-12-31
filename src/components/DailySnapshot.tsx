@@ -9,7 +9,9 @@ import {
 } from '../utils/astrology';
 import { getFunctionalNature } from '../utils/adityaGurujiSubathuvam';
 import { getDailySnapshot } from '../utils/gocharam';
+import { getOrGenerateDailyForecast } from '../utils/dailyForecastAI';
 import ChartGrid from './ChartGrid';
+import PushOptIn from './PushOptIn';
 
 interface DailySnapshotProps {
     data: any;
@@ -26,7 +28,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
     if (!moon) return <div className="text-center p-8 text-slate-400">Moon position not found.</div>;
 
     // 1. Calculate Dasa Status
-    const dashaPeriods = calculateDashaPeriods(moon.longitude, birthDate);
+    const dashaPeriods = calculateDashaPeriods(birthDate, moon.longitude);
     const currentDasha = getCurrentDasha(dashaPeriods);
 
     let dasaStatus: 'Good' | 'Bad' | 'Neutral' = 'Neutral';
@@ -68,6 +70,57 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
         }
     };
 
+    // AI FORECAST GENERATION
+    const [aiPredictions, setAiPredictions] = React.useState<Record<string, { text: string; lang: string }>>({});
+    const [generatingDate, setGeneratingDate] = React.useState<string | null>(null);
+    // Push Opt In manages its own state
+
+    React.useEffect(() => {
+        if (!snapshot?.forecast15Days || snapshot.forecast15Days.length === 0) return;
+
+        const generateForecasts = async () => {
+            // Process sequentially to be nice to API
+            for (const day of snapshot.forecast15Days) {
+                const dateKey = day.dateString;
+
+                // Skip if already has AI prediction for CURRENT language
+                if (aiPredictions[dateKey]?.lang === language) continue;
+
+                setGeneratingDate(dateKey);
+                try {
+                    const prediction = await getOrGenerateDailyForecast(
+                        data.userDetails?.uid || "anonymous",
+                        {
+                            date: day.date,
+                            dasaLord: day.dasaLord,
+                            bhuktiLord: day.bhuktiLord,
+                            dasaStatus: day.verdict === 'Danger' ? 'Danger' : 'Neutral', // Approximation map
+                            transitStatus: day.verdict === 'Excellent' || day.verdict === 'Good' ? 'Good' : 'Neutral',
+                            starRating: day.starRating,
+                            keyTransits: day.keyFactors, // Map keyFactors to keyTransits
+                            taraBala: { score: 0, type: "Calculated" }, // Gocharam doesn't export raw tara score easily, simplified
+                            verdict: day.verdict
+                        },
+                        language as 'en' | 'ta'
+                    );
+
+                    setAiPredictions(prev => ({
+                        ...prev,
+                        [dateKey]: { text: prediction, lang: language }
+                    }));
+                } catch (e) {
+                    console.error("AI Generation failed for", dateKey, e);
+                } finally {
+                    // Small delay
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+            setGeneratingDate(null);
+        };
+
+        generateForecasts();
+    }, [snapshot?.forecast15Days, language]);
+
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             <motion.div
@@ -82,6 +135,11 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                 <p className="text-slate-400 mt-2">
                     Your personalized daily forecast based on Gocharam & Dasa Balance.
                 </p>
+
+                {/* Push Notification Trigger */}
+                <div className="mt-4 flex justify-center">
+                    <PushOptIn uid={data.userDetails?.uid || "anonymous"} />
+                </div>
             </motion.div>
 
             {/* Verdict Card */}
@@ -201,119 +259,135 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
             </div>
 
             {/* 15-Day Forecast Section */}
-            {snapshot.forecast15Days && snapshot.forecast15Days.length > 0 && (
-                <div className="mt-12">
-                    <h3 className="text-xl font-bold text-slate-300 mb-6 flex items-center gap-2 border-l-4 border-blue-500 pl-3">
-                        <span className="bg-blue-500/10 p-1 rounded">📅</span>
-                        {t.forecast?.title || "Next 15 Days Forecast (Dasa + Gocharam)"}
-                    </h3>
+            {
+                snapshot.forecast15Days && snapshot.forecast15Days.length > 0 && (
+                    <div className="mt-12">
+                        <h3 className="text-xl font-bold text-slate-300 mb-6 flex items-center gap-2 border-l-4 border-blue-500 pl-3">
+                            <span className="bg-blue-500/10 p-1 rounded">📅</span>
+                            {t.forecast?.title || "Next 15 Days Forecast (Dasa + Gocharam)"}
+                        </h3>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {snapshot.forecast15Days.map((day, idx) => {
-                            const isExtended = !!day.extended;
-                            return (
-                                <motion.div
-                                    key={idx}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: idx * 0.05 }}
-                                    className={`glass-panel p-4 border-l-4 relative overflow-hidden group ${day.verdict === 'Excellent' || day.verdict === 'மிகச்சிறப்பு' ? 'border-l-green-400' :
-                                        day.verdict === 'Good' || day.verdict === 'நன்று' ? 'border-l-blue-400' :
-                                            day.verdict === 'Average' || day.verdict === 'சராசரி' ? 'border-l-yellow-400' :
-                                                day.verdict === 'Caution' || day.verdict === 'எச்சரிக்கை' ? 'border-l-orange-400' : 'border-l-red-400'
-                                        }`}
-                                >
-                                    {/* Header */}
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <div className="text-sm font-bold text-slate-200">{day.dateString}</div>
-                                            {isExtended && day.extended && (
-                                                <div className="text-[11px] font-bold text-purple-300 mt-0.5 flex items-center gap-1">
-                                                    <span>✨</span> {day.extended.nakshatra} <span className="text-slate-500 font-normal">- {day.extended.tara}</span>
-                                                </div>
-                                            )}
-                                            {isExtended && day.extended ? (
-                                                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-1">
-                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">D:</span> {day.extended.dasa.dasa}</div>
-                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">B:</span> {day.extended.dasa.bhukti}</div>
-                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">A:</span> {day.extended.dasa.antaram}</div>
-                                                    <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">S:</span> {day.extended.dasa.sookshma}</div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-xs text-slate-500 mt-0.5">{day.dasaLord} / {day.bhuktiLord}</div>
-                                            )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {snapshot.forecast15Days.map((day, idx) => {
+                                const isExtended = !!day.extended;
+                                return (
+                                    <motion.div
+                                        key={idx}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: idx * 0.05 }}
+                                        className={`glass-panel p-4 border-l-4 relative overflow-hidden group ${day.verdict === 'Excellent' || day.verdict === 'மிகச்சிறப்பு' ? 'border-l-green-400' :
+                                            day.verdict === 'Good' || day.verdict === 'நன்று' ? 'border-l-blue-400' :
+                                                day.verdict === 'Average' || day.verdict === 'சராசரி' ? 'border-l-yellow-400' :
+                                                    day.verdict === 'Caution' || day.verdict === 'எச்சரிக்கை' ? 'border-l-orange-400' : 'border-l-red-400'
+                                            }`}
+                                    >
+                                        {/* Header */}
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-200">{day.dateString}</div>
+                                                {isExtended && day.extended && (
+                                                    <div className="text-[11px] font-bold text-purple-300 mt-0.5 flex items-center gap-1">
+                                                        <span>✨</span> {day.extended.nakshatra} <span className="text-slate-500 font-normal">- {day.extended.tara}</span>
+                                                    </div>
+                                                )}
+                                                {isExtended && day.extended ? (
+                                                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-1">
+                                                        <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">D:</span> {day.extended.dasa.dasa}</div>
+                                                        <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">B:</span> {day.extended.dasa.bhukti}</div>
+                                                        <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">A:</span> {day.extended.dasa.antaram}</div>
+                                                        <div className="text-[9px] text-slate-300 font-medium"><span className="text-slate-500 font-bold">S:</span> {day.extended.dasa.sookshma}</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-xs text-slate-500 mt-0.5">{day.dasaLord} / {day.bhuktiLord}</div>
+                                                )}
+                                            </div>
+                                            <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 ${day.verdict === 'Excellent' || day.verdict === 'மிகச்சிறப்பு' || day.verdict === 'Good' || day.verdict === 'நன்று' ? 'bg-green-500/20 text-green-400' :
+                                                day.verdict === 'Average' || day.verdict === 'சராசரி' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    'bg-red-500/20 text-red-400'
+                                                }`}>
+                                                {isExtended && day.extended && (
+                                                    <span className="bg-slate-900/50 px-1 rounded text-[9px] mr-1">
+                                                        {day.extended.totalScore}%
+                                                    </span>
+                                                )}
+                                                {day.verdict}
+                                            </div>
                                         </div>
-                                        <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 ${day.verdict === 'Excellent' || day.verdict === 'மிகச்சிறப்பு' || day.verdict === 'Good' || day.verdict === 'நன்று' ? 'bg-green-500/20 text-green-400' :
-                                            day.verdict === 'Average' || day.verdict === 'சராசரி' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                'bg-red-500/20 text-red-400'
-                                            }`}>
-                                            {isExtended && day.extended && (
-                                                <span className="bg-slate-900/50 px-1 rounded text-[9px] mr-1">
-                                                    {day.extended.totalScore}%
+
+                                        {/* Score Bars (New) */}
+                                        {isExtended && day.extended && (
+                                            <div className="grid grid-cols-2 gap-2 mb-3 bg-slate-900/30 p-2 rounded-lg">
+                                                {Object.entries(day.extended.lifeAreas).map(([area, score]) => (
+                                                    <div key={area} className="flex flex-col gap-1">
+                                                        <div className="flex justify-between text-[10px] text-slate-400 uppercase">
+                                                            <span>{language === 'ta' ?
+                                                                (area === 'career' ? 'தொழில்' : area === 'finance' ? 'நிதி' : area === 'health' ? 'ஆரோக்கியம்' : 'உறவு')
+                                                                : area}</span>
+                                                            <span className="font-bold">{score}%</span>
+                                                        </div>
+                                                        <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${score > 75 ? 'bg-green-400' : score > 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                                                                style={{ width: `${score}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Prediction Text */}
+                                        {/* Prediction Text */}
+                                        <p className="text-xs text-slate-300 mb-3 leading-relaxed opacity-90">
+                                            {aiPredictions[day.dateString]?.lang === language ? (
+                                                <span className="animate-in fade-in duration-500">
+                                                    <span className="text-purple-400 font-bold text-[10px] uppercase mr-2">
+                                                        {language === 'ta' ? 'AI கணிப்பு:' : 'AI Forecast:'}
+                                                    </span>
+                                                    {aiPredictions[day.dateString].text}
                                                 </span>
+                                            ) : (
+                                                <>
+                                                    {day.prediction}
+                                                    {generatingDate === day.dateString && (
+                                                        <span className="inline-block ml-2 w-2 h-2 bg-purple-500 rounded-full animate-ping" />
+                                                    )}
+                                                </>
                                             )}
-                                            {day.verdict}
-                                        </div>
-                                    </div>
+                                        </p>
 
-                                    {/* Score Bars (New) */}
-                                    {isExtended && day.extended && (
-                                        <div className="grid grid-cols-2 gap-2 mb-3 bg-slate-900/30 p-2 rounded-lg">
-                                            {Object.entries(day.extended.lifeAreas).map(([area, score]) => (
-                                                <div key={area} className="flex flex-col gap-1">
-                                                    <div className="flex justify-between text-[10px] text-slate-400 uppercase">
-                                                        <span>{language === 'ta' ?
-                                                            (area === 'career' ? 'தொழில்' : area === 'finance' ? 'நிதி' : area === 'health' ? 'ஆரோக்கியம்' : 'உறவு')
-                                                            : area}</span>
-                                                        <span className="font-bold">{score}%</span>
+                                        {/* Key Factors */}
+                                        {day.keyFactors.length > 0 && (
+                                            <div className="text-[10px] text-slate-500 bg-slate-900/50 p-2 rounded space-y-1">
+                                                {day.keyFactors.slice(0, 6).map((factor, i) => (
+                                                    <div key={i} className="flex items-start gap-1">
+                                                        <span className="text-slate-600 mt-0.5 text-[8px]">●</span>
+                                                        <span>{factor}</span>
                                                     </div>
-                                                    <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full ${score > 75 ? 'bg-green-400' : score > 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                                                            style={{ width: `${score}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Prediction Text */}
-                                    <p className="text-xs text-slate-300 mb-3 leading-relaxed opacity-90">
-                                        {day.prediction}
-                                    </p>
-
-                                    {/* Key Factors */}
-                                    {day.keyFactors.length > 0 && (
-                                        <div className="text-[10px] text-slate-500 bg-slate-900/50 p-2 rounded space-y-1">
-                                            {day.keyFactors.slice(0, 6).map((factor, i) => (
-                                                <div key={i} className="flex items-start gap-1">
-                                                    <span className="text-slate-600 mt-0.5 text-[8px]">●</span>
-                                                    <span>{factor}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Lucky Info Footer (New) */}
-                                    {isExtended && day.extended && (
-                                        <div className="mt-3 pt-2 border-t border-slate-700/50 flex justify-between text-[10px] text-slate-400">
-                                            <div className="flex gap-1">
-                                                <span>⏱</span> {day.extended.luckyTime}
+                                                ))}
                                             </div>
-                                            <div className="flex gap-1">
-                                                <span>🎨</span> {day.extended.color}
+                                        )}
+
+                                        {/* Lucky Info Footer (New) */}
+                                        {isExtended && day.extended && (
+                                            <div className="mt-3 pt-2 border-t border-slate-700/50 flex justify-between text-[10px] text-slate-400">
+                                                <div className="flex gap-1">
+                                                    <span>⏱</span> {day.extended.luckyTime}
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <span>🎨</span> {day.extended.color}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            );
-                        })}
+                                        )}
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
-};
-
+};// End of component
 export default DailySnapshot;

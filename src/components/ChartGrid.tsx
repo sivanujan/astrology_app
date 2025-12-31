@@ -37,7 +37,7 @@ const ChartGrid: React.FC<ChartGridProps> = ({ title, planets, ascendant, onCent
                         if (signIndex === -1) {
                             if (gridIndex === 5) {
                                 return (
-                                    <div key={gridIndex} className="col-span-2 row-span-2 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm border border-slate-800/50 m-1 rounded-lg">
+                                    <div key="center-content" className="col-span-2 row-span-2 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm border border-slate-800/50 m-1 rounded-lg">
                                         {onCenterContent ? onCenterContent() : (
                                             <div className="text-center p-4">
                                                 <div className="text-4xl font-serif text-slate-700 opacity-20 mb-2">ॐ</div>

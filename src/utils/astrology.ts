@@ -495,6 +495,16 @@ const generateSubPeriods = (
     return subPeriods;
 };
 
+
+
+// Precise Dasa Years (Sidereal Solar Year ~ 365.25636 days)
+// We use a standard approximation of 365.25 days per year for compatibility with general almanacs.
+const addSiderealYears = (date: Date, years: number): Date => {
+    const millisPerYear = 365.25 * 24 * 60 * 60 * 1000;
+    const totalMillis = years * millisPerYear;
+    return new Date(date.getTime() + totalMillis);
+};
+
 export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) => {
     // 1. Calculate Nakshatra and Balance
     const nakshatraSpan = 13.333333; // 13 degrees 20 minutes
@@ -524,7 +534,7 @@ export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) =>
 
     // 2. Generate Maha Dashas for 120 years
     // First period (Balance)
-    let endDate = addYears(currentDate, birthDashaBalanceYears);
+    let endDate = addSiderealYears(currentDate, birthDashaBalanceYears);
     periods.push({
         planet: birthLord,
         startDate: new Date(currentDate),
@@ -534,13 +544,15 @@ export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) =>
     });
     currentDate = endDate;
 
-    // Subsequent periods
-    let currentLordIndex = (birthLordIndexInOrder + 1) % 9;
-    while (periods.length < 9) { // Usually cover full cycle or until 120 years
-        const planet = DASHA_ORDER[currentLordIndex];
-        const duration = DASHA_YEARS[planet];
-        endDate = addYears(currentDate, duration);
+    const birthLordIndex = DASHA_ORDER.indexOf(birthLord);
 
+    // Continue cycle from next planet
+    for (let i = 1; i <= 9; i++) {
+        const nextIndex = (birthLordIndex + i) % 9;
+        const planet = DASHA_ORDER[nextIndex];
+        const duration = DASHA_YEARS[planet];
+
+        endDate = addSiderealYears(currentDate, duration);
         periods.push({
             planet,
             startDate: new Date(currentDate),
@@ -548,9 +560,7 @@ export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) =>
             durationYears: duration,
             level: 'Maha'
         });
-
         currentDate = endDate;
-        currentLordIndex = (currentLordIndex + 1) % 9;
     }
 
     // 3. Generate Bhuktis and Antarams for each Maha Dasha

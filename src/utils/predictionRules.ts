@@ -1192,6 +1192,7 @@ export const predictMarriageType = (
 };
 
 // 4. Suitable Career Path (Job vs Business) - Guruji Method
+// 4. Suitable Career Path (Job vs Business) - Guruji Method
 export const predictCareerPath = (
     planets: any[],
     ascendantSign: number,
@@ -1204,13 +1205,195 @@ export const predictCareerPath = (
 
     const getP = (name: string) => getPlanetPosition(planets, name);
 
+    // --- Helper for Planetary Combinations ---
+    const checkCombo = (p1: string, p2: string): boolean => {
+        const pl1 = getP(p1);
+        const pl2 = getP(p2);
+        return !!(pl1 && pl2 && pl1.signIndex === pl2.signIndex); // Conjunction
+    };
+
+    // --- Detailed Combination Rules (From User) ---
+    const combinationRules = [
+        // 1. SUN Combinations
+        {
+            check: () => checkCombo('Sun', 'Moon'),
+            msg_ta: "அரசாங்க வேலைகள், பொது நிர்வாகம், அரசியல்",
+            msg_en: "Government Jobs, Public Administration, Politics"
+        },
+        {
+            check: () => checkCombo('Sun', 'Mars'),
+            msg_ta: "இராணுவம், காவல்துறை, பாதுகாப்பு துறை (குறிப்பாக 10-ல் இருந்தால் சிறப்பு)",
+            msg_en: "Army, Police, Defense Sector (Excellent if in 10th House)"
+        },
+        {
+            check: () => checkCombo('Sun', 'Mercury'),
+            msg_ta: "நிதி, வங்கி, அரசாங்க கணக்காளர் (நிபுணத்துவம்)",
+            msg_en: "Finance, Banking, Govt Accountant (Expertise)"
+        },
+        {
+            check: () => checkCombo('Sun', 'Jupiter'),
+            msg_ta: "நீதிபதி, சட்டம், உயர் கல்வி துறை, நிர்வாகம்",
+            msg_en: "Judge, Law, Higher Education, Administration"
+        },
+        {
+            check: () => checkCombo('Sun', 'Venus'),
+            msg_ta: "நிதி மேலாண்மை, கலை/ஆடம்பர அரசுத் துறை",
+            msg_en: "Financial Management, Arts/Luxury Govt Sector"
+        },
+        {
+            check: () => checkCombo('Sun', 'Saturn'),
+            msg_ta: "தாமதமான அரசு வேலை, கடின உழைப்பு சார்ந்த நிர்வாகம்",
+            msg_en: "Delayed Govt Job, Hard Labor Administration"
+        },
+
+        // 2. MOON Combinations
+        {
+            check: () => checkCombo('Moon', 'Mars'),
+            msg_ta: "உணர்ச்சி சார்ந்த தொழில், விவசாயம், மருத்துவம்",
+            msg_en: "Emotion-centric jobs, Agriculture, Medical"
+        },
+        {
+            check: () => checkCombo('Moon', 'Mercury'),
+            msg_ta: "எழுத்து, இதழியல், வணிகம், கணக்கு",
+            msg_en: "Writing, Journalism, Business, Accounts"
+        },
+        {
+            check: () => checkCombo('Moon', 'Jupiter'),
+            msg_ta: "வங்கி, நிதி, ஆசிரியர், தொண்டு நிறுவனம்",
+            msg_en: "Banking, Finance, Teaching, NGO/Charity"
+        },
+        {
+            check: () => checkCombo('Moon', 'Venus'),
+            msg_ta: "சினிமா, பொழுதுபோக்கு, பால்/திரவம் சார்ந்த தொழில்",
+            msg_en: "Cinema, Entertainment, Dairy/Liquid Business"
+        },
+        {
+            check: () => checkCombo('Moon', 'Saturn'),
+            msg_ta: "எண்ணெய், சுரங்கம், விவசாயம், பனி/நீர் தொழில்",
+            msg_en: "Oil, Mining, Agriculture, Ice/Water Business"
+        },
+
+        // 3. MARS Combinations
+        {
+            check: () => checkCombo('Mars', 'Mercury'),
+            msg_ta: "கட்டிட இன்ஜினியர் (Contractor), ரியல் எஸ்டேட்",
+            msg_en: "Civil Engineer (Contractor), Real Estate"
+        },
+        {
+            check: () => checkCombo('Mars', 'Jupiter'),
+            msg_ta: "உயர் அதிகாரி (சீருடை), சட்டம், நிர்வாகம்",
+            msg_en: "High Officer (Uniform), Law, Admin"
+        },
+        {
+            check: () => checkCombo('Mars', 'Venus'),
+            msg_ta: "கட்டடக்கலை (Architect), வாகனம், ஃபேஷன்",
+            msg_en: "Architecture, Automobile, Fashion"
+        },
+        {
+            check: () => checkCombo('Mars', 'Saturn'),
+            msg_ta: "மெக்கானிக்கல், தொழிற்சாலை, இரும்பு/எஃகு",
+            msg_en: "Mechanical, Industry, Iron/Steel"
+        },
+        {
+            check: () => checkCombo('Mars', 'Ketu'),
+            msg_ta: "ஆன்மீகம் கலந்த மருத்துவம், ஜோதிடம், மின்சாரம்",
+            msg_en: "Spiritual Medicine, Astrology, Electricity"
+        },
+
+        // 4. MERCURY Combinations
+        {
+            check: () => checkCombo('Mercury', 'Jupiter'),
+            msg_ta: "வங்கி அதிகாரி, ஆடிட்டர், ஆசிரியர், ஜோதிடம்",
+            msg_en: "Bank Officer, Auditor, Teacher, Astrology"
+        },
+        {
+            check: () => checkCombo('Mercury', 'Venus'),
+            msg_ta: "கலை மற்றும் கணினி, வரைபடம் (Graphics), ஊடகம்",
+            msg_en: "Arts & Tech, Graphics, Media"
+        },
+        {
+            check: () => checkCombo('Mercury', 'Saturn'),
+            msg_ta: "கணக்கு தணிக்கை, புள்ளிவிவரம், வியாபாரம்",
+            msg_en: "Auditing, Statistics, Business"
+        },
+        {
+            check: () => checkCombo('Mercury', 'Rahu'),
+            msg_ta: "ஆராய்ச்சி, டெக்னாலஜி, புகைப்படம், நிழல் உலகத் தொடர்பு",
+            msg_en: "Research, Technology, Photography"
+        },
+
+        // 5. JUPITER Combinations (Key for Profession)
+        {
+            check: () => checkCombo('Jupiter', 'Venus'),
+            msg_ta: "நிர்வாக ஆலோசகர், கல்வி நிறுவனம், வங்கி",
+            msg_en: "Management Consultant, Education Institute, Banking"
+        },
+        {
+            check: () => checkCombo('Jupiter', 'Saturn'),
+            msg_ta: "சட்டம், தர்ம ஸ்தாபனம், மத போதகர்/தலைவர்",
+            msg_en: "Law, Charitable Trust, Religious Leader"
+        },
+
+        // 6. SATURN Combinations (Career Karaka)
+        {
+            check: () => checkCombo('Saturn', 'Venus'),
+            msg_ta: "வாகனம், இரும்பு, தோல் தொழில், அழகு சாதனங்கள்",
+            msg_en: "Automobile, Iron, Leather, Cosmetics"
+        },
+
+        // 7. RAHU/KETU
+        {
+            check: () => checkCombo('Rahu', 'Jupiter'),
+            msg_ta: "வெளிநாட்டுத் தொடர்பு, சட்டம், பிரம்மாண்டத் தொழில்",
+            msg_en: "Foreign Connect, Law, Large Scale Industry"
+        },
+        {
+            check: () => checkCombo('Ketu', 'Mars'),
+            msg_ta: "மருத்துவம் (Surgery), மின்சாரம், நுண்ணிய கருவிகள்",
+            msg_en: "Medical (Surgery), Electrical, Micro Instruments"
+        },
+
+        // 8. THREE PLANET COMBOS (Special) - Nested Checks
+        {
+            check: () => checkCombo('Sun', 'Jupiter') && checkCombo('Sun', 'Mercury'),
+            msg_ta: "மிகப்பெரிய அரசியல்/நிர்வாக வெற்றி (Power & Admin)",
+            msg_en: "Great Political/Administrative Success"
+        },
+        {
+            check: () => checkCombo('Moon', 'Jupiter') && checkCombo('Moon', 'Venus'),
+            msg_ta: "செல்வம் கொழிக்கும் தொழில், பொழுதுபோக்கு",
+            msg_en: "Wealthy Business, Entertainment"
+        },
+        {
+            check: () => checkCombo('Mars', 'Mercury') && checkCombo('Mars', 'Jupiter'),
+            msg_ta: "தொழில்நுட்ப மேதை, இன்ஜினியரிங் தலைமை",
+            msg_en: "Tech Genius, Engineering Head"
+        },
+        {
+            check: () => checkCombo('Saturn', 'Venus') && checkCombo('Saturn', 'Mercury'),
+            msg_ta: "சிறந்த வணிகர் (Merchant), வரைவாளர்",
+            msg_en: "Excellent Merchant, Draftsman"
+        }
+    ];
+
+    // Find Matched Combinations
+    const matches: string[] = [];
+    combinationRules.forEach(rule => {
+        if (rule.check()) {
+            matches.push(isTamil ? rule.msg_ta : rule.msg_en);
+        }
+    });
+    // Deduplicate and Take top 3
+    const uniqueMatches = Array.from(new Set(matches)).slice(0, 3);
+
+    // --- Original Logic (Subathuvam & Dasa) ---
     // House Definitions
     const house6Sign = (ascendantSign + 5) % 12;
     const house8Sign = (ascendantSign + 7) % 12;
     const lord6 = SIGN_LORDS[house6Sign];
     const lord8 = SIGN_LORDS[house8Sign];
 
-    // Safe access to scores
+    // Score Access
     const saturnScore = subathuvamScores['Saturn']?.totalScore || 0;
     const mercuryScore = subathuvamScores['Mercury']?.totalScore || 0;
     const sunScore = subathuvamScores['Sun']?.totalScore || 0;
@@ -1277,10 +1460,9 @@ export const predictCareerPath = (
         domainText = isTamil ? "பொதுவான துறை" : "General Stream";
     }
 
-    // 3. Dasa Influence & 6/8 Rules (The User Request)
+    // 3. Current Dasa Focus
     if (currentDasa) {
         const dasaLord = currentDasa.maha.planet;
-
         // Find Dasa Lord's Domain
         const dasaPlanetInfo = scores.find(s => s.planet === dasaLord);
         if (dasaPlanetInfo && dasaPlanetInfo.val > 10) {
@@ -1293,16 +1475,16 @@ export const predictCareerPath = (
             ? `தற்போதைய தசை: ${dasaLord} (இப்போதைய கவனம்).`
             : `Current Dasa: ${dasaLord} (Current focus).`);
 
-        // 6th Lord Rule
+        // 6th Lord Rule Check
         if (dasaLord === lord6) {
-            reasons.push(isTamil
-                ? "எச்சரிக்கை: 6-ம் அதிபதி தசை நடப்பதால், சொந்த தொழில் செய்வதை விட வேலைக்கு செல்வதே சிறந்தது (கடன் பிரச்சனை வரலாம்)."
-                : "Warning: Running 6th Lord Dasa. Employment is safer than Business (Risk of Debt).");
-            if (isBusiness) {
-                currentFocus += isTamil ? " (வேலையில் தொடர்வது நல்லது)" : " (Better to stick to Service).";
-            }
-        }
+            currentFocus += isTamil
+                ? " (எச்சரிக்கை: 6-ம் அதிபதி தசை. கடன்/விரோதம் தவிர்க்க வேலையில் தொடர்வது நல்லது)"
+                : " (Warning: 6th Lord Dasa. Employment is safer/preferred).";
 
+            reasons.push(isTamil
+                ? "6-ம் அதிபதி தசையில் சொந்த தொழில் இடர்பாடானது."
+                : "Running 6th Lord Dasa makes business risky.");
+        }
         // 8th Lord Rule
         else if (dasaLord === lord8) {
             reasons.push(isTamil
@@ -1312,16 +1494,28 @@ export const predictCareerPath = (
         }
     }
 
-    // 4. Detailed Jupiter Analysis (Requested Feature)
-    const jupiterAnalysis = predictJupiterCareer(planets, ascendantSign, (planets.find(p => p.name === 'Moon')?.signIndex || 0), subathuvamScores, language);
+    // 4. Incorporate Combination Insights
+    let combinationText = "";
+    if (uniqueMatches.length > 0) {
+        combinationText = isTamil
+            ? `\n\n**சிறப்பு யோகங்கள்:**\n- ${uniqueMatches.join('\n- ')}`
+            : `\n\n**Special Combinations:**\n- ${uniqueMatches.join('\n- ')}`;
 
+        reasons.push(isTamil
+            ? `கிரக சேர்க்கைகள் (${uniqueMatches.length}) கூடுதல் வலிமை சேர்க்கின்றன.`
+            : `Found ${uniqueMatches.length} significant planetary combinations.`);
+    }
+
+    // 5. Jupiter Analysis (Existing)
+    const jupiterAnalysis = predictJupiterCareer(planets, ascendantSign, (planets.find(p => p.name === 'Moon')?.signIndex || 0), subathuvamScores, language);
     let jupiterText = "";
     if (jupiterAnalysis) {
         jupiterText = `\n\n**${isTamil ? "குரு (Jupiter) சிறப்பு பலன்கள்:" : "Jupiter Specific Career Insights:"}**\n${jupiterAnalysis.prediction}`;
         reasons.push(`**${isTamil ? "குருவின் பங்களிப்பு" : "Jupiter's Contribution"}:**\n- ${jupiterAnalysis.reason}`);
     }
 
-    const answer = `**${careerType}**\n${domainText}\n\n**${currentFocus}**${jupiterText}`;
+    // Construct Final Answer
+    const answer = `**${careerType}**\n${domainText}${combinationText}\n\n${currentFocus}${jupiterText}`;
     const reasonText = reasons.join('\n- ');
 
     return {

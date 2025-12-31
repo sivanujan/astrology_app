@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X, Clock } from 'lucide-react';
+import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X, Clock, Activity } from 'lucide-react';
 
 // ... (lines 5-223)
 
 
 import GurujiPredictions from '../components/GurujiPredictions';
+import GurujiPersonaModal from '../components/GurujiPersonaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useChartData } from '../contexts/ChartContext';
 import { calculatePlanetaryPositions } from '../utils/astrology';
@@ -28,11 +29,13 @@ const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { setChartData } = useChartData();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const [charts, setCharts] = useState<SavedChart[]>([]);
     const [loading, setLoading] = useState(true);
     const [predictionData, setPredictionData] = useState<any | null>(null);
     const [showPredictionModal, setShowPredictionModal] = useState(false);
+    const [personaData, setPersonaData] = useState<any | null>(null);
+    const [showPersonaModal, setShowPersonaModal] = useState(false);
 
     useEffect(() => {
         if (!user) {
@@ -109,6 +112,27 @@ const Dashboard: React.FC = () => {
             birthDate: chart.dob
         });
         setShowPredictionModal(true);
+    };
+
+    const handleShowPersona = (chart: SavedChart) => {
+        const chartData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
+        setPersonaData({
+            ...chartData,
+            userDetails: {
+                name: chart.name,
+                place: chart.place,
+            },
+            birthDetails: {
+                date: chart.dob,
+                time: chart.dob.toTimeString().slice(0, 5),
+                place: chart.place,
+                latitude: chart.latitude,
+                longitude: chart.longitude,
+                nakshatra: 'Unknown' // Will be calculated inside if needed, or I should calculate here? 
+                // Actually generateGurujiPersonaProfile calculates nakshatra if missing, or we can use chartData.
+            }
+        });
+        setShowPersonaModal(true);
     };
 
     return (
@@ -229,10 +253,11 @@ const Dashboard: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="mt-4 pt-4 border-t border-white/10 flex gap-2">
+                                <div className="mt-4 pt-4 border-t border-white/10 flex flex-col gap-3">
+                                    {/* Primary Action: View Chart */}
                                     <motion.button
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
                                         onClick={() => {
                                             const chartData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
                                             setChartData({
@@ -249,20 +274,37 @@ const Dashboard: React.FC = () => {
                                             });
                                             navigate('/chart');
                                         }}
-                                        className="flex-1 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition text-sm font-semibold"
+                                        className="w-full py-2.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 text-yellow-400 border border-yellow-500/30 rounded-xl transition font-bold"
                                     >
                                         {t.dashboard.viewChart}
                                     </motion.button>
 
-                                    <motion.button
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => handleShowPrediction(chart)}
-                                        className="flex-1 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition text-sm font-semibold flex items-center justify-center gap-1"
-                                    >
-                                        <Sparkles className="w-3 h-3" />
-                                        Predictions
-                                    </motion.button>
+                                    {/* Secondary Actions: Analysis Grid */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => handleShowPersona(chart)}
+                                            className="px-2 py-2 bg-gradient-to-r from-pink-500/20 to-rose-500/20 hover:from-pink-500/30 hover:to-rose-500/30 text-pink-300 border border-pink-500/30 rounded-lg transition text-xs font-semibold flex flex-col items-center justify-center gap-1 min-h-[60px]"
+                                        >
+                                            <Activity className="w-5 h-5 mb-0.5" />
+                                            <span className="text-center leading-tight">
+                                                {language === 'ta' ? 'நான் யார்?' : 'Who am I?'}
+                                            </span>
+                                        </motion.button>
+
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => handleShowPrediction(chart)}
+                                            className="px-2 py-2 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 hover:from-purple-500/30 hover:to-indigo-500/30 text-purple-300 border border-purple-500/30 rounded-lg transition text-xs font-semibold flex flex-col items-center justify-center gap-1 min-h-[60px]"
+                                        >
+                                            <Sparkles className="w-5 h-5 mb-0.5" />
+                                            <span className="text-center leading-tight">
+                                                {(t.dashboard as any).predictions || 'Predictions'}
+                                            </span>
+                                        </motion.button>
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}
@@ -292,6 +334,16 @@ const Dashboard: React.FC = () => {
                     </div>
                 )
             }
+
+            {/* Persona Modal */}
+            {showPersonaModal && personaData && (
+                <GurujiPersonaModal
+                    isOpen={showPersonaModal}
+                    onClose={() => setShowPersonaModal(false)}
+                    chartData={personaData}
+                    birthDetails={personaData.birthDetails}
+                />
+            )}
         </div >
 
     );

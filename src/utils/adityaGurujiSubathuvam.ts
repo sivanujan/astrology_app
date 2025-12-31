@@ -10,6 +10,8 @@ export interface SubathuvamResult {
     isSubathuva: boolean;
     isNeutral: boolean; // NEW: True if malefic achieved Subathuvam (through Jupiter)
     details: string[];
+    hasSookshmaValu?: boolean;
+    sookshmaValuReason?: string;
 }
 
 // Helper to calculate moon phase and light
@@ -398,7 +400,23 @@ export interface FunctionalStatus {
     planet: string;
     nature: string; // "Yogakaraka", "Benefic", "Malefic", "Maraka", "Neutral"
     roles: string[]; // e.g., ["Lord of 1", "Lord of 5"]
+    lordOfHouses?: number[]; // Numeric house numbers
+    karakatvam?: string[]; // Natural significations
+    affectedPersons?: string[]; // Derived from 9th=Father etc.
+    combinedEffect?: string; // Summary
 }
+
+const PLANET_KARAKAS: Record<string, string[]> = {
+    'Sun': ['Father', 'Soul', 'Government', 'Health', 'Right Eye'],
+    'Moon': ['Mother', 'Mind', 'Emotions', 'Travel', 'Left Eye'],
+    'Mars': ['Siblings', 'Courage', 'Land', 'Blood', 'Enemies'],
+    'Mercury': ['Intelligence', 'Education', 'Speech', 'Business', 'Maternal Uncle'],
+    'Jupiter': ['Children', 'Wealth', 'Wisdom', 'Guru', 'Husband (for Female)'],
+    'Venus': ['Spouse', 'Luxury', 'Vehicles', 'Arts', 'Semen'],
+    'Saturn': ['Longevity', 'Karma', 'Servants', 'Sorrow', 'Oil'],
+    'Rahu': ['Foreign', 'Illusion', 'Technology', 'Paternal Grandfather'],
+    'Ketu': ['Moksha', 'Spirituality', 'Occult', 'Maternal Grandfather']
+};
 
 export const getFunctionalNature = (ascendantSignIndex: number, language: 'en' | 'ta' = 'en'): Record<string, FunctionalStatus> => {
     const results: Record<string, FunctionalStatus> = {};
@@ -446,16 +464,47 @@ export const getFunctionalNature = (ascendantSignIndex: number, language: 'en' |
             nature = "Malefic";
         }
 
+        // Populate new fields
+        const karakas = PLANET_KARAKAS[planet] || [];
+        const affected = [...karakas];
+
+        // Add house based relations
+        if (houses.includes(4)) affected.push("Mother (4th House)");
+        if (houses.includes(9)) affected.push("Father (9th House)");
+        if (houses.includes(5)) affected.push("Children (5th House)");
+        if (houses.includes(7)) affected.push("Spouse (7th House)");
+        if (houses.includes(3)) affected.push("Siblings (3th House)");
+
         results[planet] = {
             planet,
             nature: translateNature(nature),
-            roles
+            roles,
+            lordOfHouses: houses,
+            karakatvam: karakas,
+            affectedPersons: affected,
+            combinedEffect: `${translateNature(nature)} (${roles.join(', ')}) - Signifies: ${karakas.slice(0, 3).join(', ')}`
         };
     });
 
     // Nodes are usually Malefic unless in Kendra/Trikona with Lord
-    results['Rahu'] = { planet: 'Rahu', nature: 'Malefic', roles: [] };
-    results['Ketu'] = { planet: 'Ketu', nature: 'Malefic', roles: [] };
+    results['Rahu'] = {
+        planet: 'Rahu',
+        nature: 'Malefic',
+        roles: [],
+        lordOfHouses: [],
+        karakatvam: PLANET_KARAKAS['Rahu'],
+        affectedPersons: [],
+        combinedEffect: "Shadow Planet (Malefic) - Agent of Karma"
+    };
+    results['Ketu'] = {
+        planet: 'Ketu',
+        nature: 'Malefic',
+        roles: [],
+        lordOfHouses: [],
+        karakatvam: PLANET_KARAKAS['Ketu'],
+        affectedPersons: [],
+        combinedEffect: "Shadow Planet (Malefic) - Agent of Moksha"
+    };
 
     return results;
 };

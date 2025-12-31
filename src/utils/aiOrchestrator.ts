@@ -12,6 +12,7 @@ import {
     PredictionResult
 } from './predictionRules';
 import { calculatePlanetaryPositions, calculateDashaPeriods, getCurrentDasha, calculateCurrentTransits } from './astrology';
+import { generateGurujiPersonaProfile } from './gurujiPersonaHelpers';
 
 export interface OrchestratorResponse {
     intent: string;
@@ -869,7 +870,12 @@ For each house:
             const moon = planets.find((p: any) => p.name === 'Moon');
 
             if (moon) {
-                const periods = calculateDashaPeriods(new Date(chartData.userParams.dob), moon.longitude);
+                // Safely get birth date (try birthDetails.dob first, then root birthDate)
+                const rawDob = chartData.birthDetails?.date || chartData.birthDetails?.dob || chartData.birthDate || chartData.userParams?.dob;
+                if (!rawDob) throw new Error("Missing Date of Birth in chartData");
+                const birthDateObj = new Date(rawDob);
+
+                const periods = calculateDashaPeriods(birthDateObj, moon.longitude);
                 // NOTE: chartData.userParams.dob might need parsing if it's string. Assuming Date or convertible.
                 const currentDasa = getCurrentDasha(periods, now);
                 const subathuvamScores = calculateAdityaGurujiSubathuvam(planets);
@@ -886,7 +892,7 @@ For each house:
                         ruleBasedInsight = `\n**Algorithmic Calculation Results (Ground Truth):**\n1. Job Timing: ${jobTiming.answer}\n   Reason: ${jobTiming.reason}\n2. Suitable Career Path: ${careerPath.answer}\n   Reason: ${careerPath.reason}`;
                     }
                     else if (lowerIntent.includes('marriage') || lowerIntent.includes('wedding') || lowerIntent.includes('spouse')) {
-                        prediction = predictDetailedMarriageTiming({ maha: currentDasa.maha, bhukti: currentDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, new Date(chartData.userParams.dob), 'male', periods, language);
+                        prediction = predictDetailedMarriageTiming({ maha: currentDasa.maha, bhukti: currentDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, birthDateObj, chartData.userDetails?.gender || 'male', periods, language);
                         ruleBasedInsight = `\n**Algorithmic Calculation Results (Ground Truth):**\nMarriage Prediction: ${prediction.answer}\nReason: ${prediction.reason}`;
                     }
                     else if (lowerIntent.includes('abroad') || lowerIntent.includes('foreign') || lowerIntent.includes('travel')) {
@@ -1621,6 +1627,9 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
     });
 
     const baseContext = {
+        CurrentDate: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+        CurrentYear: new Date().getFullYear(),
+        CurrentMonth: new Date().toLocaleString('default', { month: 'long' }),
         TargetLanguage: language === 'ta' ? "TAMIL (தமிழ்)" : "ENGLISH",
         Gender: data.userDetails?.gender || "Unknown",
         Lagna: ZODIAC_SIGNS[ascSignIndex], // FORCE CORRECT NAME FROM INDEX
@@ -1686,6 +1695,8 @@ ALWAYS use 'combined_interpretation' field to understand WHO + WHAT for each pla
         HouseLords: houseLords,
         CalculatedAspects: calculatedAspects,
         KeyPlanets: comprehensivePlanets,
+        Yogas: data.yogas || [], // Pass Yogas explicitly
+        Doshas: data.doshas || [], // Pass Doshas explicitly
         // Provide the titles directly so AI doesn't have to guess or translate
         OutputFormatGuide: {
             HouseTitles: language === 'ta' ? HOUSE_NAMES_TA : HOUSE_NAMES_EN
@@ -1749,4 +1760,152 @@ async function logInteraction(userQuery: string, response: OrchestratorResponse,
         console.error("Failed to log chat interaction", e);
     }
 }
-0
+
+/**
+ * Generate Guruji Style "Who Am I?" Persona Analysis
+ */
+export const generateGurujiPersona = async (
+    chartData: any,
+    birthDetails: any,
+    language: 'en' | 'ta' = 'ta',
+    apiKey: string = OPENROUTER_API_KEY
+): Promise<string> => {
+    try {
+        const profileData = generateGurujiPersonaProfile(chartData, birthDetails);
+
+        const tamilPrompt = `You are an expert Vedic Astrologer following the unique "Subathuvam & Sookshma" methodology of Aditya Guruji.
+Your goal is to analyze the provided User JSON data and generate a "Shocking & Accurate" life analysis in Tamil.
+
+RULES FOR ANALYSIS:
+1. FOCUS ON SUBATHUVAM:
+   - If a Malefic planet (Saturn, Mars, Rahu, Ketu) has 'is_subathuvam: true', predict HUGE SUCCESS in that area.
+   - Example: If Saturn is in 7th with Subathuvam -> "You will have a very loyal workforce and business growth."
+   - If a Malefic planet has 'is_papathuvam: true', predict STRUGGLE.
+
+2. LAGNA & LAGNATHIPATHI:
+   - If Lagnathipathi is strong/Subathuvam -> "You are a born leader, you will never bow down."
+   - If Weak -> "You often lack confidence and depend on others."
+
+3. IDENTIFY "HIDDEN TRUTHS" (The Shocking Part):
+   - Look for contradictions. Example: A person might have a lot of money (2nd house strong) but no peace of mind (Moon afflicted).
+   - Look for 'Digbala'. If Sun/Mars in 10th -> "You are born to command, not to obey."
+   - Use the 'shocking_events' array in input to Reveal Past Trauma if present (e.g. "You faced a major health crisis in childhood due to 6th lord...").
+
+4. REVEAL AGE-BASED EVENTS (From 'shocking_events'):
+   - Use the 'shocking_events' list to tell them exactly what happened at what age.
+   - Example: "At age 19, during Saturn Dasa - Mercury Bhukti, you likely faced a break in education." (Say this in Tamil).
+   - Direct and specific.
+
+OUTPUT STRUCTURE (In Tamil):
+1. **உங்கள் அடிப்படை குணம் (Core Character):** (Describe based on Lagna & Moon).
+2. **மறைந்திருக்கும் உண்மைகள் (Shocking Truths):** (Tell 3 specific points about their secret nature, struggles, OR past trauma based on Papathuvam/Shocking Events).
+3. **தொழில் & வருமானம்:** .
+4. **திருமணம் & உறவு:**
+5. **இப்போதைய நிலைமை:** 
+
+Tone: Direct, authoritative, yet guiding (like Aditya Guruji).
+
+IMPORTANT: Return VALID RAW JSON formatting is NOT needed. Just return the clear Tamil text with Markdown headers.
+`;
+
+        const englishPrompt = `You are an expert Vedic Astrologer following the unique "Subathuvam & Sookshma" methodology of Aditya Guruji.
+Your goal is to analyze the provided User JSON data and generate a "Shocking & Accurate" life analysis in English.
+
+RULES FOR ANALYSIS:
+1. FOCUS ON SUBATHUVAM:
+   - If a Malefic planet (Saturn, Mars, Rahu, Ketu) has 'is_subathuvam: true', predict HUGE SUCCESS in that area.
+   - Example: If Saturn is in 7th with Subathuvam -> "You will have a very loyal workforce and business growth."
+   - If a Malefic planet has 'is_papathuvam: true', predict STRUGGLE.
+
+2. LAGNA & LAGNATHIPATHI:
+   - If Lagnathipathi is strong/Subathuvam -> "You are a born leader, you will never bow down."
+   - If Weak -> "You often lack confidence and depend on others."
+
+3. IDENTIFY "HIDDEN TRUTHS" (The Shocking Part):
+   - Look for contradictions. Example: A person might have a lot of money (2nd house strong) but no peace of mind (Moon afflicted).
+   - Look for 'Digbala'. If Sun/Mars in 10th -> "You are born to command, not to obey."
+   - Use the 'shocking_events' array in input to Reveal Past Trauma if present (e.g. "You faced a major health crisis in childhood due to 6th lord...").
+
+4. REVEAL AGE-BASED EVENTS (From 'shocking_events'):
+   - Use the 'shocking_events' list to tell them exactly what happened at what age.
+   - Example: "At age 19, during Saturn Dasa - Mercury Bhukti, you likely faced a break in education."
+   - Direct and specific.
+
+OUTPUT STRUCTURE (In English):
+1. **Core Character (Your True Nature):** (Describe based on Lagna & Moon).
+2. **Hidden Personal Truths (Shocking Revelations):** (Tell 3 specific points about their secret nature, struggles, OR past trauma based on Papathuvam/Shocking Events).
+3. **Career & Wealth Status:** .
+4. **Marriage & Relationships:**
+5. **Current Life Situation:** 
+
+Tone: Direct, authoritative, yet guiding (like Aditya Guruji).
+Use plain English, avoiding overly complex Sanskrit terms unless necessary for context.
+
+IMPORTANT: Return VALID RAW JSON formatting is NOT needed. Just return the clear English text with Markdown headers.
+`;
+
+        const systemPrompt = language === 'ta' ? tamilPrompt : englishPrompt;
+
+        const userContext = JSON.stringify(profileData, null, 2);
+
+        const models = [
+            "google/gemini-2.0-flash-exp:free",
+            "google/gemini-2.0-flash-thinking-exp:free",
+            "meta-llama/llama-3.2-11b-vision-instruct:free",
+        ];
+
+        let retries = 3;
+        let modelIndex = 0;
+
+        while (retries > 0) {
+            const currentModel = models[modelIndex % models.length]; // Cycle models
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${apiKey}`,
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://astrology-app.com", // Recommended by OpenRouter
+                    },
+                    body: JSON.stringify({
+                        "model": currentModel,
+                        "messages": [
+                            { "role": "system", "content": systemPrompt },
+                            { "role": "user", "content": userContext }
+                        ]
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.choices[0].message.content || "Prediction generation failed.";
+                }
+
+                if (response.status === 429) {
+                    console.warn(`Rate limited (429) on ${currentModel}. Switching models...`);
+                    modelIndex++; // Try next model
+                    await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s
+                    retries--;
+                    continue;
+                }
+
+                // For other errors (500, etc), also try switching
+                console.warn(`Error ${response.status} on ${currentModel}. Switching models...`);
+                modelIndex++;
+                retries--;
+
+            } catch (err) {
+                console.warn(`Network error on ${currentModel}. Switching...`);
+                modelIndex++;
+                retries--;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        return "System is busy. Please try again in 1 minute.";
+
+    } catch (error) {
+        console.error("Guruji Persona Gen Error:", error);
+        return "உங்களின் ஜாதகத்தை கணிப்பதில் சிரமம் உள்ளது. சிறிது நேரம் கழித்து முயற்சிக்கவும்.";
+    }
+};

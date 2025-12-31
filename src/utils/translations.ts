@@ -86,7 +86,7 @@ export const translations = {
         },
         predictions: {
             title: "AI Astrologer",
-            subtitle: "Powered by Claude 3.5 Sonnet",
+            subtitle: "Powered by Astrozen 1.0",
             apiKeyLabel: "Enter Anthropic API Key",
             apiKeyPlaceholder: "sk-ant-...",
             generateBtn: "Generate Full Reading",
@@ -332,7 +332,7 @@ export const translations = {
         },
         predictions: {
             title: "AI ஜோதிடர்",
-            subtitle: "Claude 3.5 Sonnet மூலம் இயங்குகிறது",
+            subtitle: "Astrozen 1.0 மூலம் இயங்குகிறது",
             apiKeyLabel: "Anthropic API குறியீட்டை உள்ளிடவும்",
             apiKeyPlaceholder: "sk-ant-...",
             generateBtn: "முழு பலன்களை கணிக்கவும்",

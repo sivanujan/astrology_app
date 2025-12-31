@@ -27,7 +27,9 @@ app.get('/api/health', (req, res) => {
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// Additional routes to be created:
+// Routes
+// app.use('/api/whatsapp', require('./routes/whatsapp')); // Deprecated
+app.use('/api/notifications', require('./routes/notifications'));
 // const userRoutes = require('./routes/user');
 // const ruleRoutes = require('./routes/rules');
 // app.use('/api/users', userRoutes);
@@ -51,9 +53,14 @@ app.use((err, req, res, next) => {
     });
 });
 
+const { initJob } = require('./jobs/dailyForecast');
+
 // Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+
+    // Initialize Jobs
+    initJob();
 });

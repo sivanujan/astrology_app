@@ -166,10 +166,10 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             // Usually 'calculateYogas' in 'astrology.ts' or 'yogas.ts'.
             // Let's assume basic yogas are in 'data.yogas' if calculated previously. 
             // If not present, we should calculate.
-            if (!enrichedData.yogas) {
-                const { calculateYogas } = await import('../utils/astrology'); // Assuming this export exists
-                const yogas = calculateYogas(data.planets, data.ascendant?.signIndex || 0);
-                enrichedData = { ...enrichedData, yogas };
+            if (!enrichedData.yogas || !enrichedData.doshas) {
+                const { calculateYogas } = await import('../utils/astrology');
+                const { yogas, doshas } = calculateYogas(data.planets, data.ascendant?.signIndex || 0);
+                enrichedData = { ...enrichedData, yogas, doshas };
             }
 
             // Call the Orchestrator with enriched data

@@ -71,5 +71,42 @@ export const predictionService = {
         } catch (error) {
             console.error("Error logging chat:", error);
         }
+    },
+
+    // --- DAILY FORECAST CACHING ---
+    getStoredDailyForecast: async (userId: string, date: string, language: string = 'en'): Promise<string | null> => {
+        try {
+            // ID Format: userId_yyyy-mm-dd_lang
+            // date string should be consistently formatted (e.g. YYYY-MM-DD from toDateString or ISO split)
+            const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
+            const docId = `${userId}_${cleanDate}_${language}`;
+            const docRef = doc(db, `daily_forecasts/${docId}`);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                return docSnap.data().prediction;
+            }
+            return null;
+        } catch (error) {
+            console.error("Error fetching daily forecast:", error);
+            return null;
+        }
+    },
+
+    saveDailyForecast: async (userId: string, date: string, prediction: string, language: string = 'en'): Promise<void> => {
+        try {
+            const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
+            const docId = `${userId}_${cleanDate}_${language}`;
+            const docRef = doc(db, `daily_forecasts/${docId}`);
+            await setDoc(docRef, {
+                userId,
+                date,
+                prediction,
+                language,
+                timestamp: serverTimestamp()
+            });
+        } catch (error) {
+            console.error("Error saving daily forecast:", error);
+        }
     }
 };
