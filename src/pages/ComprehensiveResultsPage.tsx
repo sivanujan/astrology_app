@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Download, Share2, MessageCircle } from 'lucide-react';
@@ -7,6 +7,7 @@ import { ComprehensiveResultsDisplay } from '../components/ComprehensiveResultsD
 import { MarriageDasaForecast } from '../components/MarriageDasaForecast';
 import { useLanguage } from '../contexts/LanguageContext';
 import { saveMarriageResult, loadMarriageResult, generateShareableUrl } from '../services/marriageResultService';
+import MarriageAIModal from '../components/MarriageAIModal';
 
 const ComprehensiveResultsPage: React.FC = () => {
     const location = useLocation();
@@ -20,6 +21,8 @@ const ComprehensiveResultsPage: React.FC = () => {
     const [girlDetails, setGirlDetails] = useState(location.state?.girlDetails);
     const [shareableUrl, setShareableUrl] = useState<string>('');
     const [loading, setLoading] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [showAIModal, setShowAIModal] = useState(false);
 
     // Load result from Firestore if coming from shared link
     useEffect(() => {
@@ -114,7 +117,7 @@ const ComprehensiveResultsPage: React.FC = () => {
 
     // WhatsApp Handler with unique URL
     const handleWhatsApp = () => {
-        const url = shareableUrl || window.location.href;
+        const url = shareableUrl || window.location.href; // Fallback to Firestore URL if available, otherwise current URL
         const message = isTamil
             ? `🌟 திருமண பொருத்த முடிவுகள் 🌟\n\nமொத்த மதிப்பெண்: ${result.overallScore.toFixed(1)}/100\nதீர்ப்பு: ${result.verdict}\n\n${boyDetails?.name || 'ஆண்'} & ${girlDetails?.name || 'பெண்'}\n\nமுடிவுகளைப் பார்க்க: ${url}`
             : `🌟 Marriage Matching Results 🌟\n\nOverall Score: ${result.overallScore.toFixed(1)}/100\nVerdict: ${result.verdict}\n\n${boyDetails?.name || 'Boy'} & ${girlDetails?.name || 'Girl'}\n\nView full results: ${url}`;
@@ -132,27 +135,47 @@ const ComprehensiveResultsPage: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-8"
                 >
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
                         <button
                             onClick={() => navigate('/marriage-matching')}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors self-start md:self-auto"
                         >
                             <ArrowLeft className="w-5 h-5" />
-                            <span>{isTamil ? 'திரும்ப' : 'Back'}</span>
+                            {isTamil ? 'திரும்ப' : 'Back'}
                         </button>
 
-                        <div className="flex items-center gap-3">
-                            <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                                <Download className="w-5 h-5" />
-                                <span className="hidden sm:inline">{isTamil ? 'PDF' : 'Download PDF'}</span>
-                            </button>
-                            <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
+                        <div className="flex flex-wrap gap-2 justify-center md:justify-end">
+                            <button
+                                onClick={handleShare}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors border border-blue-500/30"
+                            >
                                 <Share2 className="w-5 h-5" />
-                                <span className="hidden sm:inline">{isTamil ? 'பகிர்' : 'Share'}</span>
+                                {isTamil ? 'பகிர்' : 'Share'}
                             </button>
-                            <button onClick={handleWhatsApp} className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+
+                            <button
+                                onClick={handleWhatsApp}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors border border-green-500/30"
+                            >
                                 <MessageCircle className="w-5 h-5" />
-                                <span className="hidden sm:inline">WhatsApp</span>
+                                {isTamil ? 'வாட்ஸ்அப்' : 'WhatsApp'}
+                            </button>
+
+                            <button
+                                onClick={handleDownloadPDF}
+                                disabled={downloading}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                            >
+                                <Download className="w-5 h-5" />
+                                {downloading ? (isTamil ? 'பதிவிறக்குகிறது...' : 'Downloading...') : (isTamil ? 'PDF பதிவிறக்கம்' : 'Download PDF')}
+                            </button>
+
+                            <button
+                                onClick={() => setShowAIModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 rounded-lg transition-colors text-white font-semibold shadow-lg shadow-amber-900/50"
+                            >
+                                <span className="text-xl">🔮</span>
+                                {isTamil ? 'AI கணிப்பு' : 'AI Prediction'}
                             </button>
                         </div>
                     </div>
@@ -176,24 +199,34 @@ const ComprehensiveResultsPage: React.FC = () => {
                 />
 
                 {/* 10-Year Dasa Forecast */}
-                {result && boyDetails && girlDetails && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="mt-8"
-                    >
-                        <MarriageDasaForecast
-                            boyChart={result.boyChart}
-                            girlChart={result.girlChart}
-                            boyBirthDate={result.boyChart.birthDate}
-                            girlBirthDate={result.girlChart.birthDate}
-                            language={isTamil ? 'ta' : 'en'}
-                        />
-                    </motion.div>
-                )}
-            </div>
-        </div>
+                {
+                    result && boyDetails && girlDetails && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="mt-8"
+                        >
+                            <MarriageDasaForecast
+                                boyChart={result.boyChart}
+                                girlChart={result.girlChart}
+                                boyBirthDate={result.boyChart.birthDate}
+                                girlBirthDate={result.girlChart.birthDate}
+                                language={isTamil ? 'ta' : 'en'}
+                            />
+                        </motion.div>
+                    )
+                }
+            </div >
+
+            <MarriageAIModal
+                isOpen={showAIModal}
+                onClose={() => setShowAIModal(false)}
+                boyDetails={boyDetails || { name: 'Boy', date: 'Unknown' }}
+                girlDetails={girlDetails || { name: 'Girl', date: 'Unknown' }}
+                matchingResult={result}
+            />
+        </div >
     );
 };
 

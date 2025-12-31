@@ -3,30 +3,68 @@ import { X, Sparkles, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateGurujiPersona } from '../utils/aiOrchestrator';
 import { useLanguage } from '../contexts/LanguageContext';
+import { db } from '../lib/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 interface GurujiPersonaModalProps {
     isOpen: boolean;
     onClose: () => void;
     chartData: any;
     birthDetails: any;
+    chartId?: string; // Optional because chart might not be saved yet
 }
 
-const GurujiPersonaModal: React.FC<GurujiPersonaModalProps> = ({ isOpen, onClose, chartData, birthDetails }) => {
+const GurujiPersonaModal: React.FC<GurujiPersonaModalProps> = ({ isOpen, onClose, chartData, birthDetails, chartId }) => {
     const { language } = useLanguage();
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen && !result && !loading) {
-            fetchPersona();
+            checkCacheAndFetch();
         }
     }, [isOpen]);
 
-    const fetchPersona = async () => {
+    const checkCacheAndFetch = async () => {
         setLoading(true);
+
         try {
+            // 1. Try to load from Cache (if chartId exists)
+            if (chartId) {
+                const docRef = doc(db, 'charts', chartId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const cacheKey = language === 'ta' ? 'guruji_persona_ta' : 'guruji_persona_en';
+
+                    if (data[cacheKey]) {
+                        console.log("Loaded Persona from Cache!");
+                        setResult(data[cacheKey]);
+                        setLoading(false);
+                        return; // Exit if found in cache
+                    }
+                }
+            }
+
+            // 2. If not in cache, Generate with AI
             const analysis = await generateGurujiPersona(chartData, birthDetails, language as 'en' | 'ta');
             setResult(analysis);
+
+            // 3. Save to Cache (if chartId exists)
+            if (chartId && analysis && !analysis.includes("System is busy")) {
+                try {
+                    const docRef = doc(db, 'charts', chartId);
+                    const cacheKey = language === 'ta' ? 'guruji_persona_ta' : 'guruji_persona_en';
+                    await updateDoc(docRef, {
+                        [cacheKey]: analysis
+                    });
+                    console.log("Saved Persona to Cache!");
+                } catch (saveError) {
+                    console.error("Failed to save to cache", saveError);
+                }
+            }
+
         } catch (error) {
             console.error("Persona Generation Failed", error);
             setResult(language === 'ta' ? "பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்." : "An error occurred. Please try again.");

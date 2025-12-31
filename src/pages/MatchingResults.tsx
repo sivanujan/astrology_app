@@ -12,6 +12,7 @@ import {
     copyToClipboard
 } from '../utils/matchingResultsShare';
 import { generateMarriageMatchingPDF } from '../utils/marriageMatchingPDF';
+import MarriageAIModal from '../components/MarriageAIModal';
 
 const MatchingResults: React.FC = () => {
     const location = useLocation();
@@ -21,14 +22,64 @@ const MatchingResults: React.FC = () => {
 
     const [downloading, setDownloading] = useState(false);
     const [sharing, setSharing] = useState(false);
+    const [showAIModal, setShowAIModal] = useState(false);
 
-    const result = location.state?.result as MatchingResult;
-    const boyName = location.state?.boyName || 'Boy';
-    const girlName = location.state?.girlName || 'Girl';
-    const boyChart = location.state?.boyChart || null;
-    const girlChart = location.state?.girlChart || null;
+    const [hydratedData, setHydratedData] = useState<any>(null);
+    const [loading, setLoading] = useState(!location.state);
 
-    if (!result) {
+    useEffect(() => {
+        if (!location.state) {
+            const params = new URLSearchParams(window.location.search);
+            // Dynamic import to avoid circular dependencies if needed, or just import normally
+            import('../utils/urlUtils').then(({ deserializeMarriageDetails }) => {
+                const { boy, girl } = deserializeMarriageDetails(params);
+                if (boy && girl) {
+                    // Recalculate result
+                    import('../utils/marriageMatching').then(({ analyzeCompatibility }) => {
+                        import('../utils/astrology').then(({ calculatePlanetaryPositions }) => {
+                            try {
+                                const boyDate = new Date(`${boy.date}T${boy.time}`);
+                                const girlDate = new Date(`${girl.date}T${girl.time}`);
+
+                                const boyChart = calculatePlanetaryPositions(boyDate, boy.lat, boy.lng);
+                                const girlChart = calculatePlanetaryPositions(girlDate, girl.lat, girl.lng);
+
+                                const result = analyzeCompatibility(boyChart, girlChart);
+
+                                setHydratedData({
+                                    result,
+                                    boyName: boy.name,
+                                    girlName: girl.name,
+                                    boyDetails: { name: boy.name, date: boy.date, birthLat: boy.lat, birthLng: boy.lng }, // Ensure structure matches context
+                                    girlDetails: { name: girl.name, date: girl.date, birthLat: girl.lat, birthLng: girl.lng },
+                                    boyChart: { planets: boyChart.planets }, // Minimal chart data needed for display
+                                    girlChart: { planets: girlChart.planets }
+                                });
+                            } catch (e) {
+                                console.error("Failed to hydrate from URL", e);
+                            } finally {
+                                setLoading(false);
+                            }
+                        });
+                    });
+                } else {
+                    setLoading(false);
+                }
+            });
+        }
+    }, [location.state]);
+
+    const activeData = location.state || hydratedData;
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+            </div>
+        );
+    }
+
+    if (!activeData || !activeData.result) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
@@ -44,6 +95,24 @@ const MatchingResults: React.FC = () => {
         );
     }
 
+    const { result, boyName, girlName, boyDetails, girlDetails, boyChart, girlChart } = activeData;
+
+    const handleShare = async () => {
+        try {
+            // Import dynamically or assume it's available
+            const { generateShareLink } = await import('../utils/urlUtils');
+            const link = generateShareLink('/matching-results',
+                { ...boyDetails, lat: boyDetails.birthLat, lng: boyDetails.birthLng, time: boyDetails.date.split('T')[1]?.slice(0, 5) || "00:00" },
+                { ...girlDetails, lat: girlDetails.birthLat, lng: girlDetails.birthLng, time: girlDetails.date.split('T')[1]?.slice(0, 5) || "00:00" }
+            );
+
+            await copyToClipboard(link);
+            alert(isTamil ? 'இணைப்பு நகலெடுக்கப்பட்டது!' : 'Link copied to clipboard!');
+        } catch (err) {
+            console.error('Failed to share', err);
+        }
+    };
+
     return (
         <div className="min-h-screen py-12 px-4">
             <div className="max-w-6xl mx-auto">
@@ -53,13 +122,23 @@ const MatchingResults: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-8"
                 >
-                    <button
-                        onClick={() => navigate('/marriage-matching')}
-                        className="flex items-center gap-2 text-purple-400 hover:text-purple-300 mb-4"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                        {isTamil ? 'திரும்பிச் செல்' : 'Back to Matching'}
-                    </button>
+                    <div className="flex justify-between items-start">
+                        <button
+                            onClick={() => navigate('/marriage-matching')}
+                            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                            {isTamil ? 'திரும்ப' : 'Back'}
+                        </button>
+
+                        <button
+                            onClick={handleShare}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors border border-blue-500/30"
+                        >
+                            <Share2 className="w-5 h-5" />
+                            {isTamil ? 'பகிர்க' : 'Share Result'}
+                        </button>
+                    </div>
 
                     <div className="flex items-center gap-4 mb-2">
                         <Heart className="w-8 h-8 text-pink-500" />
@@ -90,6 +169,14 @@ const MatchingResults: React.FC = () => {
                         >
                             <FileText className="w-5 h-5" />
                             {downloading ? 'Downloading...' : (isTamil ? 'PDF பதிவிறக்கம்' : 'Download PDF')}
+                        </button>
+
+                        <button
+                            onClick={() => setShowAIModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 rounded-lg transition-colors text-white font-semibold shadow-lg shadow-amber-900/50"
+                        >
+                            <span className="text-xl">🔮</span>
+                            {isTamil ? 'AI திருமண கணிப்பு' : 'AI Prediction'}
                         </button>
 
                         <button
@@ -623,6 +710,14 @@ const MatchingResults: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            <MarriageAIModal
+                isOpen={showAIModal}
+                onClose={() => setShowAIModal(false)}
+                boyDetails={boyDetails}
+                girlDetails={girlDetails}
+                matchingResult={result}
+            />
         </div>
     );
 };

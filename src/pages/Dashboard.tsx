@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X, Clock, Activity } from 'lucide-react';
 
-// ... (lines 5-223)
-
-
 import GurujiPredictions from '../components/GurujiPredictions';
 import GurujiPersonaModal from '../components/GurujiPersonaModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -118,6 +115,7 @@ const Dashboard: React.FC = () => {
         const chartData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
         setPersonaData({
             ...chartData,
+            chartId: chart.id, // Pass ID for caching
             userDetails: {
                 name: chart.name,
                 place: chart.place,
@@ -128,8 +126,7 @@ const Dashboard: React.FC = () => {
                 place: chart.place,
                 latitude: chart.latitude,
                 longitude: chart.longitude,
-                nakshatra: 'Unknown' // Will be calculated inside if needed, or I should calculate here? 
-                // Actually generateGurujiPersonaProfile calculates nakshatra if missing, or we can use chartData.
+                nakshatra: 'Unknown'
             }
         });
         setShowPersonaModal(true);
@@ -137,7 +134,6 @@ const Dashboard: React.FC = () => {
 
     return (
         <div className="min-h-screen">
-
             {/* Header */}
             <div className="relative z-10 p-6 backdrop-blur-sm bg-white/5 border-b border-white/10">
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -313,27 +309,25 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Prediction Modal */}
-            {
-                showPredictionModal && predictionData && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative"
+            {showPredictionModal && predictionData && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative"
+                    >
+                        <button
+                            onClick={() => setShowPredictionModal(false)}
+                            className="absolute top-4 right-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition z-10"
                         >
-                            <button
-                                onClick={() => setShowPredictionModal(false)}
-                                className="absolute top-4 right-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition z-10"
-                            >
-                                <X className="w-6 h-6 text-slate-400" />
-                            </button>
-                            <div className="p-6">
-                                <GurujiPredictions data={predictionData} />
-                            </div>
-                        </motion.div>
-                    </div>
-                )
-            }
+                            <X className="w-6 h-6 text-slate-400" />
+                        </button>
+                        <div className="p-6">
+                            <GurujiPredictions data={predictionData} />
+                        </div>
+                    </motion.div>
+                </div>
+            )}
 
             {/* Persona Modal */}
             {showPersonaModal && personaData && (
@@ -342,10 +336,10 @@ const Dashboard: React.FC = () => {
                     onClose={() => setShowPersonaModal(false)}
                     chartData={personaData}
                     birthDetails={personaData.birthDetails}
+                    chartId={personaData.chartId}
                 />
             )}
         </div >
-
     );
 };
 

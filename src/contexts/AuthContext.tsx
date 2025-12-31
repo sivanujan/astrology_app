@@ -79,6 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
 
             // Create user document in Firestore
+            const ip = await getIpAddress();
             await setDoc(doc(db, 'users', userCredential.user.uid), {
                 firebase_uid: userCredential.user.uid,
                 profile: {
@@ -90,6 +91,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     plan: 'free',
                     is_active: false
                 },
+                ip_address: ip,
+                last_login_ip: ip,
                 createdAt: new Date(),
                 updatedAt: new Date()
             });
@@ -108,6 +111,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             throw new Error('Please verify your email before logging in. Check your inbox.');
         }
 
+        // Update IP on login
+        try {
+            const ip = await getIpAddress();
+            await setDoc(doc(db, 'users', userCredential.user.uid), {
+                last_login_ip: ip,
+                last_login: new Date()
+            }, { merge: true });
+        } catch (e) {
+            console.error("Failed to update login IP", e);
+        }
+
         return userCredential;
     };
 
@@ -122,7 +136,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Check if user document exists, if not create one
         const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
 
-        if (!userDoc.exists()) {
+        if (userDoc.exists()) {
+            // Update Last Login & IP
+            try {
+                const ip = await getIpAddress();
+                await setDoc(doc(db, 'users', userCredential.user.uid), {
+                    last_login_ip: ip,
+                    last_login: new Date()
+                }, { merge: true });
+            } catch (e) { console.error("Failed to update login stats", e); }
+        } else {
+            const ip = await getIpAddress();
             await setDoc(doc(db, 'users', userCredential.user.uid), {
                 firebase_uid: userCredential.user.uid,
                 profile: {
@@ -134,12 +158,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     plan: 'free',
                     is_active: false
                 },
+                ip_address: ip, // Registration IP
+                last_login_ip: ip,
                 createdAt: new Date(),
                 updatedAt: new Date()
             });
         }
 
         return userCredential;
+    };
+
+    // Helper to get IP
+    const getIpAddress = async (): Promise<string> => {
+        try {
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json();
+            return data.ip;
+        } catch (error) {
+            console.error('Failed to get IP', error);
+            return 'Unknown';
+        }
     };
 
     const logout = async () => {

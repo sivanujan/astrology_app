@@ -68,8 +68,16 @@ export function analyzeMarriageDasaForecast(
     }
 
     // Validate birth dates
-    const boyDate = boyBirthDate instanceof Date ? boyBirthDate : new Date(boyBirthDate);
-    const girlDate = girlBirthDate instanceof Date ? girlBirthDate : new Date(girlBirthDate);
+    // Helper to convert Firestore Timestamp or string to Date
+    const toDate = (d: any) => {
+        if (!d) return new Date('Invalid');
+        if (d instanceof Date) return d;
+        if (typeof d.toDate === 'function') return d.toDate(); // Firestore Timestamp
+        return new Date(d);
+    };
+
+    const boyDate = toDate(boyBirthDate);
+    const girlDate = toDate(girlBirthDate);
 
     if (isNaN(boyDate.getTime()) || isNaN(girlDate.getTime())) {
         console.error('Invalid birth dates:', { boyBirthDate, girlBirthDate });

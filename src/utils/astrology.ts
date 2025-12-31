@@ -506,7 +506,19 @@ const addSiderealYears = (date: Date, years: number): Date => {
 };
 
 export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) => {
-    // 1. Calculate Nakshatra and Balance
+    // 1. Validate Inputs
+    if (!birthDate || isNaN(birthDate.getTime()) || typeof moonLongitude !== 'number' || isNaN(moonLongitude)) {
+        console.error("Invalid inputs for Dasha calculation:", { birthDate, moonLongitude });
+        return [{
+            planet: 'Ketu', // Default fallback
+            startDate: new Date(),
+            endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+            durationYears: 1,
+            level: 'Maha' as 'Maha'
+        }];
+    }
+
+    // 2. Calculate Nakshatra and Balance
     const nakshatraSpan = 13.333333; // 13 degrees 20 minutes
     let nakshatraIndex = Math.floor(moonLongitude / nakshatraSpan);
 
@@ -521,7 +533,14 @@ export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) =>
     const birthLord = NAKSHATRA_LORDS[nakshatraIndex];
     if (!birthLord) {
         console.error("Invalid nakshatra index or lord:", nakshatraIndex, birthLord);
-        return [];
+        // Fallback: Return a default short dasha starting now, to prevent crash
+        return [{
+            planet: 'Ketu', // Default
+            startDate: new Date(),
+            endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+            durationYears: 1,
+            level: 'Maha' as 'Maha'
+        }];
     }
 
     const birthLordIndexInOrder = DASHA_ORDER.indexOf(birthLord);

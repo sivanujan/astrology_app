@@ -47,6 +47,30 @@ export const ChartProvider: React.FC<ChartProviderProps> = ({ children }) => {
         }
     };
 
+    // Hydrate from URL if present
+    React.useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        // Quick check before importing heavy utils
+        if (params.has('n') && params.has('d') && params.has('t')) {
+            Promise.all([
+                import('../utils/urlUtils'),
+                import('../utils/astrology')
+            ]).then(([{ deserializeChartDetails }, { calculatePlanetaryPositions }]) => {
+                const details = deserializeChartDetails(params);
+                if (details) {
+                    try {
+                        const date = new Date(`${details.date}T${details.time}`);
+                        const chart = calculatePlanetaryPositions(date, details.lat, details.lng);
+                        setChartData({ ...chart, userDetails: details });
+                        console.log("Hydrated chart from URL");
+                    } catch (e) {
+                        console.error("Failed to hydrate chart from URL", e);
+                    }
+                }
+            });
+        }
+    }, []);
+
     return (
         <ChartContext.Provider value={{ chartData, setChartData }}>
             {children}

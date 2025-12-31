@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Star, AlertTriangle, Crown, Activity, Eye, ArrowRight } from 'lucide-react';
-import { NAKSHATRAS, ZODIAC_SIGNS, TAMIL_RASI_NAMES } from '../utils/constants';
+import { ChevronDown, ChevronUp, Star, AlertTriangle, Crown, Activity, Eye, ArrowRight, Share2 } from 'lucide-react';
+import { NAKSHATRAS, ZODIAC_SIGNS, TAMIL_RASI_NAMES, PLANET_SYMBOLS } from '../utils/constants';
 import {
     getNakshatra,
     calculateDignity,
@@ -34,9 +34,85 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
 
 
 
-    if (!data) return null;
+    // If no data prop, try to load from URL or Context
+    const [hydratedData, setHydratedData] = useState<any>(null);
+    const [loading, setLoading] = useState(!data);
 
-    const { planets, ascendant } = data;
+    React.useEffect(() => {
+        if (!data) {
+            const params = new URLSearchParams(window.location.search);
+            import('../utils/urlUtils').then(({ deserializeChartDetails }) => {
+                const details = deserializeChartDetails(params);
+                if (details) {
+                    import('../utils/astrology').then(({ calculatePlanetaryPositions }) => {
+                        try {
+                            const date = new Date(`${details.date}T${details.time}`);
+                            const chart = calculatePlanetaryPositions(date, details.lat, details.lng);
+                            setHydratedData({ ...chart, userDetails: details }); // mimic structure
+                            setLoading(false);
+                        } catch (e) { console.error(e); setLoading(false); }
+                    });
+                } else {
+                    setLoading(false);
+                }
+            });
+        }
+    }, [data]);
+
+    const activeChart = data || hydratedData;
+
+    // Sync URL with state
+    React.useEffect(() => {
+        if (activeChart && activeChart.userDetails) {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.has('n')) {
+                import('../utils/urlUtils').then(({ generateSingleChartShareLink }) => {
+                    const link = generateSingleChartShareLink('/analysis', activeChart.userDetails);
+                    const query = link.split('?')[1];
+                    if (query) {
+                        const newUrl = `${window.location.pathname}?${query}`;
+                        window.history.replaceState({ ...window.history.state }, '', newUrl);
+                    }
+                });
+            }
+        }
+    }, [activeChart]);
+
+    if (loading) return <div className="p-12 text-center text-slate-400">Loading Chart...</div>;
+    if (!activeChart) return null;
+
+    const { planets, ascendant } = activeChart;
+    const userDetails = activeChart.userDetails || {}; // Fallback for name
+
+    const handleShare = async () => {
+        try {
+            const { generateSingleChartShareLink } = await import('../utils/urlUtils');
+            // Assuming we have access to user details from somewhere, but data might be clean chart data.
+            // If data came from context, we might rely on props passed down or context state. 
+            // For now, if hydrated, we have details. If from props? 
+            // Ideally ChartAnalysis receives 'userDetails' in data prop too.
+            if (activeChart.userDetails) {
+                const link = generateSingleChartShareLink('/analysis', activeChart.userDetails);
+                await navigator.clipboard.writeText(link);
+                alert(language === 'ta' ? 'இணைப்பு நகலெடுக்கப்பட்டது!' : 'Link copied to clipboard!');
+            } else {
+                alert("Cannot share this chart (missing details)");
+            }
+        } catch (e) {
+            console.error("Share failed", e);
+        }
+    };
+
+    // Header with Share Button (Only if details exist)
+    const ShareButton = () => (
+        <button
+            onClick={handleShare}
+            className="mb-6 flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors border border-blue-500/30 w-fit"
+        >
+            <Share2 className="w-5 h-5" />
+            {language === 'ta' ? 'பகிர்' : 'Share Chart'}
+        </button>
+    );
     const [expandedSection, setExpandedSection] = useState<string | null>('planets');
     const [isGurujiModalOpen, setIsGurujiModalOpen] = useState(false);
 
@@ -73,15 +149,18 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-orange-500">
+                    {language === 'ta' ? 'ஜாதக ஆய்வு' : 'Chart Analysis'}
+                </h2>
+                {activeChart.userDetails && <ShareButton />}
+            </div>
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center mb-8"
             >
-                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                    {t.analysis.title}
-                </h2>
                 <p className="text-slate-400 mb-4">{t.analysis.subtitle}</p>
 
             </motion.div>
@@ -192,6 +271,86 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                                         })}
                                     </tbody>
                                 </table>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            {/* Retrograde Analysis Section */}
+            <div className="glass-panel overflow-hidden">
+                <button
+                    onClick={() => toggleSection('retrograde')}
+                    className="w-full px-6 py-4 flex items-center justify-between bg-slate-900/50 hover:bg-slate-800/50 transition-colors"
+                >
+                    <div className="flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-red-400" />
+                        <h3 className="text-lg font-semibold">{language === 'ta' ? 'வக்ர கிரகங்கள் (Retrograde)' : 'Retrograde Analysis'}</h3>
+                    </div>
+                    {expandedSection === 'retrograde' ? <ChevronUp /> : <ChevronDown />}
+                </button>
+
+                <AnimatePresence>
+                    {expandedSection === 'retrograde' && (
+                        <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: 'auto' }}
+                            exit={{ height: 0 }}
+                            className="p-6 text-slate-300"
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Current Status */}
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-400 uppercase mb-4">{language === 'ta' ? 'தற்போதைய நிலை' : 'Current Status'}</h4>
+                                    <div className="space-y-3">
+                                        {planets.map((planet: any) => {
+                                            if (['Sun', 'Moon', 'Rahu', 'Ketu'].includes(planet.name)) return null;
+                                            return (
+                                                <div key={planet.name} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-lg">{PLANET_SYMBOLS[planet.name as keyof typeof PLANET_SYMBOLS]}</span>
+                                                        <span className="font-medium">{language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}</span>
+                                                    </div>
+                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${planet.isRetro ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                        {planet.isRetro
+                                                            ? (language === 'ta' ? 'வக்ரம்' : 'Retrograde')
+                                                            : (language === 'ta' ? 'நேர்கதி' : 'Direct')}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Info Card */}
+                                <div className="bg-slate-800/30 p-4 rounded-xl border border-slate-700/50">
+                                    <h4 className="flex items-center gap-2 text-sm font-bold text-slate-400 uppercase mb-4">
+                                        <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                                        {language === 'ta' ? 'வக்ர கால அளவு' : 'Retrograde Cycles'}
+                                    </h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between items-start border-b border-slate-700/50 pb-2">
+                                            <span>{language === 'ta' ? 'புதன் (☿)' : 'Mercury (☿)'}</span>
+                                            <span className="text-right text-slate-400">{language === 'ta' ? 'வருடத்திற்கு 3-4 முறை (3 வாரங்கள்)' : '3-4 times a year (3 weeks)'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-start border-b border-slate-700/50 pb-2">
+                                            <span>{language === 'ta' ? 'சுக்கிரன் (♀)' : 'Venus (♀)'}</span>
+                                            <span className="text-right text-slate-400">{language === 'ta' ? '18 மாதங்களுக்கு ஒருமுறை (40 நாட்கள்)' : 'Every 18 months (40 days)'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-start border-b border-slate-700/50 pb-2">
+                                            <span>{language === 'ta' ? 'செவ்வாய் (♂)' : 'Mars (♂)'}</span>
+                                            <span className="text-right text-slate-400">{language === 'ta' ? '2 வருடங்களுக்கு ஒருமுறை (2-3 மாதங்கள்)' : 'Every 2 years (2-3 months)'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-start border-b border-slate-700/50 pb-2">
+                                            <span>{language === 'ta' ? 'குரு (♃)' : 'Jupiter (♃)'}</span>
+                                            <span className="text-right text-slate-400">{language === 'ta' ? 'ஒவ்வொரு வருடமும் (4 மாதங்கள்)' : 'Every year (4 months)'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-start">
+                                            <span>{language === 'ta' ? 'சனி (♄)' : 'Saturn (♄)'}</span>
+                                            <span className="text-right text-slate-400">{language === 'ta' ? 'ஒவ்வொரு வருடமும் (4.5 மாதங்கள்)' : 'Every year (4.5 months)'}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </motion.div>
                     )}
@@ -667,7 +826,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
 
                 {/* Guruji's Predictions (FAQ) - Moved to separate page */}
             </div>
-        </div>
+        </div >
     );
 };
 

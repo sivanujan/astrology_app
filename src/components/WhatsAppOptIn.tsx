@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageCircle, Send, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';

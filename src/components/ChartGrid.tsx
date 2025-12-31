@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TAMIL_RASI_NAMES, PLANET_SYMBOLS } from '../utils/constants';
-import { TAMIL_PLANET_ABBREVIATIONS, TAMIL_PLANET_NAMES } from '../utils/translations';
+import { TAMIL_PLANET_NAMES } from '../utils/translations';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getFunctionalNature } from '../utils/adityaGurujiSubathuvam';
 
 export interface ChartGridProps {
     title: string;
@@ -13,6 +14,31 @@ export interface ChartGridProps {
 
 const ChartGrid: React.FC<ChartGridProps> = ({ title, planets, ascendant, onCenterContent }) => {
     const { t, language } = useLanguage();
+
+    // Determine functional nature based on Ascendant (Force English for stable logic keys)
+    const nature = useMemo(() => getFunctionalNature(ascendant.signIndex, 'en'), [ascendant.signIndex]);
+
+    // Helper to get color based on nature
+    const getPlanetColor = (planetName: string) => {
+        // User overrides
+        if (planetName === 'Sun') return 'text-orange-400';
+        if (planetName === 'Venus') return 'text-green-400';
+        if (planetName === 'Mercury') {
+            const planet = planets.find((p: any) => p.name === 'Mercury');
+            if (planet) {
+                const count = planets.filter((p: any) => p.signIndex === planet.signIndex).length;
+                return count === 1 ? 'text-green-400' : 'text-orange-400';
+            }
+        }
+
+        // Default to Functional Nature for others
+        const pNature = nature[planetName]?.nature;
+        if (!pNature) return 'text-yellow-300';
+
+        if (['Yogakaraka', 'Benefic'].includes(pNature)) return 'text-green-400 font-semibold';
+        if (['Malefic', 'Maraka'].includes(pNature)) return 'text-red-400';
+        return 'text-yellow-300';
+    };
 
     // Helper to get planets in a specific sign index
     const getPlanetsInSign = (signIndex: number) => {
@@ -30,17 +56,19 @@ const ChartGrid: React.FC<ChartGridProps> = ({ title, planets, ascendant, onCent
 
     return (
         <div className="flex flex-col items-center w-full">
-            <h3 className="text-xl font-semibold mb-4 text-slate-300">{title}</h3>
-            <div className="aspect-square w-full max-w-xl relative bg-slate-900/50 rounded-lg border-2 border-slate-700 shadow-2xl overflow-hidden">
+            <h3 className="text-xl font-semibold mb-4 text-slate-300 tracking-wide">{title}</h3>
+            <div className="aspect-square w-full max-w-xl relative bg-slate-900 rounded-xl border-2 border-slate-700 shadow-2xl overflow-hidden ring-1 ring-slate-800">
                 <div className="grid grid-cols-4 grid-rows-4 h-full w-full">
                     {gridMap.map((signIndex, gridIndex) => {
                         if (signIndex === -1) {
                             if (gridIndex === 5) {
                                 return (
-                                    <div key="center-content" className="col-span-2 row-span-2 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm border border-slate-800/50 m-1 rounded-lg">
+                                    <div key="center-content" className="col-span-2 row-span-2 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm border border-slate-800/50 m-1 rounded-2xl relative overflow-hidden group">
+                                        {/* Cosmic Center Effect */}
+                                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10 opacity-50" />
                                         {onCenterContent ? onCenterContent() : (
-                                            <div className="text-center p-4">
-                                                <div className="text-4xl font-serif text-slate-700 opacity-20 mb-2">ॐ</div>
+                                            <div className="text-center p-4 relative z-10">
+                                                <div className="text-5xl font-serif text-slate-700 opacity-20 mb-2 animate-pulse">ॐ</div>
                                             </div>
                                         )}
                                     </div>
@@ -58,53 +86,54 @@ const ChartGrid: React.FC<ChartGridProps> = ({ title, planets, ascendant, onCent
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ delay: gridIndex * 0.05 }}
                                 className={`
-                  relative border border-slate-700/50 bg-slate-900/30 hover:bg-slate-800/50 transition-colors p-1 flex flex-col
-                  ${isAscendant ? 'ring-1 ring-purple-500/50 bg-purple-900/10' : ''}
+                  relative border border-slate-700/50 bg-slate-900/40 hover:bg-slate-800/60 transition-colors flex flex-col p-1
+                  ${isAscendant ? 'ring-2 ring-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.3)] bg-purple-900/20 z-10' : ''}
                 `}
                             >
+                                {/* Rasi Name Watermark */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-                                    <span className="text-[10px] md:text-xs font-bold text-slate-800 uppercase tracking-widest rotate-[-45deg] opacity-50">
+                                    <span className="text-[10px] md:text-sm font-bold text-slate-800 uppercase tracking-widest rotate-[-45deg] opacity-40">
                                         {TAMIL_RASI_NAMES[signIndex]}
                                     </span>
                                 </div>
 
+                                {/* Ascendant Badge */}
                                 {isAscendant && (
-                                    <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] px-1 rounded-bl shadow-sm z-10">
-                                        {t.chart.lagna}
+                                    <div className="absolute -top-px -right-px bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-bl shadow-sm z-20 uppercase tracking-wider">
+                                        {t.chart.lagna} ({TAMIL_RASI_NAMES[signIndex]})
                                     </div>
                                 )}
 
-                                <div className="absolute top-0 left-0 text-[10px] text-slate-500 font-mono px-1">
+                                {/* House Number */}
+                                <div className="absolute top-0.5 left-1 text-xs md:text-sm font-bold text-slate-500 font-mono opacity-60">
                                     {((signIndex - ascendant.signIndex + 12) % 12) + 1}
                                 </div>
 
-                                <div className="relative z-10 grid grid-cols-2 gap-0.5 mt-auto">
+                                {/* Planet List */}
+                                <div className={`relative z-10 flex flex-col justify-center h-full gap-0.5 mt-3 ${cellPlanets.length > 4 ? 'scale-90 origin-center' : ''}`}>
                                     {cellPlanets.map((planet: any, i: number) => (
-                                        <motion.div
+                                        <div
                                             key={planet.name}
-                                            initial={{ opacity: 0, y: 5 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.5 + (i * 0.1) }}
                                             className={`
-                        text-[10px] md:text-xs font-medium px-0.5 py-0.5 rounded
-                        ${planet.name === 'Sun' ? 'text-yellow-400' :
-                                                    planet.name === 'Moon' ? 'text-white' :
-                                                        planet.name === 'Mars' ? 'text-red-400' :
-                                                            planet.name === 'Mercury' ? 'text-green-400' :
-                                                                planet.name === 'Jupiter' ? 'text-yellow-200' :
-                                                                    planet.name === 'Venus' ? 'text-pink-300' :
-                                                                        planet.name === 'Saturn' ? 'text-blue-300' :
-                                                                            'text-slate-300'}
-                      `}
-                                            title={`${language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}: ${Math.floor(planet.degree)}°`}
+                                                flex items-center justify-between px-1 rounded hover:bg-white/5 transition-colors
+                                                text-[9px] md:text-[10px] lg:text-xs font-medium leading-tight
+                                                ${getPlanetColor(planet.name)}
+                                            `}
                                         >
-                                            {language === 'ta' ? TAMIL_PLANET_ABBREVIATIONS[planet.name] : PLANET_SYMBOLS[planet.name as keyof typeof PLANET_SYMBOLS]}
-                                            {planet.isRetro && (
-                                                <sup className="text-[8px] text-red-300 ml-0.5 font-bold">
-                                                    {language === 'ta' ? 'வ' : 'R'}
-                                                </sup>
-                                            )}
-                                        </motion.div>
+                                            <div className="flex items-center gap-1">
+                                                <span>
+                                                    {language === 'ta' ? TAMIL_PLANET_NAMES[planet.name] : planet.name}
+                                                </span>
+                                                {planet.isRetro && (
+                                                    <span className="text-[8px] text-red-500 font-bold bg-red-500/10 px-0.5 rounded ml-0.5">
+                                                        {language === 'ta' ? 'வ' : '(R)'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-[8px] md:text-[9px] opacity-60 font-mono tracking-tighter">
+                                                {Math.floor(planet.degree)}°
+                                            </span>
+                                        </div>
                                     ))}
                                 </div>
                             </motion.div>

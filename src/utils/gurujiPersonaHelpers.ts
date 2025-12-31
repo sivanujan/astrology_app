@@ -32,7 +32,7 @@ export const generateGurujiPersonaProfile = (chartData: any, birthDetails: any) 
 
     // Fix: Get Moon Longitude for Dasa Calculation
     const moon = planets.find((p: any) => p.name === 'Moon');
-    const moonLon = moon ? moon.fullDegree : 0; // Assuming fullDegree exists, or calculate from sign + degree
+    const moonLon = moon ? (moon.fullDegree || moon.longitude || 0) : 0;
 
     // Call with correct 2 arguments
     const dasaPeriods = calculateDashaPeriods(new Date(birthDetails.date), moonLon);

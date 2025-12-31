@@ -248,7 +248,9 @@ const MarriageMatching: React.FC = () => {
                             ascendant: getAscendantSign(girlChart),
                             moonSign: getMoonSign(girlChart),
                             planets: girlChart.planets
-                        }
+                        },
+                        boyDetails,
+                        girlDetails
                     }
                 });
 
@@ -264,7 +266,9 @@ const MarriageMatching: React.FC = () => {
                         boyName: boyDetails.name,
                         girlName: girlDetails.name,
                         boyChart: null,
-                        girlChart: null
+                        girlChart: null,
+                        boyDetails,
+                        girlDetails
                     }
                 });
             }

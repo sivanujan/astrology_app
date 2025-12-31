@@ -70,6 +70,32 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
 
     const navamsaData = useMemo(() => getNavamsaChartData(data), [data]);
 
+    // Sync URL with state
+    React.useEffect(() => {
+        if (data && data.userDetails) {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.has('n')) {
+                import('../utils/urlUtils').then(({ generateSingleChartShareLink }) => {
+                    // We just need the query string really
+                    const link = generateSingleChartShareLink('/chart', {
+                        name: data.userDetails.name,
+                        date: data.userDetails.date,
+                        time: data.userDetails.time,
+                        lat: data.userDetails.lat,
+                        lng: data.userDetails.lng,
+                        place: data.userDetails.city
+                    });
+                    // Extract query part
+                    const query = link.split('?')[1];
+                    if (query) {
+                        const newUrl = `${window.location.pathname}?${query}`;
+                        window.history.replaceState({ ...window.history.state }, '', newUrl);
+                    }
+                });
+            }
+        }
+    }, [data]);
+
     if (!data) return null;
 
     return (

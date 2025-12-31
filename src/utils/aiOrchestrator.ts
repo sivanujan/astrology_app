@@ -1793,12 +1793,20 @@ RULES FOR ANALYSIS:
 
 4. REVEAL AGE-BASED EVENTS (From 'shocking_events'):
    - Use the 'shocking_events' list to tell them exactly what happened at what age.
-   - Example: "At age 19, during Saturn Dasa - Mercury Bhukti, you likely faced a break in education." (Say this in Tamil).
-   - Direct and specific.
+    - Example: "At age 19, during Saturn Dasa - Mercury Bhukti, you likely faced a break in education." (Say this in Tamil).
+    - Direct and specific.
+
+5. TENSE HANDLING (CRITICAL):
+    - Verify the 'year' of the event against the current year (2025).
+    - If the event year is in the PAST (e.g., 2000, 2010): Use PAST TENSE.
+      - INCORRECT: "2000ல் பிரச்சனை ஏற்பட வாய்ப்பு உள்ளது" (Future tense for past)
+      - CORRECT: "2000ல் பிரச்சனை ஏற்பட்டிருக்கலாம்" or "ஏற்பட்டது" (Past tense)
+    - If the event year is in the FUTURE: Use FUTURE TENSE.
+      - CORRECT: "2030ல் யோகம் கிடைக்கும்"
 
 OUTPUT STRUCTURE (In Tamil):
 1. **உங்கள் அடிப்படை குணம் (Core Character):** (Describe based on Lagna & Moon).
-2. **மறைந்திருக்கும் உண்மைகள் (Shocking Truths):** (Tell 3 specific points about their secret nature, struggles, OR past trauma based on Papathuvam/Shocking Events).
+2. **மறைந்திருக்கும் உண்மைகள் (Shocking Truths & Past Events):** (Tell 3 specific points. For past events, strictly use PAST tense like "நடந்தது", "ஏற்பட்டது").
 3. **தொழில் & வருமானம்:** .
 4. **திருமணம் & உறவு:**
 5. **இப்போதைய நிலைமை:** 
@@ -1847,58 +1855,73 @@ IMPORTANT: Return VALID RAW JSON formatting is NOT needed. Just return the clear
         const systemPrompt = language === 'ta' ? tamilPrompt : englishPrompt;
 
         const userContext = JSON.stringify(profileData, null, 2);
-
+        // reliable models list (Free first, then Paid fallbacks)
         const models = [
-            "google/gemini-2.0-flash-exp:free",
-            "google/gemini-2.0-flash-thinking-exp:free",
-            "meta-llama/llama-3.2-11b-vision-instruct:free",
+            "google/gemini-2.0-flash-exp:free", // Fast & Good
+            "google/gemini-2.0-flash-thinking-exp:free", // Smarter
+            "mistralai/mistral-7b-instruct:free", // Backup Free
+            "openai/gpt-4o", // Paid High Quality (Fallback)
+            "google/gemini-flash-1.5" // Paid Speed (Fallback)
         ];
 
-        let retries = 3;
+        let retries = models.length;
         let modelIndex = 0;
 
         while (retries > 0) {
-            const currentModel = models[modelIndex % models.length]; // Cycle models
+            const currentModel = models[modelIndex % models.length];
+            console.log(`🤖 Attempting AI generation with model: ${currentModel} (Retries left: ${retries})`);
+
             try {
                 const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${apiKey}`,
                         "Content-Type": "application/json",
-                        "HTTP-Referer": "https://astrology-app.com", // Recommended by OpenRouter
+                        "HTTP-Referer": "https://astrology-app.com",
+                        "X-Title": "Astrology App"
                     },
                     body: JSON.stringify({
                         "model": currentModel,
                         "messages": [
                             { "role": "system", "content": systemPrompt },
                             { "role": "user", "content": userContext }
-                        ]
+                        ],
+                        // Add safety settings if needed, but standard params are safer for now
+                        "temperature": 0.7,
+                        "max_tokens": 2000
                     })
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    return data.choices[0].message.content || "Prediction generation failed.";
+                    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                        console.log("✅ AI Generation Successful!");
+                        return data.choices[0].message.content;
+                    } else {
+                        throw new Error("Invalid response format from AI provider");
+                    }
                 }
+
+                // Log error details
+                const errorText = await response.text();
+                console.warn(`⚠️ Error ${response.status} on ${currentModel}:`, errorText);
 
                 if (response.status === 429) {
-                    console.warn(`Rate limited (429) on ${currentModel}. Switching models...`);
-                    modelIndex++; // Try next model
-                    await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s
-                    retries--;
-                    continue;
+                    // Rate limit - wait longer
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                } else {
+                    // Other errors - short wait
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
 
-                // For other errors (500, etc), also try switching
-                console.warn(`Error ${response.status} on ${currentModel}. Switching models...`);
                 modelIndex++;
                 retries--;
 
             } catch (err) {
-                console.warn(`Network error on ${currentModel}. Switching...`);
+                console.warn(`❌ Network/System error on ${currentModel}:`, err);
                 modelIndex++;
                 retries--;
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
         }
 
@@ -1907,5 +1930,175 @@ IMPORTANT: Return VALID RAW JSON formatting is NOT needed. Just return the clear
     } catch (error) {
         console.error("Guruji Persona Gen Error:", error);
         return "உங்களின் ஜாதகத்தை கணிப்பதில் சிரமம் உள்ளது. சிறிது நேரம் கழித்து முயற்சிக்கவும்.";
+    }
+};
+
+/**
+ * Generate Comprehensive Marriage Matching Analysis
+ */
+export const generateMarriageMatchingAI = async (
+    boyDetails: any,
+    girlDetails: any,
+    matchingResult: any,
+    language: 'en' | 'ta' = 'ta',
+    apiKey: string = OPENROUTER_API_KEY
+): Promise<string> => {
+    // Normalize data (Handle both Standard and Comprehensive Result structures)
+    try {
+        const isComprehensive = 'dasaSync' in matchingResult;
+
+        const overallScore = matchingResult.overallScore;
+        const verdict = matchingResult.verdict;
+
+        // Dasa Matching
+        const dasaScore = isComprehensive
+            ? matchingResult.dasaSync.score
+            : matchingResult.dasaMatching?.score || 0;
+
+        const dasaWarning = isComprehensive
+            ? (matchingResult.dasaSync.warnings?.length > 0 || matchingResult.autoRejectReasons?.some((r: string) => r.includes('6-8')))
+            : matchingResult.dasaMatching?.sixEightRelationship || false;
+
+        // House Matching
+        const house2Score = isComprehensive ? matchingResult.house2nd?.score : matchingResult.houseMatching?.house2?.score || 0;
+        const house7Score = isComprehensive ? matchingResult.house7th?.score : matchingResult.houseMatching?.house7?.score || 0;
+        const house8Score = isComprehensive ? matchingResult.house8th?.score : matchingResult.houseMatching?.house8?.score || 0;
+
+        const tamilPrompt = `You are an expert Vedic Astrologer specializing in Marriage Matching (Thirumana Porutham) using Aditya Guruji's Subathuvam & Dasa methods.
+Your task is to analyze the provided Marriage Matching Result and give a **Detailed, Honest, and Predictive Analysis** in Tamil.
+
+USER DATA:
+- Boy: ${boyDetails.name} (${boyDetails.date})
+- Girl: ${girlDetails.name} (${girlDetails.date})
+- Compatibility Score: ${overallScore}/100
+- Verdict: ${verdict}
+- Dasa Compatibility: Score ${dasaScore}/100
+- 6-8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
+- House Matching:
+   - 2nd House (Family): ${house2Score}
+   - 7th House (Kalathra): ${house7Score}
+   - 8th House (Longevity): ${house8Score}
+
+RULES FOR ANALYSIS (Strictly in Tamil Language):
+0. **LANGUAGE INSTRUCTION:** You MUST output the entire analysis ONLY in Tamil (தமிழ்). Do not use English words unless absolutely necessary for technical terms.
+1. **START WITH A CLEAR VERDICT:** 
+   - "இந்த திருமணம் சிறப்பாக இருக்கும்" (Recommended) OR "இந்த திருமணத்தை தவிர்ப்பது நல்லது" (Not Recommended).
+   - Base this on the 'Verdict' and 'Overall Score'.
+
+2. **ANALYZE DASA SANDHI (Crucial):**
+   - Look at 'dasaMatching'. If there is a 6-8 relationship (Sashtashtama), WARN THEM seriously.
+   - Explain what will happen: "தசா நாதர்கள் 6-8 க இருப்பதால், ஈகோ பிரச்சனைகள் வரும்..."
+   - If Dasa is good: Predict growth after marriage.
+
+3. **PREDICT THE FUTURE (Next 5-10 Years):**
+   - Use the 'nextTenYears' timeline (if good) to predict: "குழந்தை பாக்கியம்", "சொத்து சேரும் காலம்".
+   - If verified risks exist: Mention "பிரிவு ஏற்பட வாய்ப்பு" (Possibility of separation) honestly but gently.
+
+OUTPUT STRUCTURE (Return plain Tamil text with headers):
+1. **திருமண பொருத்த முடிவு (Final Verdict):**
+2. **மனயீர்ப்பு & ஒற்றுமை (Psychological Compatibility):**
+3. **தசா-புத்தி சவால்கள் (Dasa Predictions):** (Explain 6-8 issues if any).
+4. **எதிர்கால வாழ்க்கை (Future Prediction):** (Career, Wealth after marriage).
+
+Tone: Trusted Guruji, Caring, Protective but Truthful.
+`;
+
+        const englishPrompt = `You are an expert Vedic Astrologer specializing in Marriage Matching using Aditya Guruji's Subathuvam & Dasa methods.
+Your task is to analyze the provided Marriage Matching Result and give a **Detailed, Honest, and Predictive Analysis** in English.
+
+USER DATA:
+- Boy: ${boyDetails.name} (${boyDetails.date})
+- Girl: ${girlDetails.name} (${girlDetails.date})
+- Compatibility Score: ${overallScore}/100
+- Verdict: ${verdict}
+- Dasa Compatibility: Score ${dasaScore}/100
+- 6-8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
+- House Matching:
+   - 2nd House (Family): ${house2Score}
+   - 7th House (Kalathra): ${house7Score}
+   - 8th House (Longevity): ${house8Score}
+
+OUTPUT STRUCTURE (Return plain English text with headers):
+1. **Final Verdict (Marriage Decision):**
+2. **Compatibility & Understanding:**
+3. **Dasa & Timing Analysis:** (Crucial for long term).
+4. **Future Predictions (Post-Marriage):** (Wealth, Children, Career).
+
+Tone: Professional, Insightful, and Honest.
+`;
+
+        const systemPrompt = language === 'ta' ? tamilPrompt : englishPrompt;
+        const contextData = JSON.stringify(matchingResult, null, 2);
+
+        // Model List (Smartest First)
+        const models = [
+            'google/gemini-2.0-flash-exp:free',
+            'google/gemini-2.0-flash-thinking-exp:free',
+            'meta-llama/llama-3.1-70b-instruct:free',
+            'mistralai/mistral-7b-instruct:free',
+            'openai/gpt-4o', // Paid Fallback
+            'google/gemini-flash-1.5' // Paid Fallback
+        ];
+
+        let modelIndex = 0;
+        let retries = models.length;
+
+        while (retries > 0 && modelIndex < models.length) {
+            const currentModel = models[modelIndex];
+            console.log(`🤖 Attempting Marriage AI with model: ${currentModel}`);
+
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${apiKey}`,
+                        "HTTP-Referer": "https://astrology-app.com",
+                        "X-Title": "Astrology App",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "model": currentModel,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": systemPrompt
+                            },
+                            {
+                                "role": "user",
+                                "content": `Analyze this matching result:\n${contextData}\n\nIMPORTANT: Output the analysis STRICTLY in ${language === 'ta' ? 'TAMIL (தமிழ்)' : 'ENGLISH'} language.`
+                            }
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 2000
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.choices && data.choices.length > 0) {
+                        return data.choices[0].message.content;
+                    }
+                }
+
+                // If failed, try next model
+                console.warn(`⚠️ Model ${currentModel} failed or returned empty.`);
+                modelIndex++;
+                retries--;
+
+            } catch (e) {
+                console.error(`Error with ${currentModel}:`, e);
+                modelIndex++;
+                retries--;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        throw new Error("All models failed");
+
+    } catch (error) {
+        console.error("Error in Marriage AI:", error);
+        return language === 'ta'
+            ? "மன்னிக்கவும், தொழில்நுட்ப கோளாறு உள்ளது."
+            : "Sorry, error generating analysis.";
     }
 };
