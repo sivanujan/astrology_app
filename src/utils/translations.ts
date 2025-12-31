@@ -44,7 +44,10 @@ export const translations = {
             noChartsSub: "Create your first birth chart to begin your cosmic journey",
             getStarted: "Get Started",
             viewChart: "View Chart",
-            loading: "Loading your charts..."
+            loading: "Loading your charts...",
+            createNew: "Create New Chart",
+            savedCharts: "Saved Charts",
+            createFirst: "Create your first birth chart to reveal planetary insights."
         },
         input: {
             title: "Discover Your Cosmic Blueprint",
@@ -295,7 +298,10 @@ export const translations = {
             noChartsSub: "உங்கள் ஜோதிட பயணத்தைத் தொடங்க முதல் ஜாதகத்தை உருவாக்கவும்",
             getStarted: "தொடங்கவும்",
             viewChart: "ஜாதகத்தை பார்க்க",
-            loading: "ஜாதகங்கள் ஏற்றப்படுகின்றன..."
+            loading: "ஜாதகங்கள் ஏற்றப்படுகின்றன...",
+            createNew: "புதிய ஜாதகம்",
+            savedCharts: "சேமிக்கப்பட்ட ஜாதகங்கள்",
+            createFirst: "உங்கள் முதல் ஜாதகத்தை உருவாக்கி பலன்களை அறியவும்."
         },
         input: {
             title: "உங்கள் ஜாதகத்தை கண்டறியவும்",

@@ -18,6 +18,14 @@ export const NAKSHATRAS = [
     "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
 ];
 
+export const TAMIL_NAKSHATRAS = [
+    "அஸ்வினி", "பரணி", "கார்த்திகை", "ரோகிணி", "மிருகசீரிடம்", "திருவாதிரை",
+    "புனர்பூசம்", "பூசம்", "ஆயில்யம்", "மகம்", "பூரம்", "உத்திரம்",
+    "ஹஸ்தம்", "சித்திரை", "சுவாதி", "விசாகம்", "அனுஷம்", "கேட்டை",
+    "மூலம்", "பூராடம்", "உத்திராடம்", "திருவோணம்", "அவிட்டம்",
+    "சதயம்", "பூரட்டாதி", "உத்திரட்டாதி", "ரேவதி"
+];
+
 export const PLANETS = [
     "Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"
 ];
