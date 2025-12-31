@@ -174,10 +174,36 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 enrichedData = { ...enrichedData, yogas, doshas };
             }
 
-            // Call the Orchestrator with enriched data
-            // Call the Orchestrator with enriched data
+            // CRITICAL VALIDATION: Ensure Dasha calculation succeeded
+            if (!enrichedData.currentDasa || !enrichedData.dashaPeriods || enrichedData.dashaPeriods.length === 0) {
+                console.error('[AI Chat] Dasha calculation failed or incomplete:', {
+                    hasDasa: !!enrichedData.currentDasa,
+                    hasSchedule: !!enrichedData.dashaPeriods,
+                    scheduleLength: enrichedData.dashaPeriods?.length || 0
+                });
 
-            // Call the Orchestrator with selected response language
+                setError(isTamil ?
+                    'தசா கணக்கீடு முடிவடையவில்லை. பக்கத்தை புதுப்பித்து மீண்டும் முயற்சிக்கவும்.' :
+                    'Dasha calculation incomplete. Please refresh the page and try again.');
+                setIsLoading(false);
+                return;
+            }
+
+            // Debug: Log what we're sending to AI
+            console.log('[AI Chat] Sending to AI:', {
+
+
+                question: question,
+                hasDasha: !!enrichedData.currentDasa,
+                dashaLord: enrichedData.currentDasa?.maha?.planet,
+                bhuktiLord: enrichedData.currentDasa?.bhukti?.planet,
+                hasSchedule: !!enrichedData.dashaPeriods,
+                scheduleLength: enrichedData.dashaPeriods?.length || 0,
+                hasSubathuvam: !!enrichedData.subathuvam_calculations,
+                responseLanguage: responseLanguage
+            });
+
+            // Call the Orchestrator with enriched data
             const response = await queryAstrologyOrchestrator(question, enrichedData, responseLanguage);
 
             setPrediction(response);
@@ -334,11 +360,11 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     )}
 
                     {chatHistory.map((msg, idx) => (
-                        <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-blue-600' : 'bg-purple-600'}`}>
-                                {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-white" />}
+                        <div key={idx} className={`flex gap-4 mb-6 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600'}`}>
+                                {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <span className="text-xl">🔮</span>}
                             </div>
-                            <div className={`rounded-lg p-4 max-w-[80%] ${msg.role === 'user' ? 'bg-blue-900/30 text-blue-100' : 'bg-slate-800/50 text-slate-200'}`}>
+                            <div className={`rounded-2xl p-5 max-w-[80%] shadow-lg text-base md:text-lg leading-relaxed ${msg.role === 'user' ? 'bg-blue-600/40 border border-blue-500/30 shadow-blue-500/10 text-blue-50' : 'bg-indigo-900/30 border border-indigo-500/20 shadow-indigo-500/10 text-slate-100'}`} style={{ fontFamily: 'Noto Sans Tamil, sans-serif' }}>
                                 {msg.content}
                                 {msg.details?.bava_analysis_report && (
                                     <div className="mt-6 space-y-4">
@@ -383,10 +409,37 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                     </div>
                                 )}
                                 {msg.details && !msg.details.bava_analysis_report && (
-                                    <div className="mt-4 pt-4 border-t border-slate-700 text-sm text-slate-400">
-                                        <p><strong>Intent:</strong> {msg.details.intent}</p>
-                                        <p><strong>Key Planet:</strong> {msg.details.primary_analysis.key_planet} ({msg.details.primary_analysis.status})</p>
-                                        <p><strong>Reasoning:</strong> {msg.details.reasoning}</p>
+                                    <div className="mt-6 space-y-3">
+                                        {msg.details.intent && (
+                                            <div className="bg-slate-800/40 rounded-xl border border-indigo-500/30 p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span>📋</span>
+                                                    <span className="font-bold text-indigo-300 text-sm">Intent</span>
+                                                </div>
+                                                <p className="text-slate-300 text-sm">{msg.details.intent}</p>
+                                            </div>
+                                        )}
+                                        {msg.details.primary_analysis?.key_planet && (
+                                            <div className="bg-slate-800/40 rounded-xl border border-purple-500/30 p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span>🪐</span>
+                                                    <span className="font-bold text-purple-300 text-sm">Key Planet</span>
+                                                </div>
+                                                <p className="text-slate-300 text-sm">
+                                                    {msg.details.primary_analysis.key_planet}
+                                                    {msg.details.primary_analysis.status && ` (${msg.details.primary_analysis.status})`}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {msg.details.reasoning && (
+                                            <div className="bg-slate-800/40 rounded-xl border border-cyan-500/30 p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span>💭</span>
+                                                    <span className="font-bold text-cyan-300 text-sm">Reasoning</span>
+                                                </div>
+                                                <p className="text-slate-300 text-sm leading-relaxed">{msg.details.reasoning}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -398,17 +451,34 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                         existingFeedback={msg.feedback}
                                     />
                                 )}
+
+                                {/* TIMESTAMP */}
+                                {msg.timestamp && (
+                                    <div className={`flex items-center gap-1 text-xs text-slate-500 mt-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <Clock className="w-3 h-3" />
+                                        <span>
+                                            {new Date(msg.timestamp.seconds ? msg.timestamp.seconds * 1000 : msg.timestamp).toLocaleTimeString(isTamil ? 'ta-IN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
 
                     {isLoading && (
-                        <div className="flex gap-4">
-                            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
-                                <Bot className="w-5 h-5 text-white" />
+                        <div className="flex gap-4 mb-6">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg">
+                                <span className="text-xl">🔮</span>
                             </div>
-                            <div className="bg-slate-800/50 rounded-lg p-4 text-slate-200">
-                                <Sparkles className="w-5 h-5 animate-spin" /> Thinking...
+                            <div className="bg-indigo-900/30 border border-indigo-500/20 rounded-2xl p-5 shadow-lg shadow-indigo-500/10">
+                                <div className="flex items-center gap-3 text-indigo-300">
+                                    <span className="text-sm">{isTamil ? 'AI ஜோதிடர் உங்கள் ஜாதகத்தை பார்க்கிறார்...' : 'AI Astrologer is analyzing your chart...'}</span>
+                                    <div className="flex gap-1">
+                                        <span className="animate-bounce">●</span>
+                                        <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>●</span>
+                                        <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>●</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
