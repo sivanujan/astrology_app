@@ -10,13 +10,13 @@ interface SEOProps {
 }
 
 const SEO: React.FC<SEOProps> = ({
-    title = "SivaAstro - Advanced AI Vedic Astrology",
+    title = "AstroZen - Advanced AI Vedic Astrology",
     description = "Get accurate Vedic Astrology predictions powered by Advanced AI. Discover your Job, Marriage, and Foreign Travel possibilities.",
     keywords = "astrology, vedic astrology, horoscope, marriage prediction, job prediction",
-    image = "https://sivaastro.com/icon.png",
-    url = "https://sivaastro.com/"
+    image = "https://astrozen.app/icon.png",
+    url = "https://astrozen.app/"
 }) => {
-    const siteTitle = title === "SivaAstro - Advanced AI Vedic Astrology" ? title : `${title} | SivaAstro`;
+    const siteTitle = title === "AstroZen - Advanced AI Vedic Astrology" ? title : `${title} | AstroZen`;
 
     return (
         <Helmet>

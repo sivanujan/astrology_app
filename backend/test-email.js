@@ -24,6 +24,23 @@ async function testEmailVerification() {
         }
         console.log('✅ Email service is ready!\n');
 
+        // Check if user exists, if not create them (required for generating link)
+        try {
+            await auth.getUserByEmail(testEmail);
+            console.log('✅ Test user exists in Firebase');
+        } catch (error) {
+            if (error.code === 'auth/user-not-found') {
+                console.log('⚠️ Test user not found. Creating temporary user...');
+                await auth.createUser({
+                    email: testEmail,
+                    emailVerified: false
+                });
+                console.log('✅ Created temporary test user');
+            } else {
+                throw error;
+            }
+        }
+
         // Step 2: Generate Firebase verification link (NO EMAIL SENT BY FIREBASE)
         console.log('🔗 Step 2: Asking Firebase for verification link...');
         console.log(`   Email: ${testEmail}`);

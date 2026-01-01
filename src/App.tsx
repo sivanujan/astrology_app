@@ -26,6 +26,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import DashaPredictionsPage from './pages/DashaPredictionsPage';
 import SEO from './components/SEO';
 import InstallPWA from './components/InstallPWA';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
@@ -66,6 +68,19 @@ const AppRoutes = () => {
           <EmailVerification />
         </>
       } />
+      <Route path="/privacy" element={
+        <>
+          <SEO title="Privacy Policy" />
+          <PrivacyPolicy />
+        </>
+      } />
+      <Route path="/terms" element={
+        <>
+          <SEO title="Terms of Service" />
+          <TermsOfService />
+        </>
+      } />
+
 
       {/* Admin Routes */}
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
@@ -173,7 +188,7 @@ const AppRoutes = () => {
           <ComprehensiveResultsPage />
         </ProtectedRoute>
       } />
-    </Routes>
+    </Routes >
   );
 };
 

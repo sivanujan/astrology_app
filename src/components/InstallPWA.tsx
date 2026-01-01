@@ -57,9 +57,9 @@ const InstallPWA = () => {
                                 <Download className="w-6 h-6 text-violet-400" />
                             </div>
                             <div>
-                                <h3 className="text-violet-100 font-bold text-sm">Install SivaAstro to Home Screen</h3>
+                                <h3 className="text-violet-100 font-bold text-sm">Install AstroZen to Home Screen</h3>
                                 <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-                                    Get one-tap access and use SivaAstro just like a mobile app.
+                                    Get one-tap access and use AstroZen just like a mobile app.
                                     Save data and access your content faster.
                                 </p>
                             </div>
@@ -76,7 +76,7 @@ const InstallPWA = () => {
                         onClick={handleInstallClick}
                         className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-lg shadow-violet-900/20"
                     >
-                        Install App
+                        Install AstroZen
                     </button>
                 </motion.div>
             )}

@@ -7,7 +7,10 @@ import {
     GoogleAuthProvider,
     signOut,
     onAuthStateChanged,
-    UserCredential
+    UserCredential,
+    setPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -17,7 +20,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     register: (email: string, password: string, name: string) => Promise<UserCredential>;
-    login: (email: string, password: string) => Promise<UserCredential>;
+    login: (email: string, password: string, rememberMe?: boolean) => Promise<UserCredential>;
     loginWithGoogle: () => Promise<UserCredential>;
     logout: () => Promise<void>;
     resendVerification: () => Promise<void>;
@@ -102,7 +105,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 
 
-    const login = async (email: string, password: string): Promise<UserCredential> => {
+    const login = async (email: string, password: string, rememberMe: boolean = false): Promise<UserCredential> => {
+        // Set persistence based on rememberMe preference (Local = Remember, Session = Don't Remember)
+        await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
         // Check if email is verified

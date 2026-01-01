@@ -35,6 +35,8 @@ import { generateDasaPrediction } from '../utils/dasaPredictionGenerator';
 
 import DasaAnalysis from './DasaAnalysis';
 import HouseAnalysisDashboard from './HouseAnalysisDashboard';
+import LifeScoreOverview from './LifeScoreOverview';
+import LifeGuidanceSection, { FAQItem } from './LifeGuidanceSection';
 import { HouseData } from './HouseAnalysisCard';
 
 interface GurujiPredictionsProps {
@@ -516,276 +518,82 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
                         </button>
                     </div>
 
-                    {/* 0. NEW: Life Quality Analysis (The First Card) */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.1 }}
-                        className="glass-panel p-6 border-l-4 border-yellow-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition mb-6"
-                    >
-                        <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                            <Star className="w-32 h-32 text-yellow-400" />
-                        </div>
-                        <h3 className="text-xl font-bold text-yellow-200 mb-2 flex items-center gap-2">
-                            <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
-                            {lifeQuality.question}
-                        </h3>
+                    {/* NEW: Life Score Overview */}
+                    <LifeScoreOverview
+                        lifeQuality={{
+                            question: lifeQuality.question,
+                            answer: lifeQuality.answer,
+                            reason: lifeQuality.reason,
+                            totalScore: lifeQuality.totalScore,
+                            starRating: lifeQuality.starRating,
+                            categories: lifeQuality.categories
+                        }}
+                    />
 
-                        {/* Score & Verdict Header */}
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="text-4xl font-bold text-white">
-                                {lifeQuality.totalScore}<span className="text-lg text-slate-400 font-normal">/100</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <div className="flex text-yellow-400">
-                                    {[...Array(5)].map((_, i) => {
-                                        const rating = lifeQuality.starRating;
-                                        const isFull = i < Math.floor(rating);
-                                        const isHalf = i === Math.floor(rating) && rating % 1 !== 0;
-
-                                        return (
-                                            <div key={i} className="relative w-4 h-4">
-                                                {/* Base empty star */}
-                                                <Star className="w-4 h-4 text-yellow-400 opacity-30 absolute top-0 left-0" />
-
-                                                {/* Full or Half Overlay */}
-                                                {isFull && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
-                                                {isHalf && <StarHalf className="w-4 h-4 text-yellow-400 fill-yellow-400 absolute top-0 left-0" />}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                <span className={`text-sm font-bold ${lifeQuality.totalScore >= 60 ? 'text-emerald-400' : 'text-orange-400'}`}>
-                                    {lifeQuality.answer.split('\n\n')[1]?.replace('**Rating:** ', '').replace('**தரமதிப்பீடு:** ', '')}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* 8 Category Breakdown */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                            {Object.entries(lifeQuality.categories).map(([key, scoreVal]: [string, any]) => {
-                                const score = Number(scoreVal);
-
-                                // Config for icons and labels
-                                const categoryConfig: Record<string, { icon: React.ReactNode, labelEn: string, labelTa: string }> = {
-                                    education: { icon: <GraduationCap className="w-4 h-4" />, labelEn: "Education", labelTa: "கல்வி" },
-                                    wealth: { icon: <Coins className="w-4 h-4" />, labelEn: "Wealth", labelTa: "செல்வம்" },
-                                    career: { icon: <Briefcase className="w-4 h-4" />, labelEn: "Career", labelTa: "தொழில்" },
-                                    marriage: { icon: <Heart className="w-4 h-4" />, labelEn: "Marriage", labelTa: "திருமணம்" },
-                                    health: { icon: <Activity className="w-4 h-4" />, labelEn: "Health", labelTa: "ஆரோக்கியம்" },
-                                    family: { icon: <Users className="w-4 h-4" />, labelEn: "Family", labelTa: "குடும்பம்" },
-                                    property: { icon: <Home className="w-4 h-4" />, labelEn: "Property", labelTa: "சொத்து" },
-                                    happiness: { icon: <Smile className="w-4 h-4" />, labelEn: "Happiness", labelTa: "மகிழ்ச்சி" }
-                                };
-
-                                const config = categoryConfig[key];
-                                if (!config) return null;
-
-                                let colorClass = '';
-                                if (score >= 81) colorClass = 'text-emerald-400 border-emerald-500';
-                                else if (score >= 61) colorClass = 'text-blue-400 border-blue-500';
-                                else if (score >= 41) colorClass = 'text-orange-400 border-orange-500';
-                                else colorClass = 'text-red-400 border-red-500';
-
-                                return (
-                                    <div key={key} className={`bg-slate-800/50 p-3 rounded border-l-2 ${colorClass}`}>
-                                        <div className="flex items-center gap-1 mb-1">
-                                            <span className="text-base">{config.icon}</span>
-                                            <div className="text-xs text-slate-400 leading-tight">{isTamil ? config.labelTa : config.labelEn}</div>
-                                        </div>
-                                        <div className={`text-lg font-bold ${colorClass.split(' ')[0]}`}>{score}<span className="text-xs text-slate-500">/100</span></div>
-                                        {/* Progress bar */}
-                                        <div className="w-full bg-slate-700/50 rounded-full h-1 mt-1">
-                                            <div
-                                                className={`h-1 rounded-full ${colorClass.includes('emerald') ? 'bg-emerald-500' : colorClass.includes('blue') ? 'bg-blue-500' : colorClass.includes('orange') ? 'bg-orange-500' : 'bg-red-500'}`}
-                                                style={{ width: `${score}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Detailed Reasoning */}
-                        <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line text-sm">
-                            {lifeQuality.answer.split('\n\n').slice(2).join('\n\n')}
-                        </p>
-
-                        <div className="text-xs text-yellow-400/80 italic border-t border-yellow-900/30 pt-2">
-                            <pre className="whitespace-pre-wrap mt-1 font-sans opacity-80">{lifeQuality.reason}</pre>
-                        </div>
-                    </motion.div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-
-                        {/* 1. Job Timing */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.1 }}
-                            className="glass-panel p-6 border-l-4 border-blue-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                        >
-                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                                <Briefcase className="w-24 h-24 text-blue-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
-                                <Briefcase className="w-5 h-5" />
-                                {jobPrediction.question}
-                            </h3>
-                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                                {jobPrediction.answer}
-                            </p>
-                            <div className="text-xs text-blue-400 italic border-t border-blue-900/30 pt-2 flex justify-between items-center">
-                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {jobPrediction.reason}</span>
-                                <button
-                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Job Timing prediction is wrong. ${jobPrediction.answer}` } })}
-                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                                >
-                                    {isTamil ? "தவறா?" : "Wrong?"}
-                                </button>
-                            </div>
-                        </motion.div>
-
-                        {/* 2. Foreign Settlement */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.12 }}
-                            className="glass-panel p-6 border-l-4 border-indigo-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                        >
-                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                                <Globe className="w-24 h-24 text-indigo-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-indigo-200 mb-2 flex items-center gap-2">
-                                <Globe className="w-5 h-5" />
-                                {foreignTravel.question}
-                            </h3>
-                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                                {foreignTravel.answer}
-                            </p>
-                            <div className="text-xs text-indigo-400 italic border-t border-indigo-900/30 pt-2 flex justify-between items-center">
-                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {foreignTravel.reason}</span>
-                                <button
-                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Foreign Travel prediction is wrong. ${foreignTravel.answer}` } })}
-                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                                >
-                                    {isTamil ? "தவறா?" : "Wrong?"}
-                                </button>
-                            </div>
-                        </motion.div>
-
-                        {/* 3. Career Path */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.15 }}
-                            className="glass-panel p-6 border-l-4 border-cyan-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                        >
-                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                                <Briefcase className="w-24 h-24 text-cyan-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-cyan-200 mb-2 flex items-center gap-2">
-                                <Briefcase className="w-5 h-5" />
-                                {careerPath.question}
-                            </h3>
-                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                                {careerPath.answer}
-                            </p>
-                            <div className="text-xs text-cyan-400 italic border-t border-cyan-900/30 pt-2 flex justify-between items-center">
-                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {careerPath.reason}</span>
-                                <button
-                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Career Path prediction is wrong. ${careerPath.answer}` } })}
-                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                                >
-                                    {isTamil ? "தவறா?" : "Wrong?"}
-                                </button>
-                            </div>
-                        </motion.div>
-
-                        {/* 4. Current Love Status */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.18 }}
-                            className="glass-panel p-6 border-l-4 border-rose-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                        >
-                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                                <Heart className="w-24 h-24 text-rose-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-rose-200 mb-2 flex items-center gap-2">
-                                <Heart className="w-5 h-5" />
-                                {loveStatus.question}
-                            </h3>
-                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                                {loveStatus.answer}
-                            </p>
-                            <div className="text-xs text-rose-400 italic border-t border-rose-900/30 pt-2 flex justify-between items-center">
-                                <span className="whitespace-pre-line">{isTamil ? "காரணம்:" : "Reasoning:"} {loveStatus.reason}</span>
-                                <button
-                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Current Love Status prediction is wrong. ${loveStatus.answer}` } })}
-                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                                >
-                                    {isTamil ? "தவறா?" : "Wrong?"}
-                                </button>
-                            </div>
-                        </motion.div>
-
-                        {/* 5. Marriage Timing */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.2 }}
-                            className="glass-panel p-6 border-l-4 border-pink-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                        >
-                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                                <Heart className="w-24 h-24 text-pink-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-pink-200 mb-2 flex items-center gap-2">
-                                <Heart className="w-5 h-5" />
-                                {marriageTiming.question}
-                            </h3>
-                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                                {marriageTiming.answer}
-                            </p>
-                            <div className="text-xs text-pink-400 italic border-t border-pink-900/30 pt-2 flex justify-between items-center">
-                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageTiming.reason}</span>
-                                <button
-                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Timing prediction is wrong. ${marriageTiming.answer}. My Age is ${new Date().getFullYear() - new Date(birthDate).getFullYear()}` } })}
-                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                                >
-                                    {isTamil ? "தவறா?" : "Wrong?"}
-                                </button>
-                            </div>
-                        </motion.div>
-
-                        {/* 6. Marriage Type */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.3 }}
-                            className="glass-panel p-6 border-l-4 border-purple-500 bg-slate-900/40 relative overflow-hidden group hover:bg-slate-900/60 transition"
-                        >
-                            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition">
-                                <Sparkles className="w-24 h-24 text-purple-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-purple-200 mb-2 flex items-center gap-2">
-                                <Sparkles className="w-5 h-5" />
-                                {marriageType.question}
-                            </h3>
-                            <p className="text-slate-300 font-medium leading-relaxed mb-3 whitespace-pre-line">
-                                {marriageType.answer}
-                            </p>
-                            <div className="text-xs text-purple-400 italic border-t border-purple-900/30 pt-2 flex justify-between items-center">
-                                <span>{isTamil ? "காரணம்:" : "Reasoning:"} {marriageType.reason}</span>
-                                <button
-                                    onClick={() => navigate('/predictions', { state: { initialMessage: `I think the Marriage Type prediction is wrong. ${marriageType.answer}` } })}
-                                    className="text-[10px] text-red-400/60 hover:text-red-400 hover:bg-red-900/20 px-2 py-1 rounded transition"
-                                >
-                                    {isTamil ? "தவறா?" : "Wrong?"}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </div>
+                    {/* NEW: Life Guidance FAQ Section */}
+                    <LifeGuidanceSection
+                        items={[
+                            {
+                                id: 'job',
+                                question: jobPrediction.question,
+                                answer: jobPrediction.answer,
+                                reason: jobPrediction.reason,
+                                category: 'career',
+                                icon: <Briefcase className="w-5 h-5" />,
+                                isTiming: true
+                            },
+                            {
+                                id: 'career',
+                                question: careerPath.question,
+                                answer: careerPath.answer,
+                                reason: careerPath.reason,
+                                category: 'career',
+                                icon: <Briefcase className="w-5 h-5" />
+                            },
+                            {
+                                id: 'foreign',
+                                question: foreignTravel.question,
+                                answer: foreignTravel.answer,
+                                reason: foreignTravel.reason,
+                                category: 'travel',
+                                icon: <Globe className="w-5 h-5" />
+                            },
+                            {
+                                id: 'marriage_timing',
+                                question: marriageTiming.question,
+                                answer: marriageTiming.answer,
+                                reason: marriageTiming.reason,
+                                category: 'marriage',
+                                icon: <Heart className="w-5 h-5" />,
+                                isTiming: true
+                            },
+                            {
+                                id: 'marriage_type',
+                                question: marriageType.question,
+                                answer: marriageType.answer,
+                                reason: marriageType.reason,
+                                category: 'marriage',
+                                icon: <Heart className="w-5 h-5" />
+                            },
+                            {
+                                id: 'love',
+                                question: loveStatus.question,
+                                answer: loveStatus.answer,
+                                reason: loveStatus.reason,
+                                category: 'marriage', // Grouping under marriage/relationship
+                                icon: <Heart className="w-5 h-5" />
+                            },
+                            {
+                                id: 'marriage_status',
+                                question: isTamil ? "திருமண வாழ்க்கை நிலை" : "Marriage Life Status",
+                                answer: marriageStatus.statusText,
+                                reason: marriageStatus.reason,
+                                category: 'marriage',
+                                icon: <Users className="w-5 h-5" />
+                            }
+                        ]}
+                        onAskAI={() => navigate('/predictions')}
+                    />
                 </div>
             )}
 

@@ -17,13 +17,18 @@ const ForgotPassword: React.FC = () => {
         setError('');
         setLoading(true);
 
+        console.log('🔄 Initiating password reset for:', email);
+
         try {
-            await apiCall(API_CONFIG.endpoints.auth.sendPasswordReset, {
+            const response = await apiCall(API_CONFIG.endpoints.auth.sendPasswordReset, {
                 method: 'POST',
                 body: JSON.stringify({ email })
             });
+
+            console.log('✅ Password reset API Success:', response);
             setSuccess(true);
         } catch (err: any) {
+            console.error('❌ Password reset API Error:', err);
             setError(err.message || 'Failed to send reset email');
         } finally {
             setLoading(false);
@@ -42,17 +47,28 @@ const ForgotPassword: React.FC = () => {
                         <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
                         <h2 className="text-2xl font-bold text-white mb-2">Check Your Email</h2>
                         <p className="text-slate-300 mb-6">
-                            We've sent a password reset link to <span className="text-yellow-400">{email}</span>
+                            We've sent a password reset link to <br />
+                            <span className="text-yellow-400 font-bold text-lg block mt-2">{email}</span>
                         </p>
-                        <p className="text-slate-400 text-sm mb-6">
-                            Click the link in the email to reset your password. The link will expire in 1 hour.
+                        <p className="text-slate-400 text-sm mb-6 bg-black/20 p-4 rounded-lg">
+                            ⚠️ Please check your <b className="text-white">Spam</b> or <b className="text-white">Junk</b> folder if you don't see it within a minute.
                         </p>
-                        <Link
-                            to="/login"
-                            className="inline-block w-full bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 font-bold py-3 rounded-xl hover:from-yellow-400 hover:to-orange-500 transition shadow-lg"
-                        >
-                            Back to Login
-                        </Link>
+
+                        <div className="space-y-3">
+                            <Link
+                                to="/login"
+                                className="inline-block w-full bg-gradient-to-r from-yellow-500 to-orange-600 text-slate-900 font-bold py-3 rounded-xl hover:from-yellow-400 hover:to-orange-500 transition shadow-lg"
+                            >
+                                Back to Login
+                            </Link>
+
+                            <button
+                                onClick={() => setSuccess(false)}
+                                className="text-slate-400 hover:text-white text-sm underline"
+                            >
+                                Didn't receive it? Try again
+                            </button>
+                        </div>
                     </div>
                 </motion.div>
             </div>

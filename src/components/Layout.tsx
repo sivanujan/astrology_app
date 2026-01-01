@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import PlanetaryBackground from './PlanetaryBackground';
 import Logo from '/logo2.png';
 import FeatureAccessPopup from './FeatureAccessPopup';
+import Footer from './Footer';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
@@ -99,7 +100,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
                             <div className="w-28 md:w-42 h-auto flex items-center justify-start">
-                                <img src={Logo} alt="Astro Siva Logo" className="w-full h-full object-contain" />
+                                <img src={Logo} alt="AstroZen Logo" className="w-full h-full object-contain" />
                             </div>
                         </div>
 
@@ -353,6 +354,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 </AnimatePresence>
             </main>
 
+
+            <Footer />
 
             <FeatureAccessPopup
                 isOpen={showFeaturePopup}

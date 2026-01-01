@@ -1,6 +1,6 @@
 export const translations = {
     en: {
-        appTitle: "SivaAstro",
+        appTitle: "AstroZen",
         nav: {
             birthDetails: "Birth Details",
             chart: "Vedic Chart",
@@ -251,7 +251,7 @@ export const translations = {
 
     },
     ta: {
-        appTitle: "சிவா அஸ்ட்ரோ",
+        appTitle: "AstroZen",
         nav: {
             birthDetails: "பிறப்பு விவரங்கள்",
             chart: "ஜாதக கட்டம்",
