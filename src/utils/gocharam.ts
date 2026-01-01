@@ -49,6 +49,9 @@ export interface DayForecast {
         color: string;
         dos: string[];
         donts: string[];
+        tithi: string;
+        yoga: string;
+        unluckyTime: string;
         nakshatra: string;
         tara: string;
     };
@@ -488,6 +491,9 @@ export const generate15DayForecast = (
                 color: "Red", // Placeholder or implement based on Star
                 dos: ["Focus on goals", "Pray to ancestors"],
                 donts: ["Avoid arguments", "No new loans"],
+                tithi: getStr(lang, "gocharam.factors.tithiDefault", { n: "Shukla Paksha" }), // Placeholder
+                yoga: getStr(lang, "gocharam.factors.yogaDefault", { n: "Siddha" }), // Placeholder
+                unluckyTime: "10:30 - 12:00", // Placeholder (Rahu Kalam approx)
                 nakshatra: tara.starName,
                 tara: tara.taraLabel
             }

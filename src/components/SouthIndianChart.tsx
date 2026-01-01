@@ -98,6 +98,16 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
 
     if (!data) return null;
 
+    // Debug: Log data structure to understand what's available
+    console.log('[SouthIndianChart] Full data:', {
+        hasUserDetails: !!data.userDetails,
+        userDetails: data.userDetails,
+        hasBirthDetails: !!data.birth_details,
+        birth_details: data.birth_details,
+        birthDate: data.birthDate,
+        birthPlace: data.birthPlace
+    });
+
     return (
         <div className="max-w-7xl mx-auto p-4">
             <motion.div
@@ -179,6 +189,79 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                     </motion.button>
                 </div>
             )}
+
+            {/* Birth Details Section */}
+            <div className="mb-6 px-4 py-4 bg-gradient-to-r from-indigo-900/30 to-purple-900/30 rounded-xl border border-indigo-500/20 shadow-lg">
+                <h3 className="text-lg font-bold text-indigo-300 mb-3 text-center">📋 {t.chart?.birthDetails || 'Birth Details' || 'பிறப்பு விவரங்கள்'}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    {/* Date of Birth */}
+                    <div className="flex flex-col items-center p-3 bg-slate-800/40 rounded-lg border border-slate-600/30">
+                        <span className="text-slate-400 text-xs mb-1">📅 {t.birthDetails?.date || 'Date'}</span>
+                        <span className="text-white font-semibold">
+                            {data.userDetails?.date ? (() => {
+                                const [y, m, d] = data.userDetails.date.split('-');
+                                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                return `${d}-${months[parseInt(m) - 1]}-${y}`;
+                            })() : 'N/A'}
+                        </span>
+                    </div>
+
+                    {/* Time of Birth */}
+                    <div className="flex flex-col items-center p-3 bg-slate-800/40 rounded-lg border border-slate-600/30">
+                        <span className="text-slate-400 text-xs mb-1">🕐 {t.birthDetails?.time || 'Time'}</span>
+                        <span className="text-white font-semibold">
+                            {data.userDetails?.time ? (() => {
+                                const [h, m] = data.userDetails.time.split(':');
+                                const hour = parseInt(h);
+                                const ampm = hour >= 12 ? 'PM' : 'AM';
+                                const hour12 = hour % 12 || 12;
+                                return `${hour12.toString().padStart(2, '0')}:${m} ${ampm}`;
+                            })() : 'N/A'}
+                        </span>
+                    </div>
+
+                    {/* Place of Birth */}
+                    <div className="flex flex-col items-center p-3 bg-slate-800/40 rounded-lg border border-slate-600/30">
+                        <span className="text-slate-400 text-xs mb-1">📍 {t.birthDetails?.place || 'Place'}</span>
+                        <span className="text-white font-semibold text-center px-2">
+                            {(() => {
+                                // Try ALL possible paths for place data
+                                const place = data.userDetails?.city ||
+                                    data.userDetails?.place ||
+                                    data.birth_details?.place ||
+                                    data.birthPlace ||
+                                    data.city ||
+                                    data.place ||
+                                    data.location ||
+                                    'Not Available';
+                                console.log('[Chart] Place data:', {
+                                    userDetailsCity: data.userDetails?.city,
+                                    userDetailsPlace: data.userDetails?.place,
+                                    birthDetailsPlace: data.birth_details?.place,
+                                    birthPlace: data.birthPlace,
+                                    rootCity: data.city,
+                                    rootPlace: data.place,
+                                    location: data.location,
+                                    resolved: place,
+                                    fullUserDetails: data.userDetails
+                                });
+                                return place;
+                            })()}
+                        </span>
+                    </div>
+
+                    {/* Lagna (Ascendant) */}
+                    <div className="flex flex-col items-center p-3 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 rounded-lg border border-purple-500/40">
+                        <span className="text-purple-300 text-xs mb-1 font-semibold">🌟 {t.chart?.lagna || 'Lagna'}</span>
+                        <span className="text-white font-bold text-base">
+                            {TAMIL_RASI_NAMES[data.ascendant.signIndex]}
+                        </span>
+                        <span className="text-purple-300 text-xs mt-1">
+                            {Math.floor(data.ascendant.degree)}° {Math.round((data.ascendant.degree % 1) * 60)}'
+                        </span>
+                    </div>
+                </div>
+            </div>
 
             <div id="chart-container" className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start justify-items-center">
                 {/* Rasi Chart */}

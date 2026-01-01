@@ -10,6 +10,7 @@ export interface HelperBirthDetails {
     lat: number;
     lng: number;
     place?: string;
+    city?: string; // Alternative field for place
 }
 
 export const serializeMarriageDetails = (boy: HelperBirthDetails, girl: HelperBirthDetails): string => {
@@ -81,7 +82,9 @@ export const serializeChartDetails = (details: HelperBirthDetails): string => {
     params.set('t', details.time);
     params.set('lat', details.lat.toString());
     params.set('lng', details.lng.toString());
-    if (details.place) params.set('p', details.place);
+    // Check both place and city fields (InputForm uses 'city')
+    const placeValue = details.place || details.city;
+    if (placeValue) params.set('p', placeValue);
     return params.toString();
 };
 

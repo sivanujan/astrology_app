@@ -18,9 +18,43 @@ const ChartGrid: React.FC<ChartGridProps> = ({ title, planets, ascendant, onCent
     // Determine functional nature based on Ascendant (Force English for stable logic keys)
     const nature = useMemo(() => getFunctionalNature(ascendant.signIndex, 'en'), [ascendant.signIndex]);
 
+    // Calculate Moon illumination percentage
+    const getMoonIllumination = useMemo(() => {
+        const moon = planets.find((p: any) => p.name === 'Moon');
+        const sun = planets.find((p: any) => p.name === 'Sun');
+
+        if (!moon || !sun) return 50; // Default to middle if not found
+
+        // Calculate angular separation between Sun and Moon
+        let separation = Math.abs(moon.longitude - sun.longitude);
+        if (separation > 180) separation = 360 - separation;
+
+        // Convert to illumination percentage
+        // 0° = New Moon (0%), 180° = Full Moon (100%)
+        const illumination = (1 - Math.cos((separation * Math.PI) / 180)) * 50;
+
+        return illumination;
+    }, [planets]);
+
     // Helper to get color based on nature
     const getPlanetColor = (planetName: string) => {
-        // User overrides
+        // Moon color based on brightness/illumination
+        if (planetName === 'Moon') {
+            const illumination = getMoonIllumination;
+
+            if (illumination < 30) {
+                // New Moon (Dark) - Red
+                return 'text-red-400';
+            } else if (illumination < 70) {
+                // Waxing/Waning (Middle) - Orange
+                return 'text-orange-400';
+            } else {
+                // Full Moon (Bright) - Green
+                return 'text-green-400';
+            }
+        }
+
+        // Other planet overrides
         if (planetName === 'Sun') return 'text-orange-400';
         if (planetName === 'Venus') return 'text-green-400';
         if (planetName === 'Mars') return 'text-red-400';

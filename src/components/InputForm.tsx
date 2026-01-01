@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, MapPin, Search, Loader2, ChevronRight, User } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search, Loader2, ChevronRight, User, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { calculatePlanetaryPositions } from '../utils/astrology';
 // import LagnaIdentificationWizard from './LagnaIdentificationWizard';
@@ -37,6 +37,14 @@ const InputForm: React.FC = () => {
 
     const [displayDate, setDisplayDate] = useState('');
     const dateInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Validation states
+    const [validationStates, setValidationStates] = useState({
+        name: { isValid: false, error: '' },
+        date: { isValid: false, error: '' },
+        time: { isValid: false, error: '' },
+        city: { isValid: false, error: '' }
+    });
 
     // Lagna identification state - DISABLED FOR NOW
     // const [unknownBirthTime, setUnknownBirthTime] = useState(false);
@@ -157,6 +165,10 @@ const InputForm: React.FC = () => {
             lng: city.longitude
         }));
         setCitySearch(`${city.name}, ${city.country}`);
+        setValidationStates(prev => ({
+            ...prev,
+            city: { isValid: true, error: '' }
+        }));
         setShowDropdown(false);
     };
 
@@ -172,7 +184,36 @@ const InputForm: React.FC = () => {
         // Simulate processing time for effect
         await new Promise(resolve => setTimeout(resolve, 1500));
 
+        // Debug: Log the input values
+        console.log('[InputForm] Date inputs:', {
+            date: formData.date,
+            time: formData.time,
+            combined: `${formData.date}T${formData.time}`
+        });
+
+        // Validate inputs before creating Date
+        if (!formData.date || !formData.time) {
+            alert("Please enter both date and time.");
+            setIsGenerating(false);
+            return;
+        }
+
         const birthDate = new Date(`${formData.date}T${formData.time}`);
+
+        // Validate the date is valid
+        if (isNaN(birthDate.getTime())) {
+            console.error('[InputForm] Invalid date created:', {
+                date: formData.date,
+                time: formData.time,
+                birthDate: birthDate,
+                dateString: `${formData.date}T${formData.time}`
+            });
+            alert(`Invalid date or time. Please check your inputs.\nDate: ${formData.date}\nTime: ${formData.time}`);
+            setIsGenerating(false);
+            return;
+        }
+
+        console.log('[InputForm] Valid birthDate created:', birthDate);
         const chartData = calculatePlanetaryPositions(birthDate, formData.lat, formData.lng);
 
         const fullChartData = {
@@ -255,16 +296,39 @@ const InputForm: React.FC = () => {
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-8">
+                        {/* Name Input */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-300 ml-1">{t.input.name}</label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
-                                placeholder="e.g. Arjuna"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.name}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, name: e.target.value });
+                                        // Validate name
+                                        const isValid = e.target.value.length >= 2;
+                                        setValidationStates(prev => ({
+                                            ...prev,
+                                            name: {
+                                                isValid,
+                                                error: isValid ? '' : 'Name must be at least 2 characters'
+                                            }
+                                        }));
+                                    }}
+                                    className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
+                                    placeholder="e.g. Arjuna"
+                                />
+                                {formData.name && validationStates.name.isValid && (
+                                    <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-400" />
+                                )}
+                                {formData.name && !validationStates.name.isValid && validationStates.name.error && (
+                                    <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-400" />
+                                )}
+                            </div>
+                            {formData.name && validationStates.name.error && (
+                                <p className="text-red-400 text-xs ml-1">{validationStates.name.error}</p>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -289,7 +353,6 @@ const InputForm: React.FC = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Date Input */}
                             {/* Date Input - Custom DD/MM/YYYY Text + Hidden Picker */}
                             <div className="space-y-2 relative">
                                 <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
@@ -302,11 +365,30 @@ const InputForm: React.FC = () => {
                                         type="text"
                                         required
                                         value={displayDate}
-                                        onChange={handleTextDateChange}
+                                        onChange={(e) => {
+                                            handleTextDateChange(e);
+                                            // Validate date format
+                                            const isValid = /^\d{2}\/\d{2}\/\d{4}$/.test(e.target.value);
+                                            setValidationStates(prev => ({
+                                                ...prev,
+                                                date: {
+                                                    isValid,
+                                                    error: isValid ? '' : 'Use format: dd/mm/yyyy'
+                                                }
+                                            }));
+                                        }}
                                         placeholder="dd/mm/yyyy"
                                         maxLength={10}
-                                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
+                                        className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pr-20 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
                                     />
+
+                                    {/* Validation Icons */}
+                                    {displayDate && validationStates.date.isValid && (
+                                        <CheckCircle className="absolute right-12 top-1/2 -translate-y-1/2 w-5 h-5 text-green-400" />
+                                    )}
+                                    {displayDate && !validationStates.date.isValid && displayDate.length === 10 && (
+                                        <AlertCircle className="absolute right-12 top-1/2 -translate-y-1/2 w-5 h-5 text-red-400" />
+                                    )}
 
                                     {/* Calendar Icon Trigger */}
                                     <button
@@ -334,13 +416,29 @@ const InputForm: React.FC = () => {
                                 <label className="text-sm font-medium text-slate-300 ml-1 flex items-center gap-2">
                                     <Clock className="w-4 h-4" /> {t.input.tob}
                                 </label>
-                                <input
-                                    type="time"
-                                    required
-                                    value={formData.time}
-                                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white [color-scheme:dark]"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type="time"
+                                        required
+                                        value={formData.time}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, time: e.target.value });
+                                            // Validate time
+                                            const isValid = e.target.value.length > 0;
+                                            setValidationStates(prev => ({
+                                                ...prev,
+                                                time: {
+                                                    isValid,
+                                                    error: isValid ? '' : 'Please select a time'
+                                                }
+                                            }));
+                                        }}
+                                        className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white [color-scheme:dark]"
+                                    />
+                                    {formData.time && validationStates.time.isValid && (
+                                        <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-400" />
+                                    )}
+                                </div>
 
                                 {/* DISABLED: I don't know my birth time checkbox */}
                                 {/* <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-slate-300 transition-colors mt-2">
@@ -386,13 +484,25 @@ const InputForm: React.FC = () => {
                                     type="text"
                                     required
                                     value={citySearch}
-                                    onChange={(e) => setCitySearch(e.target.value)}
-                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 pl-10 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all text-white placeholder-slate-600"
-                                    placeholder={t.input.searchPlaceholder}
+                                    onChange={(e) => {
+                                        setCitySearch(e.target.value);
+                                        // Reset validation when user types
+                                        if (formData.city && e.target.value !== formData.city) {
+                                            setValidationStates(prev => ({
+                                                ...prev,
+                                                city: { isValid: false, error: '' }
+                                            }));
+                                        }
+                                    }}
+                                    className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pl-10 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
+                                    placeholder="Search city..."
                                 />
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                                 {isSearching && (
                                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 animate-spin" />
+                                )}
+                                {formData.city && !isSearching && (
+                                    <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-400" />
                                 )}
                             </div>
 
@@ -436,7 +546,7 @@ const InputForm: React.FC = () => {
                         </button>
                     </form>
                 </motion.div>
-            </div>
+            </div >
         </>
     );
 };
