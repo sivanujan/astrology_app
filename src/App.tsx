@@ -4,6 +4,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
 import { ChartProvider, useChartData } from './contexts/ChartContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 import Layout from './components/Layout';
 import InputForm from './components/InputForm';
 import SouthIndianChart from './components/SouthIndianChart';
@@ -28,6 +29,7 @@ import SEO from './components/SEO';
 import InstallPWA from './components/InstallPWA';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import NotFound from './pages/NotFound';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
@@ -45,16 +47,16 @@ const AppRoutes = () => {
         </>
       } />
       <Route path="/login" element={
-        <>
+        <PublicRoute>
           <SEO title="Login" />
           <Login />
-        </>
+        </PublicRoute>
       } />
       <Route path="/register" element={
-        <>
+        <PublicRoute>
           <SEO title="Create Account" />
           <Register />
-        </>
+        </PublicRoute>
       } />
       <Route path="/forgot-password" element={
         <>
@@ -187,6 +189,14 @@ const AppRoutes = () => {
           <SEO title="Comprehensive Marriage Results" />
           <ComprehensiveResultsPage />
         </ProtectedRoute>
+      } />
+
+      {/* 404 Route */}
+      <Route path="*" element={
+        <>
+          <SEO title="Page Not Found - Saturn Blocked This!" />
+          <NotFound />
+        </>
       } />
     </Routes >
   );

@@ -7,9 +7,10 @@ import { motion } from 'framer-motion';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
+    requireAuth?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAuth = true }) => {
     const { user, loading, resendVerification, logout } = useAuth();
     const { t } = useLanguage();
     const [resendLoading, setResendLoading] = useState(false);
@@ -23,11 +24,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         );
     }
 
-    if (!user) {
+    if (requireAuth && !user) {
         return <Navigate to="/login" />;
     }
 
-    if (!user.emailVerified) {
+    if (requireAuth && user && !user.emailVerified) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
                 <motion.div

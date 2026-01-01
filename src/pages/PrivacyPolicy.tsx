@@ -3,10 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Shield, Lock, FileText, Database, Eye, Check, User, Activity } from 'lucide-react';
 
 interface PrivacyPolicyModalProps {
-    onClose: () => void;
+    onClose?: () => void;
 }
 
 const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onClose }) => {
+    const handleClose = () => {
+        if (onClose) {
+            onClose();
+        } else {
+            window.history.back();
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
@@ -22,7 +30,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onClose }) => {
                         Privacy Policy
                     </h2>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="p-2 rounded-full hover:bg-slate-800 transition-colors text-slate-400 hover:text-white"
                     >
                         <X className="w-6 h-6" />

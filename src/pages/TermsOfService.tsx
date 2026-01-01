@@ -3,10 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, FileText, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
 interface TermsOfServiceModalProps {
-    onClose: () => void;
+    onClose?: () => void;
 }
 
 const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({ onClose }) => {
+    const handleClose = () => {
+        if (onClose) {
+            onClose();
+        } else {
+            window.history.back();
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <motion.div
@@ -22,7 +30,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({ onClose }) =>
                         Terms of Service
                     </h2>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="p-2 rounded-full hover:bg-slate-800 transition-colors text-slate-400 hover:text-white"
                     >
                         <X className="w-6 h-6" />

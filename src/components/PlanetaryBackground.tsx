@@ -29,132 +29,75 @@ const MAX_SIZE = 35;
 const MIN_SPEED = 0.5;
 const MAX_SPEED = 1.5;
 
-const PlanetaryBackground: React.FC = () => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const planetsRef = useRef<Planet[]>([]);
-    const requestRef = useRef<number>(0);
+const SaturnSVG = ({ size, color, glowColor }: { size: number, color: string, glowColor: string }) => {
+    // Fixed coordinate system 100x100 for internal SVG logic
+    const PLANET_R = 17;
+    const RING_INNER = 22;
+    const RING_OUTER = 40;
+    const TILT = -25; // Degrees
 
-    // Initialize planets
-    useEffect(() => {
-        const initPlanets = () => {
-            const { innerWidth: width, innerHeight: height } = window;
-            const newPlanets: Planet[] = [];
-
-            for (let i = 0; i < PLANET_COUNT; i++) {
-                const size = Math.random() * (MAX_SIZE - MIN_SIZE) + MIN_SIZE;
-                newPlanets.push({
-                    x: Math.random() * (width - size),
-                    y: Math.random() * (height - size),
-                    vx: (Math.random() - 0.5) * 2 * (Math.random() * (MAX_SPEED - MIN_SPEED) + MIN_SPEED),
-                    vy: (Math.random() - 0.5) * 2 * (Math.random() * (MAX_SPEED - MIN_SPEED) + MIN_SPEED),
-                    size,
-                    color: COLORS[i % COLORS.length],
-                    glowColor: COLORS[i % COLORS.length],
-                });
-            }
-            planetsRef.current = newPlanets;
-        };
-
-        initPlanets();
-
-        const animate = () => {
-            if (!containerRef.current) return;
-            const { innerWidth: width, innerHeight: height } = window;
-
-            // Update positions
-            planetsRef.current.forEach((planet, index) => {
-                planet.x += planet.vx;
-                planet.y += planet.vy;
-
-                // Bounce off edges
-                if (planet.x <= 0 || planet.x + planet.size >= width) {
-                    planet.vx *= -1;
-                    // Clamp to avoid sticking
-                    planet.x = Math.max(0, Math.min(planet.x, width - planet.size));
-                }
-                if (planet.y <= 0 || planet.y + planet.size >= height) {
-                    planet.vy *= -1;
-                    // Clamp to avoid sticking
-                    planet.y = Math.max(0, Math.min(planet.y, height - planet.size));
-                }
-
-                // Apply to DOM elements directly for performance
-                const el = containerRef.current?.children[index] as HTMLDivElement;
-                if (el) {
-                    el.style.transform = `translate(${planet.x}px, ${planet.y}px)`;
-                }
-            });
-
-            requestRef.current = requestAnimationFrame(animate);
-        };
-
-        requestRef.current = requestAnimationFrame(animate);
-
-        const handleResize = () => {
-            // Re-initialize or clamp positions on resize could be added here
-            // For simplicity, we just let them bounce back naturally
-        }
-
-        window.addEventListener('resize', handleResize);
-
-        return () => {
-            cancelAnimationFrame(requestRef.current);
-            window.removeEventListener('resize', handleResize);
-        };
-    }, []);
+    // Gradients
+    const ringGradientId = `ringGrad-${Math.random().toString(36).substr(2, 9)}`;
+    const planetGradientId = `planetGrad-${Math.random().toString(36).substr(2, 9)}`;
 
     return (
-        <div
-            ref={containerRef}
-            className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden"
-            style={{
-                background: 'transparent', // Or whatever base background you want, assuming overlay on existing
-            }}
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 100 100"
+            style={{ overflow: 'visible' }}
         >
-            {planetsRef.current.map((planet, index) => (
-                <div
-                    key={index}
-                    className="absolute rounded-full"
-                    style={{
-                        width: `${planet.size}px`,
-                        height: `${planet.size}px`,
-                        // Set initial position to 0,0 and move with translate in loop
-                        left: 0,
-                        top: 0,
-                        // Realistic planet look: radial gradient + box shadow glow
-                        background: `radial-gradient(circle at 30% 30%, ${planet.color}, #000)`,
-                        boxShadow: `0 0 15px 2px ${planet.glowColor}80`, // 80 for 50% opacity hex
-                    }}
-                />
-            ))}
-            {/* Since we don't re-render, we need initial elements.
-          However, planetsRef is not state, so map won't render initially.
-          We need a state or just iterate COLORS since count is fixed.
-      */}
-            {Array.from({ length: PLANET_COUNT }).map((_, i) => (
-                // We do this just to create the DOM nodes.
-                // Their initial styles will be updated immediately by the first frame.
-                <div
-                    key={i}
-                    className="absolute rounded-full"
-                    style={{
-                        width: '0px', // Will be set by ref init, but needs to exist
-                        height: '0px',
-                        left: 0,
-                        top: 0,
-                    }}
-                />
-            ))}
-        </div>
+            <defs>
+                <linearGradient id={ringGradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="rgba(197, 180, 140, 0)" />
+                    <stop offset="20%" stopColor="rgba(197, 180, 140, 0.8)" />
+                    <stop offset="40%" stopColor="rgba(180, 160, 120, 0.4)" />
+                    <stop offset="60%" stopColor="rgba(197, 180, 140, 0.8)" />
+                    <stop offset="100%" stopColor="rgba(197, 180, 140, 0)" />
+                </linearGradient>
+                <radialGradient id={planetGradientId} cx="30%" cy="30%" r="70%">
+                    <stop offset="0%" stopColor={color} />
+                    <stop offset="100%" stopColor="#000" />
+                </radialGradient>
+            </defs>
+
+            {/* Transform Group for Rings: Flatten (Scale Y) then Rotate */}
+            <g transform={`rotate(${TILT}, 50, 50)`}>
+                <g transform="translate(50, 50) rotate(0) scale(1, 0.35)">
+                    {/* BACK RING (Top Half: 180 to 360 deg) */}
+                    <path
+                        d={`M -${RING_OUTER} 0 A ${RING_OUTER} ${RING_OUTER} 0 0 1 ${RING_OUTER} 0 L ${RING_INNER} 0 A ${RING_INNER} ${RING_INNER} 0 0 0 -${RING_INNER} 0 Z`}
+                        fill={`url(#${ringGradientId})`}
+                        opacity="0.8"
+                    />
+                </g>
+            </g>
+
+            {/* PLANET BODY */}
+            <circle
+                cx="50"
+                cy="50"
+                r={PLANET_R}
+                fill={`url(#${planetGradientId})`}
+                filter={`drop-shadow(0 0 4px ${glowColor})`}
+            />
+
+            {/* FRONT RING (Bottom Half) */}
+            <g transform={`rotate(${TILT}, 50, 50)`}>
+                <g transform="translate(50, 50) scale(1, 0.35)">
+                    {/* FRONT RING (Bottom Half: 0 to 180 deg) */}
+                    <path
+                        d={`M -${RING_OUTER} 0 A ${RING_OUTER} ${RING_OUTER} 0 0 0 ${RING_OUTER} 0 L ${RING_INNER} 0 A ${RING_INNER} ${RING_INNER} 0 0 1 -${RING_INNER} 0 Z`}
+                        fill={`url(#${ringGradientId})`}
+                        opacity="0.9"
+                    />
+                </g>
+            </g>
+        </svg>
     );
 };
 
-// We need to actually render the initial visuals because the loop updates the transform,
-// but the color/size styles need to be set.
-// Let's refactor slightly to use state for the *initial* render of static props (color, size)
-// but refs for position updates relative to each other.
-
-const PlanetaryBackgroundFixed: React.FC = () => {
+const PlanetaryBackground: React.FC = () => {
     const containerRef = useRef<HTMLDivElement>(null);
     const planetsRef = useRef<Planet[]>([]);
     const requestRef = useRef<number>(0);
@@ -190,6 +133,8 @@ const PlanetaryBackgroundFixed: React.FC = () => {
             const { innerWidth: width, innerHeight: height } = window;
 
             planetsRef.current.forEach((planet, index) => {
+                const el = containerRef.current?.children[index] as HTMLDivElement;
+
                 planet.x += planet.vx;
                 planet.y += planet.vy;
 
@@ -202,7 +147,6 @@ const PlanetaryBackgroundFixed: React.FC = () => {
                     planet.y = Math.max(0, Math.min(planet.y, height - planet.size));
                 }
 
-                const el = containerRef.current?.children[index] as HTMLDivElement;
                 if (el) {
                     el.style.transform = `translate(${planet.x}px, ${planet.y}px)`;
                 }
@@ -224,44 +168,34 @@ const PlanetaryBackgroundFixed: React.FC = () => {
         <div
             ref={containerRef}
             className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
-            // z-0 ensures it is behind content (assuming content is z-10 or default stacking context above fixed)
-            // But user asked for low z-index "above background but below content".
-            // If main content has no z-index, this fixed overlay might cover it if not careful.
-            // Usually fixed z-0 is fine if content is relative.
-            // Let's use a standard low positive or negative depending on the app structure.
-            // Safe bet: z-[1] and ensure content is z-[10] or relative with higher stack.
-            // Actually user said "above background but below content".
-            // If the app has a background image on body, this needs to be above that.
             style={{ isolation: 'isolate' }}
         >
             {initialPlanets.map((planet, index) => (
                 <div
                     key={index}
-                    className="absolute rounded-full"
+                    className="absolute"
                     style={{
                         width: `${planet.size}px`,
                         height: `${planet.size}px`,
                         left: 0,
                         top: 0,
-                        // 3D effect: Radial gradient
-                        background: `radial-gradient(circle at 30% 30%, ${planet.color}, #000)`,
-                        // Inner glow via inset shadow + Outer glow
-                        boxShadow: `
-                            inset -2px -2px 6px rgba(0,0,0,0.5),
-                            0 0 10px ${planet.glowColor},
-                            0 0 20px ${planet.glowColor}80
-                        `,
-                        transform: `translate(${planet.x}px, ${planet.y}px)`, // Set initial pos
+                        transform: `translate(${planet.x}px, ${planet.y}px)`,
                     }}
                 >
-                    {planet.hasRings && (
+                    {planet.hasRings ? (
+                        <div style={{ transform: 'scale(1.5)' }}>
+                            <SaturnSVG size={planet.size} color={planet.color} glowColor={planet.glowColor} />
+                        </div>
+                    ) : (
                         <div
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-slate-400/60"
+                            className="w-full h-full rounded-full"
                             style={{
-                                width: '160%',
-                                height: '40%',
-                                boxShadow: '0 0 10px rgba(197, 171, 110, 0.4)',
-                                transform: 'translate(-50%, -50%) rotate(-20deg)',
+                                background: `radial-gradient(circle at 30% 30%, ${planet.color}, #000)`,
+                                boxShadow: `
+                                    inset -2px -2px 6px rgba(0,0,0,0.5),
+                                    0 0 10px ${planet.glowColor},
+                                    0 0 20px ${planet.glowColor}80
+                                `,
                             }}
                         />
                     )}
@@ -271,4 +205,4 @@ const PlanetaryBackgroundFixed: React.FC = () => {
     );
 };
 
-export default PlanetaryBackgroundFixed;
+export default PlanetaryBackground;
