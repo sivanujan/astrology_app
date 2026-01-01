@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useRef } from 'react';
+import { useAuth } from './AuthContext';
 
 interface ChartContextType {
     chartData: any | null;
@@ -71,9 +72,43 @@ export const ChartProvider: React.FC<ChartProviderProps> = ({ children }) => {
         }
     }, []);
 
+    // Listen for User Logout to clear sensitive data
+    const { user, loading } = useAuth();
+
     return (
         <ChartContext.Provider value={{ chartData, setChartData }}>
+            <ChartDataAuthListener user={user} loading={loading} setChartData={setChartData} />
             {children}
         </ChartContext.Provider>
     );
+};
+
+// Separated component to use the hook safely if we import it at top level
+const ChartDataAuthListener = ({ user, loading, setChartData }: any) => {
+    const userRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => {
+        if (!loading) {
+            // Check if user changed from Logged In -> Logged Out/Different User
+            // We ignore Guest -> Logged In (keep data)
+            const currentUid = user ? user.uid : null;
+
+            // If we had a previous user, and now we don't, or it's different
+            if (userRef.current && currentUid !== userRef.current) {
+                console.log("User session changed (Logout/Switch), clearing persisted chart data.");
+                setChartData(null);
+            }
+
+            // Update ref to current
+            if (currentUid) userRef.current = currentUid;
+            // If logged out, userRef becomes null? 
+            // If I logout, currentUid is null. userRef.current WAS 'A'. 
+            // The condition `userRef.current && null !== 'A'` is true.
+            // THEN we set `userRef.current` to null? 
+            // Yes, we should update the ref to match current state.
+            userRef.current = currentUid;
+        }
+    }, [user, loading, setChartData]);
+
+    return null;
 };
