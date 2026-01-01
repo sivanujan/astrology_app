@@ -11,7 +11,7 @@ import {
 } from '../utils/astrology';
 import { format } from 'date-fns';
 import { calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
-import { TAMIL_PLANET_NAMES } from '../utils/translations';
+import { TAMIL_PLANET_NAMES, TAMIL_RASI_NAMES } from '../utils/translations';
 import { DasaScoreSummary } from './DasaScoreSummary';
 import DasaPeriodCard from './DasaPeriodCard';
 import { generatePDF } from '../utils/pdfGenerator';
@@ -34,6 +34,8 @@ import { generateDasaPrediction } from '../utils/dasaPredictionGenerator';
 
 
 import DasaAnalysis from './DasaAnalysis';
+import HouseAnalysisDashboard from './HouseAnalysisDashboard';
+import { HouseData } from './HouseAnalysisCard';
 
 interface GurujiPredictionsProps {
     data: any;
@@ -331,7 +333,36 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             housePredictions: aiResponse?.bava_analysis_report?.house_predictions
         };
         generatePDF(pdfData, language);
+
+
     };
+
+    // Prepare House Data for Dashboard
+    const houseDashboardData: HouseData[] = React.useMemo(() => {
+        if (!aiResponse?.bava_analysis_report?.house_predictions) return [];
+
+        return aiResponse.bava_analysis_report.house_predictions.map((h: any) => {
+            // Calculate target sign for this house number
+            // House 1 = Ascendant Sign
+            // House N = (Ascendant + N - 1) % 12
+            const targetSignIndex = (ascendant.signIndex + h.house_number - 1) % 12;
+
+            const housePlanets = planets
+                .filter((p: any) => p.signIndex === targetSignIndex)
+                .map((p: any) => language === 'ta' ? (TAMIL_PLANET_NAMES[p.name] || p.name) : p.name);
+
+            return {
+                house_number: h.house_number,
+                title: h.title,
+                status: h.status, // "Strong", "Weak", etc.
+                analysis: h.analysis,
+                guruji_rule_applied: h.guruji_rule_applied,
+                // If API adds score later, map it here. For now rely on status-based fallback in Card.
+                planets: housePlanets,
+                recommendations: []
+            };
+        });
+    }, [aiResponse, planets, ascendant.signIndex, language]);
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20">
@@ -450,91 +481,22 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
             )}
 
             {activeTab === 'houses' && aiResponse?.bava_analysis_report && (
-                <div className="space-y-8 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Lagna Summary */}
-                    <div className="glass-panel p-6 border border-purple-800/30 bg-purple-900/10">
-                        <h3 className="text-xl font-bold text-purple-300 mb-3 flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-yellow-400" />
-                            {isTamil ? "லக்னா சுருக்கம்" : "Lagna Summary"}
-                        </h3>
-                        <p className="text-slate-200 leading-relaxed font-medium">
-                            {aiResponse.bava_analysis_report.lagna_summary}
-                        </p>
-                    </div>
-
-                    {/* House Predictions Grid */}
-                    <div>
-                        <h3 className="text-xl font-bold text-slate-200 mb-4 flex items-center gap-2">
-                            <Star className="w-5 h-5 text-purple-400" />
-                            {isTamil ? "பாவக பலன்கள் (12 வீடுகள்)" : "House-by-House Analysis"}
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {aiResponse.bava_analysis_report.house_predictions.map((house: any, idx: number) => (
-                                <motion.div
-                                    key={house.house_number}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.05 }}
-                                    className={`glass-panel overflow-hidden border transition-colors duration-300 ${expandedId === idx
-                                        ? 'border-purple-500/50 bg-slate-900/80'
-                                        : 'border-slate-700/50 bg-slate-900/40 hover:bg-slate-800/50'
-                                        }`}
-                                >
-                                    <button
-                                        onClick={() => toggleExpand(idx)}
-                                        className="w-full px-4 py-4 flex items-center justify-between text-left"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${house.status === 'Strong' || house.status === 'Excellent'
-                                                ? 'bg-green-600/30 text-green-300'
-                                                : house.status === 'Weak'
-                                                    ? 'bg-red-600/30 text-red-300'
-                                                    : 'bg-yellow-600/30 text-yellow-300'
-                                                }`}>
-                                                {house.house_number}
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-semibold text-white">{house.title}</h3>
-                                                <span className={`text-xs ${house.status === 'Strong' || house.status === 'Excellent'
-                                                    ? 'text-green-400'
-                                                    : house.status === 'Weak'
-                                                        ? 'text-red-400'
-                                                        : 'text-yellow-400'
-                                                    }`}>
-                                                    {house.status}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        {expandedId === idx ? (
-                                            <ChevronUp className="w-5 h-5 text-purple-400" />
-                                        ) : (
-                                            <ChevronDown className="w-5 h-5 text-slate-500" />
-                                        )}
-                                    </button>
-
-                                    <AnimatePresence>
-                                        {expandedId === idx && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                transition={{ duration: 0.3 }}
-                                            >
-                                                <div className="px-4 pb-4 pt-2 border-t border-slate-800/50">
-                                                    <p className="text-slate-300 text-sm leading-relaxed mb-3">{house.analysis}</p>
-                                                    <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/30">
-                                                        <span className="text-xs font-bold text-purple-400">{isTamil ? "குருஜி விதி:" : "Guruji Rule:"}</span>
-                                                        <p className="text-xs text-slate-400 mt-1 italic">{house.guruji_rule_applied}</p>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                <HouseAnalysisDashboard
+                    houses={houseDashboardData}
+                    lagnaSummary={aiResponse.bava_analysis_report.lagna_summary}
+                    ascendantSign={language === 'ta' ? (TAMIL_RASI_NAMES[ascendant.signIndex] || ascendant.rashi_ta || ascendant.name) : (ascendant.rashi_en || ascendant.name)}
+                    ascendantLord={language === 'ta' ? (TAMIL_PLANET_NAMES[ascendant.lord] || ascendant.lord) : ascendant.lord}
+                    lagnaLordPosition={(() => {
+                        const lordPlanet = planets.find((p: any) => p.name === ascendant.lord || p.name === ascendant.lord_en);
+                        if (!lordPlanet) return "?";
+                        const houseNum = (lordPlanet.signIndex - ascendant.signIndex + 12) % 12 + 1;
+                        return language === 'ta' ? `${houseNum}-ம் வீடு` : `House ${houseNum}`;
+                    })()}
+                    // Calculate basic strength for Lagna Lord (Subathuvam Score)
+                    lagnaStrength={agScores[ascendant.lord]?.totalScore || 50}
+                    lagnaDescription={agScores[ascendant.lord]?.totalScore > 60 ? (language === 'ta' ? 'வலுவானது' : 'Strong') : (language === 'ta' ? 'சராசரி' : 'Average')}
+                    isLoading={isLoading}
+                />
             )}
 
             {activeTab === 'questions' && (
