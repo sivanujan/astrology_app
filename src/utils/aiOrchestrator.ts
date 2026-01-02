@@ -1479,4 +1479,441 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
 
     return baseContext;
 };
+<<<<<<< Updated upstream
 0
+=======
+
+// --- LOGGING ---
+// Log interaction if user data is present
+async function logInteraction(userQuery: string, response: OrchestratorResponse, chartData: any, intent: string, language: string) {
+    try {
+        const userId = chartData?.userDetails?.uid ?? "anonymous"; // Ensure you pass uid in chartData if available, or handle auth upstream
+        const userName = chartData?.userDetails?.name ?? "User";
+
+        // We log the final answer (Tamil if Tamil, English if English)
+        const answer = language === 'ta' ? response.final_answer_tamil : response.final_answer_english;
+
+        await predictionService.logChatInteraction(
+            userId,
+            userName,
+            userQuery,
+            answer,
+            intent,
+            language,
+            { model_consensus: response.model_consensus }
+        );
+    } catch (e) {
+        console.error("Failed to log chat interaction", e);
+    }
+}
+
+/**
+ * Generate Guruji Style "Who Am I?" Persona Analysis
+ */
+export const generateGurujiPersona = async (
+    chartData: any,
+    birthDetails: any,
+    language: 'en' | 'ta' = 'ta',
+    apiKey: string = OPENROUTER_API_KEY
+): Promise<string> => {
+    try {
+        const profileData = generateGurujiPersonaProfile(chartData, birthDetails);
+
+        const tamilPrompt = `You are an AI Avatar of Aditya Guruji.
+Your Task: Analyze the raw astrological data provided and "Calculate" the specific life events.
+
+### 🔮 9-PLANET SCANNING LOGIC (The deep Analysis):
+
+**SECTION 1: தலைமைப்பண்பு & ஈகோ (The Leader - Sun & Lagna):**
+- Check **Sun (Suriyan)** in 'planetary_scan':
+  - If Strong/Digbala: "You are a born leader. You have high self-respect (Ego). You won't bow down to anyone easily."
+  - If Weak/Papathuvam: "You lack confidence. You often face trouble from the Government or Father."
+
+**SECTION 2: மனம் & ரகசிய பயம் (The Mind - Moon & Ketu):**
+- Check **Moon**: (If Papathuvam -> Fear/Depression).
+- Check **Ketu**:
+  - If Strong/Connected to Moon: "You have spiritual confusion or detachment. You feel lonely even in a crowd."
+  - If Weak: "You get confused easily."
+
+**SECTION 3: செயல் & வேகம் (The Warrior - Mars & Saturn):**
+- Check **Mars**: (If Papathuvam -> Anger/Haste).
+- Check **Saturn**:
+  - If Subathuvam: "Hard worker. Honest."
+  - If Papathuvam: "Lazy. Dirty habits. Procrastinator."
+
+**SECTION 4: பணம் & அந்தஸ்து (The Rich - Jupiter & Venus):**
+- Check **Jupiter (Guru)**:
+  - If Strong: "You are honest with money. You will have good savings."
+  - If Weak/6-8-12: "Money comes and goes. You struggle to save. You might lack respect from others."
+- Check **Venus**: (If Strong -> Luxury lover).
+
+**SECTION 5: புத்தி & தந்திரம் (The Intellect - Mercury & Rahu):**
+- Check **Mercury**: (Speech/Wit).
+- Check **Rahu**:
+  - If Strong: "You think differently (Out of the box). You have foreign desires."
+  - If Bad: "You lie. You have unconventional habits."
+
+### 👁️ ASPECT ANALYSIS LOGIC (The "Why" Factor):
+
+**RULE 1: GURU PARVAI (The Savior):**
+- Iterate through 'planetary_scan'.
+- If 'aspects_received' contains "Jupiter":
+  - **Output Logic:** Even if the planet is in a bad house (6/8/12) or is a natural malefic (Mars/Saturn), predict GOOD results.
+  - **Reasoning:** "குருவின் பார்வை கோடி நன்மை! [Planet] கெட்ட இடத்தில் இருந்தாலும், குரு பார்ப்பதால் அதன் தீய குணங்கள் நீங்கி சுபத்துவம் ஆகிவிட்டது."
+
+**RULE 2: SATURN PARVAI (The Delayer/Stress Giver):**
+- If 'aspects_received' contains "Saturn":
+  - **Output Logic:** Predict delay, stress, or frustration in that area.
+  - **Reasoning:** "சனியின் பார்வை விழுவதால், இந்த விஷயத்தில் உங்களுக்கு தடை அல்லது தாமதம் ஏற்படும்."
+
+**RULE 3: RAHU/KETU CONNECTION (The Confusion):**
+- If 'aspects_received' contains "Rahu" or "Ketu":
+  - **Reasoning:** "ராகு/கேதுவின் பிடியில் இந்த கிரகம் இருப்பதால், இதில் உங்களுக்கு தெளிவு இருக்காது."
+
+### OUTPUT FORMAT (Strict Tamil Narrative):
+
+**🦁 1. உங்கள் ஆளுமை (Sun/Lagna):**
+(Analyze Sun + Aspects).
+
+**😡 2. உங்கள் கோபம் & வேகம் (Mars/Saturn):**
+(Analyze Mars/Saturn + Aspects).
+*Example:* "செவ்வாய் 2-ல் இருப்பதால் முன்கோபம் வரும். **ஆனால்**, குருவின் பார்வை (Jupiter Aspect) இருப்பதால், அந்த கோபத்தை அடக்கி ஆளும் பக்குவம் உங்களுக்கு உண்டு."
+
+**💰 3. பொருளாதாரம் & ஆசை (Jupiter/Venus):**
+(Analyze Money planets + Aspects).
+
+**🧠 4. புத்திசாலித்தனம் & பேச்சு (Mercury/Rahu):**
+(Analyze Wit & Unconventional thinking + Aspects).
+
+**🌚 5. ரகசிய பலவீனம் (Moon/Ketu):**
+(Analyze Fear & Confusion + Aspects).
+*Example:* "சந்திரன் 6-ல் மறைந்தது குறைதான். போதாத குறைக்கு **சனியின் 10-ம் பார்வை** சந்திரன் மேல் விழுகிறது. இதனால் உங்களுக்கு 'புனர்பூ தோஷம்' போன்ற மனக்குழப்பம் உள்ளது."
+
+**Tone:** Detailed, connecting all dots like a professional astrologer.
+IMPORTANT: Return VALID RAW JSON formatting is NOT needed. Just return the clear Tamil text with Markdown headers.
+`;
+
+        const englishPrompt = `You are an AI Avatar of Aditya Guruji.
+Your Task: Analyze the raw astrological data provided and "Calculate" the specific life events.
+
+### 🔮 9-PLANET SCANNING LOGIC (The deep Analysis):
+
+**SECTION 1: Leadership & Ego (The Leader - Sun & Lagna):**
+- Check **Sun (Suriyan)** in 'planetary_scan':
+  - If Strong/Digbala: "You are a born leader. You have high self-respect (Ego). You won't bow down to anyone easily."
+  - If Weak/Papathuvam: "You lack confidence. You often face trouble from the Government or Father."
+
+**SECTION 2: Mind & Secret Fears (The Mind - Moon & Ketu):**
+- Check **Moon**: (If Papathuvam -> Fear/Depression).
+- Check **Ketu**:
+  - If Strong/Connected to Moon: "You have spiritual confusion or detachment. You feel lonely even in a crowd."
+  - If Weak: "You get confused easily."
+
+**SECTION 3: Action & Speed (The Warrior - Mars & Saturn):**
+- Check **Mars**: (If Papathuvam -> Anger/Haste).
+- Check **Saturn**:
+  - If Subathuvam: "Hard worker. Honest."
+  - If Papathuvam: "Lazy. Dirty habits. Procrastinator."
+
+**SECTION 4: Money & Status (The Rich - Jupiter & Venus):**
+- Check **Jupiter (Guru)**:
+  - If Strong: "You are honest with money. You will have good savings."
+  - If Weak/6-8-12: "Money comes and goes. You struggle to save. You might lack respect from others."
+- Check **Venus**: (If Strong -> Luxury lover).
+
+**SECTION 5: Intellect & Tricks (The Intellect - Mercury & Rahu):**
+- Check **Mercury**: (Speech/Wit).
+- Check **Rahu**:
+  - If Strong: "You think differently (Out of the box). You have foreign desires."
+  - If Bad: "You lie. You have unconventional habits."
+
+### 👁️ ASPECT ANALYSIS LOGIC (The "Why" Factor):
+
+**RULE 1: GURU PARVAI (The Savior):**
+- Iterate through 'planetary_scan'.
+- If 'aspects_received' contains "Jupiter":
+  - **Output Logic:** Even if the planet is in a bad house (6/8/12) or is a natural malefic (Mars/Saturn), predict GOOD results.
+  - **Reasoning:** "Jupiter's Aspect is a blessing! Even though [Planet] is in a bad place, Guru's aspect purifies it."
+
+**RULE 2: SATURN PARVAI (The Delayer/Stress Giver):**
+- If 'aspects_received' contains "Saturn":
+  - **Output Logic:** Predict delay, stress, or frustration in that area.
+  - **Reasoning:** "Due to Saturn's aspect, you will face delays or obstacles in this matter."
+
+**RULE 3: RAHU/KETU CONNECTION (The Confusion):**
+- If 'aspects_received' contains "Rahu" or "Ketu":
+  - **Reasoning:** "Since this planet is in the grip of Rahu/Ketu, you lack clarity here."
+
+### OUTPUT FORMAT (English Narrative):
+
+**🦁 1. Your Personality (Sun/Lagna):**
+(Analyze Sun + Aspects).
+
+**😡 2. Your Anger & Speed (Mars/Saturn):**
+(Analyze Mars/Saturn + Aspects).
+*Example:* "Mars is in 2nd house causing anger. **BUT**, Jupiter's Aspect controls it, making you mature."
+
+**💰 3. Wealth & Desires (Jupiter/Venus):**
+(Analyze Money planets + Aspects).
+
+**🧠 4. Intellect & Speech (Mercury/Rahu):**
+(Analyze Wit & Unconventional thinking + Aspects).
+
+**🌚 5. Secret Weakness (Moon/Ketu):**
+(Analyze Fear & Confusion + Aspects).
+
+**Tone:** Detailed, connecting all dots like a professional astrologer.
+IMPORTANT: Return VALID RAW JSON formatting is NOT needed. Just return the clear English text with Markdown headers.
+`;
+        const systemPrompt = language === 'ta' ? tamilPrompt : englishPrompt;
+
+        const userContext = JSON.stringify(profileData, null, 2);
+        // reliable models list (Free first, then Paid fallbacks)
+        const models = [
+            "google/gemini-2.0-flash-exp:free", // Try 1: Best Quality
+            "google/gemini-2.0-flash-exp:free", // Try 2: Retry if Rate Limited (Wait 5s handled by loop)
+            "meta-llama/llama-3-8b-instruct:free", // Alternative Free (Better than Mistral for general)
+            "mistralai/mistral-7b-instruct:free", // Backup Free
+            "openai/gpt-4o", // Paid High Quality (Fallback)
+            "google/gemini-flash-1.5" // Paid Speed (Fallback)
+        ];
+
+        let retries = models.length;
+        let modelIndex = 0;
+
+        while (retries > 0) {
+            const currentModel = models[modelIndex % models.length];
+            console.log(`🤖 Attempting AI generation with model: ${currentModel} (Retries left: ${retries})`);
+
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${apiKey}`,
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://astrology-app.com",
+                        "X-Title": "Astrology App"
+                    },
+                    body: JSON.stringify({
+                        "model": currentModel,
+                        "messages": [
+                            { "role": "system", "content": systemPrompt },
+                            { "role": "user", "content": userContext }
+                        ],
+                        // Add safety settings if needed, but standard params are safer for now
+                        "temperature": 0.7,
+                        "max_tokens": 2000
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                        console.log("✅ AI Generation Successful!");
+                        return data.choices[0].message.content;
+                    } else {
+                        throw new Error("Invalid response format from AI provider");
+                    }
+                }
+
+                // Log error details
+                const errorText = await response.text();
+                console.warn(`⚠️ Error ${response.status} on ${currentModel}:`, errorText);
+
+                if (response.status === 429) {
+                    // Rate limit - wait longer
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                } else {
+                    // Other errors - short wait
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                modelIndex++;
+                retries--;
+
+            } catch (err) {
+                console.warn(`❌ Network/System error on ${currentModel}:`, err);
+                modelIndex++;
+                retries--;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
+
+        return "System is busy. Please try again in 1 minute.";
+
+    } catch (error) {
+        console.error("Guruji Persona Gen Error:", error);
+        return "உங்களின் ஜாதகத்தை கணிப்பதில் சிரமம் உள்ளது. சிறிது நேரம் கழித்து முயற்சிக்கவும்.";
+    }
+};
+
+/**
+ * Generate Comprehensive Marriage Matching Analysis
+ */
+export const generateMarriageMatchingAI = async (
+    boyDetails: any,
+    girlDetails: any,
+    matchingResult: any,
+    language: 'en' | 'ta' = 'ta',
+    apiKey: string = OPENROUTER_API_KEY
+): Promise<string> => {
+    // Normalize data (Handle both Standard and Comprehensive Result structures)
+    try {
+        const isComprehensive = 'dasaSync' in matchingResult;
+
+        const overallScore = matchingResult.overallScore;
+        const verdict = matchingResult.verdict;
+
+        // Dasa Matching
+        const dasaScore = isComprehensive
+            ? matchingResult.dasaSync.score
+            : matchingResult.dasaMatching?.score || 0;
+
+        const dasaWarning = isComprehensive
+            ? (matchingResult.dasaSync.warnings?.length > 0 || matchingResult.autoRejectReasons?.some((r: string) => r.includes('6-8')))
+            : matchingResult.dasaMatching?.sixEightRelationship || false;
+
+        // House Matching
+        const house2Score = isComprehensive ? matchingResult.house2nd?.score : matchingResult.houseMatching?.house2?.score || 0;
+        const house7Score = isComprehensive ? matchingResult.house7th?.score : matchingResult.houseMatching?.house7?.score || 0;
+        const house8Score = isComprehensive ? matchingResult.house8th?.score : matchingResult.houseMatching?.house8?.score || 0;
+
+        const tamilPrompt = `You are an expert Vedic Astrologer specializing in Marriage Matching (Thirumana Porutham) using Aditya Guruji's Subathuvam & Dasa methods.
+Your task is to analyze the provided Marriage Matching Result and give a **Detailed, Honest, and Predictive Analysis** in Tamil.
+
+USER DATA:
+- Boy: ${boyDetails.name} (${boyDetails.date})
+- Girl: ${girlDetails.name} (${girlDetails.date})
+- Compatibility Score: ${overallScore}/100
+- Verdict: ${verdict}
+- Dasa Compatibility: Score ${dasaScore}/100
+- 6-8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
+- House Matching:
+   - 2nd House (Family): ${house2Score}
+   - 7th House (Kalathra): ${house7Score}
+   - 8th House (Longevity): ${house8Score}
+
+RULES FOR ANALYSIS (Strictly in Tamil Language):
+0. **LANGUAGE INSTRUCTION:** You MUST output the entire analysis ONLY in Tamil (தமிழ்). Do not use English words unless absolutely necessary for technical terms.
+1. **START WITH A CLEAR VERDICT:** 
+   - "இந்த திருமணம் சிறப்பாக இருக்கும்" (Recommended) OR "இந்த திருமணத்தை தவிர்ப்பது நல்லது" (Not Recommended).
+   - Base this on the 'Verdict' and 'Overall Score'.
+
+2. **ANALYZE DASA SANDHI (Crucial):**
+   - Look at 'dasaMatching'. If there is a 6-8 relationship (Sashtashtama), WARN THEM seriously.
+   - Explain what will happen: "தசா நாதர்கள் 6-8 க இருப்பதால், ஈகோ பிரச்சனைகள் வரும்..."
+   - If Dasa is good: Predict growth after marriage.
+
+3. **PREDICT THE FUTURE (Next 5-10 Years):**
+   - Use the 'nextTenYears' timeline (if good) to predict: "குழந்தை பாக்கியம்", "சொத்து சேரும் காலம்".
+   - If verified risks exist: Mention "பிரிவு ஏற்பட வாய்ப்பு" (Possibility of separation) honestly but gently.
+
+OUTPUT STRUCTURE (Return plain Tamil text with headers):
+1. **திருமண பொருத்த முடிவு (Final Verdict):**
+2. **மனயீர்ப்பு & ஒற்றுமை (Psychological Compatibility):**
+3. **தசா-புத்தி சவால்கள் (Dasa Predictions):** (Explain 6-8 issues if any).
+4. **எதிர்கால வாழ்க்கை (Future Prediction):** (Career, Wealth after marriage).
+
+Tone: Trusted Guruji, Caring, Protective but Truthful.
+`;
+
+        const englishPrompt = `You are an expert Vedic Astrologer specializing in Marriage Matching using Aditya Guruji's Subathuvam & Dasa methods.
+Your task is to analyze the provided Marriage Matching Result and give a **Detailed, Honest, and Predictive Analysis** in English.
+
+USER DATA:
+- Boy: ${boyDetails.name} (${boyDetails.date})
+- Girl: ${girlDetails.name} (${girlDetails.date})
+- Compatibility Score: ${overallScore}/100
+- Verdict: ${verdict}
+- Dasa Compatibility: Score ${dasaScore}/100
+- 6-8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
+- House Matching:
+   - 2nd House (Family): ${house2Score}
+   - 7th House (Kalathra): ${house7Score}
+   - 8th House (Longevity): ${house8Score}
+
+OUTPUT STRUCTURE (Return plain English text with headers):
+1. **Final Verdict (Marriage Decision):**
+2. **Compatibility & Understanding:**
+3. **Dasa & Timing Analysis:** (Crucial for long term).
+4. **Future Predictions (Post-Marriage):** (Wealth, Children, Career).
+
+Tone: Professional, Insightful, and Honest.
+`;
+
+        const systemPrompt = language === 'ta' ? tamilPrompt : englishPrompt;
+        const contextData = JSON.stringify(matchingResult, null, 2);
+
+        // Model List (Smartest First)
+        const models = [
+            'google/gemini-2.0-flash-exp:free', // Try 1
+            'google/gemini-2.0-flash-exp:free', // Try 2 (Retry)
+            'meta-llama/llama-3.1-70b-instruct:free',
+            'mistralai/mistral-7b-instruct:free',
+            'openai/gpt-4o', // Paid Fallback
+            'google/gemini-flash-1.5' // Paid Fallback
+        ];
+
+        let modelIndex = 0;
+        let retries = models.length;
+
+        while (retries > 0 && modelIndex < models.length) {
+            const currentModel = models[modelIndex];
+            console.log(`🤖 Attempting Marriage AI with model: ${currentModel}`);
+
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${apiKey}`,
+                        "HTTP-Referer": "https://astrology-app.com",
+                        "X-Title": "Astrology App",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "model": currentModel,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": systemPrompt
+                            },
+                            {
+                                "role": "user",
+                                "content": `Analyze this matching result:\n${contextData}\n\nIMPORTANT: Output the analysis STRICTLY in ${language === 'ta' ? 'TAMIL (தமிழ்)' : 'ENGLISH'} language.`
+                            }
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 2000
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.choices && data.choices.length > 0) {
+                        return data.choices[0].message.content;
+                    }
+                }
+
+                // If failed, try next model
+                console.warn(`⚠️ Model ${currentModel} failed or returned empty.`);
+                modelIndex++;
+                retries--;
+
+            } catch (e) {
+                console.error(`Error with ${currentModel}:`, e);
+                modelIndex++;
+                retries--;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        throw new Error("All models failed");
+
+    } catch (error) {
+        console.error("Error in Marriage AI:", error);
+        return language === 'ta'
+            ? "மன்னிக்கவும், தொழில்நுட்ப கோளாறு உள்ளது."
+            : "Sorry, error generating analysis.";
+    }
+};
+>>>>>>> Stashed changes

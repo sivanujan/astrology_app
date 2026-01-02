@@ -51,5 +51,69 @@ export const predictionService = {
         } catch (error) {
             console.error("Error saving prediction:", error);
         }
+<<<<<<< Updated upstream
+=======
+    },
+
+    // Log Chat Interaction (For Admin Dashboard)
+    logChatInteraction: async (userId: string, userName: string, question: string, answer: string, intent: string, language: string, context?: any): Promise<void> => {
+        try {
+            const logsRef = collection(db, 'chat_logs');
+            await addDoc(logsRef, {
+                userId,
+                userName,
+                question,
+                answer,
+                intent,
+                language,
+                timestamp: serverTimestamp(),
+                metadata: context ? JSON.stringify(context).substring(0, 1000) : null // Truncate metadata if needed
+            });
+            console.log("Chat interaction logged");
+        } catch (error) {
+            console.error("Error logging chat:", error);
+        }
+    },
+
+    // --- DAILY FORECAST CACHING ---
+    getStoredDailyForecast: async (userId: string, date: string, language: string = 'en', contextKey: string = ''): Promise<string | null> => {
+        try {
+            // ID Format: userId_yyyy-mm-dd_context_lang
+            const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
+            const cleanContext = contextKey.replace(/[^a-zA-Z0-9-]/g, ''); // Ensure safe ID
+            const docId = `${userId}_${cleanDate}_${cleanContext}_${language}`;
+
+            const docRef = doc(db, `daily_forecasts/${docId}`);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                return docSnap.data().prediction;
+            }
+            return null;
+        } catch (error) {
+            console.error("Error fetching daily forecast:", error);
+            return null;
+        }
+    },
+
+    saveDailyForecast: async (userId: string, date: string, prediction: string, language: string = 'en', contextKey: string = ''): Promise<void> => {
+        try {
+            const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
+            const cleanContext = contextKey.replace(/[^a-zA-Z0-9-]/g, '');
+            const docId = `${userId}_${cleanDate}_${cleanContext}_${language}`;
+
+            const docRef = doc(db, `daily_forecasts/${docId}`);
+            await setDoc(docRef, {
+                userId,
+                date,
+                prediction,
+                language,
+                contextKey,
+                timestamp: serverTimestamp()
+            });
+        } catch (error) {
+            console.error("Error saving daily forecast:", error);
+        }
+>>>>>>> Stashed changes
     }
 };
