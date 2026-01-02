@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Lock, Sparkles, Lightbulb } from 'lucide-react';
+import { X, Sparkles, Check, Lock, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -23,101 +23,123 @@ const FeatureAccessPopup: React.FC<FeatureAccessPopupProps> = ({ isOpen, onClose
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 z-[60] bg-[#0d0a2c]/80 backdrop-blur-sm"
+                        className="fixed inset-0 z-[60] bg-[#0d0a2c]/90 backdrop-blur-sm"
                     />
 
-                    {/* Popup Card */}
+                    {/* Popup Modal */}
                     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pointer-events-none">
                         <motion.div
-                            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 50, scale: 0.95 }}
-                            transition={{ type: "spring", duration: 0.5 }}
-                            className="pointer-events-auto w-full max-w-[500px] bg-[rgba(139,92,246,0.15)] backdrop-blur-xl border border-[rgba(139,92,246,0.4)] rounded-[20px] shadow-[0_0_50px_rgba(139,92,246,0.2)] overflow-hidden"
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
+                            className="pointer-events-auto w-full max-w-[600px] bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                         >
                             {/* Header */}
-                            <div className="relative p-8 pb-4">
+                            <div className="relative bg-gradient-to-r from-purple-900/50 to-indigo-900/50 p-6 flex-shrink-0">
                                 <button
                                     onClick={onClose}
-                                    className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
+                                    className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
-
-                                <div className="flex items-center gap-3 mb-6">
-                                    <Sparkles className="w-8 h-8 text-purple-400 animate-pulse" />
-                                    <h2 className="text-2xl font-bold font-orbitron text-white">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-purple-500/20 p-2 rounded-lg">
+                                        <Sparkles className="w-6 h-6 text-purple-400" />
+                                    </div>
+                                    <h2 className="text-xl md:text-2xl font-bold text-white font-orbitron">
                                         {t.featurePopup.title}
                                     </h2>
                                 </div>
+                            </div>
 
-                                {/* Available Features */}
-                                <div className="mb-6">
-                                    <h3 className="text-[#10b981] font-semibold mb-3 flex items-center gap-2">
-                                        <Check className="w-5 h-5" />
-                                        {t.featurePopup.availableTitle}
-                                    </h3>
-                                    <ul className="space-y-3 pl-2">
-                                        {t.featurePopup.availableItems.map((item: string, idx: number) => (
-                                            <motion.li
-                                                key={idx}
-                                                whileHover={{ x: 5 }}
-                                                className="flex items-center gap-3 text-slate-200 text-[15px]"
-                                            >
-                                                <div className="w-1.5 h-1.5 rounded-full bg-[#10b981] shadow-[0_0_5px_#10b981]" />
-                                                {item}
-                                            </motion.li>
-                                        ))}
-                                    </ul>
-                                </div>
-
-                                {/* Divider */}
-                                <div className="h-px w-full bg-gradient-to-r from-transparent via-purple-500/30 to-transparent my-6" />
-
-                                {/* Locked Features */}
+                            {/* Scrollable Content */}
+                            <div className="p-6 overflow-y-auto custom-scrollbar flex-grow">
+                                {/* Free Features Section */}
                                 <div className="mb-8">
-                                    <h3 className="text-[#a855f7] font-semibold mb-3 flex items-center gap-2">
-                                        <Lock className="w-5 h-5" />
-                                        {t.featurePopup.lockedTitle}
-                                    </h3>
-                                    <ul className="space-y-3 pl-2">
-                                        {t.featurePopup.lockedItems.map((item: string, idx: number) => (
-                                            <motion.li
-                                                key={idx}
-                                                whileHover={{ x: 5 }}
-                                                className="flex items-center gap-3 text-slate-300/80 text-[15px]"
-                                            >
-                                                <div className="w-1.5 h-1.5 rounded-full bg-[#a855f7] shadow-[0_0_5px_#a855f7]" />
-                                                {item}
-                                            </motion.li>
-                                        ))}
-                                    </ul>
-                                </div>
-
-                                {/* Footer CTA */}
-                                <div className="bg-purple-900/20 -mx-8 -mb-8 p-6 text-center border-t border-purple-500/20">
-                                    <div className="flex items-center justify-center gap-2 mb-4 text-purple-200">
-                                        <Lightbulb className="w-4 h-4 ml-1" />
-                                        <p className="text-sm font-medium">{t.featurePopup.loginMsg}</p>
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide">
+                                            Free
+                                        </span>
+                                        <h3 className="text-slate-300 font-medium">
+                                            {t.featurePopup.subtitle}
+                                        </h3>
                                     </div>
 
-                                    <div className="flex items-center justify-center gap-4">
-                                        <motion.button
-                                            whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(168,85,247,0.4)" }}
-                                            whileTap={{ scale: 0.98 }}
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {t.featurePopup.freeFeatures.map((feature: any, idx: number) => (
+                                            <div key={idx} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex flex-col items-center text-center gap-2 hover:bg-slate-800 transition-colors">
+                                                <div className="text-2xl">{feature.icon}</div>
+                                                <div>
+                                                    <div className="text-sm font-semibold text-white">{feature.title}</div>
+                                                    <div className="text-[10px] text-slate-400 leading-tight mt-1">{feature.desc}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Premium Benefits Section */}
+                                <div className="bg-gradient-to-br from-purple-900/20 to-indigo-900/20 rounded-2xl p-5 border border-purple-500/20">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-purple-300 font-bold flex items-center gap-2">
+                                            <Lock className="w-4 h-4" />
+                                            {t.featurePopup.premiumTitle}
+                                        </h3>
+                                        <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                                            Premium
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {t.featurePopup.premiumFeatures.map((feature: any, idx: number) => (
+                                            <div key={idx} className="flex gap-3 items-start p-2 rounded-lg hover:bg-white/5 transition-colors">
+                                                <div className="text-xl flex-shrink-0 mt-0.5">{feature.icon}</div>
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">{feature.title}</div>
+                                                    <div className="text-xs text-purple-200/60 leading-snug">{feature.desc}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer / CTA */}
+                            <div className="p-6 bg-slate-900/80 border-t border-white/5 flex-shrink-0">
+                                <div className="text-center mb-4">
+                                    <div className="flex items-center justify-center gap-1 text-sm text-amber-400 font-medium mb-1">
+                                        <span>⭐⭐⭐⭐⭐</span>
+                                    </div>
+                                    <p className="text-slate-400 text-xs">
+                                        {t.featurePopup.ctaTitle}
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col gap-3">
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => { onClose(); navigate('/register'); }}
+                                        className="w-full py-3 px-6 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2"
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        {t.featurePopup.signupBtn}
+                                    </motion.button>
+
+                                    <div className="flex items-center justify-between px-2">
+                                        <button
                                             onClick={() => { onClose(); navigate('/login'); }}
-                                            className="px-6 py-2.5 rounded-lg border border-purple-500 text-purple-100 font-medium hover:bg-purple-500/10 transition-colors"
+                                            className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
                                         >
                                             {t.featurePopup.loginBtn}
-                                        </motion.button>
-
-                                        <motion.button
-                                            whileHover={{ scale: 1.02 }}
-                                            onClick={() => { onClose(); navigate('/register'); }}
-                                            className="text-white underline underline-offset-4 hover:text-purple-200 transition-colors font-medium"
+                                        </button>
+                                        <button
+                                            onClick={onClose}
+                                            className="text-slate-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-1"
                                         >
-                                            {t.featurePopup.signupBtn}
-                                        </motion.button>
+                                            {t.featurePopup.guestLink} <ChevronRight className="w-3 h-3" />
+                                        </button>
                                     </div>
                                 </div>
                             </div>

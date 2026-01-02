@@ -32,7 +32,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             ]
         },
         { type: 'link', path: '/predictions', label: t.nav.predictions, icon: Sparkles, color: 'text-teal-400', protected: true },
-        { type: 'link', path: '/marriage-matching', label: language === 'ta' ? 'திருமணப் பொருத்தம்' : 'Marriage Matching', icon: Heart, color: 'text-red-400' }
+        { type: 'link', path: '/marriage-tools', label: language === 'ta' ? 'திருமண கருவிகள்' : 'Marriage Tools', icon: Heart, color: 'text-red-400' }
     ];
 
 

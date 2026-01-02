@@ -130,9 +130,14 @@ const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewCha
 
                 <button
                     onClick={() => onViewPrediction(chart)}
-                    className="flex flex-col items-center justify-center p-3 gap-1 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 hover:text-white rounded-xl border border-white/5 hover:border-white/10 transition-all duration-300"
+                    className="relative flex flex-col items-center justify-center p-3 gap-1 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 hover:text-white rounded-xl border border-white/5 hover:border-white/10 transition-all duration-300 group/pred"
                 >
-                    <Sparkles className="w-5 h-5 text-teal-400" />
+                    {/* Notification Badge */}
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-max bg-gradient-to-r from-green-500 to-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-green-500/20 animate-pulse border border-white/10 z-10">
+                        {language === 'ta' ? 'திருமண காலம்?' : 'Marriage Date?'}
+                    </div>
+
+                    <Sparkles className="w-5 h-5 text-teal-400 group-hover/pred:text-teal-300 transition-colors" />
                     <span className="text-xs font-medium">{language === 'ta' ? 'எங்கள் கணிப்புகள்' : 'Our Predictions'}</span>
                 </button>
 

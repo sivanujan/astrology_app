@@ -157,23 +157,28 @@ export const translations = {
             Ascendant: "Ascendant"
         },
         featurePopup: {
-            title: "Feature Access Info",
-            availableTitle: "Available Without Login:",
-            availableItems: [
-                "Birth Details",
-                "Vedic Chart (Rasi)",
-                "Vimshottari Dasha Periods"
+            title: "Unlock Your Cosmic Potential",
+            subtitle: "You're currently exploring:",
+            freeFeatures: [
+                { icon: "📝", title: "Birth Details", desc: "Enter & generate chart" },
+                { icon: "📊", title: "Vedic Chart", desc: "View Rasi chart" },
+                { icon: "⏰", title: "Dasha Periods", desc: "Timeline analysis" },
+                { icon: "💑", title: "Marriage Date", desc: "Find timing" },
+                { icon: "💕", title: "Compatibility", desc: "Match making" }
             ],
-            lockedTitle: "Login Required for:",
-            lockedItems: [
-                "12 House Analysis",
-                "AI Astrologer Chat",
-                "Daily Snapshot",
-                "Save & Track Your Charts"
+            premiumTitle: "Sign up FREE to unlock:",
+            premiumFeatures: [
+                { icon: "🏠", title: "12 House Analysis", desc: "Complete life areas breakdown" },
+                { icon: "🤖", title: "AI Astrologer Chat", desc: "Ask unlimited questions 24/7" },
+                { icon: "📅", title: "Daily Predictions", desc: "Never miss important transits" },
+                { icon: "🔮", title: "Our Predictions", desc: "Personalized insights" },
+                { icon: "👤", title: "Who Am I", desc: "Discover yourself" },
+                { icon: "💾", title: "Save & Track", desc: "Access charts anytime" }
             ],
-            loginMsg: "Please login to access full features",
+            ctaTitle: "Join 100+ Happy Users",
             loginBtn: "Login",
-            signupBtn: "Sign Up"
+            signupBtn: "Get Started - It's FREE!",
+            guestLink: "Continue as Guest"
         },
         forecast: {
             title: "Next 15 Days Forecast (Dasa + Gocharam)",
@@ -408,23 +413,28 @@ export const translations = {
             Ascendant: "லக்னம்"
         },
         featurePopup: {
-            title: "அம்ச அணுகல் தகவல்",
-            availableTitle: "உள்நுழைவு இல்லாமல் கிடைக்கும்:",
-            availableItems: [
-                "பிறப்பு விவரங்கள்",
-                "வேத ஜாதகம்",
-                "விம்ஷோத்தரி தசா"
+            title: "உங்கள் முழு திறனை திறக்கவும்",
+            subtitle: "நீங்கள் தற்போது ஆராய்வது:",
+            freeFeatures: [
+                { icon: "📝", title: "பிறப்பு விவரங்கள்", desc: "ஜாதகத்தை கணிக்க" },
+                { icon: "📊", title: "வேத ஜாதகம்", desc: "இராசி கட்டம்" },
+                { icon: "⏰", title: "தசா புக்தி", desc: "காலவரிசை ஆய்வு" },
+                { icon: "💑", title: "திருமண காலம்", desc: "நேரத்தை கண்டறிய" },
+                { icon: "💕", title: "திருமண பொருத்தம்", desc: "பொருத்தம் பார்க்க" }
             ],
-            lockedTitle: "உள்நுழைவு தேவை:",
-            lockedItems: [
-                "12 பாவ பகுப்பாய்வு",
-                "AI ஜோதிடர் அரட்டை",
-                "தினசரி கணிப்பு",
-                "உங்கள் ஜாதகங்களை சேமிக்கவும்"
+            premiumTitle: "இலவசமாக பதிவு செய்து பெறுங்கள்:",
+            premiumFeatures: [
+                { icon: "🏠", title: "12 பாவ ஆய்வு", desc: "வாழ்க்கையின் முழுமையான பார்வை" },
+                { icon: "🤖", title: "AI ஜோதிடர்", desc: "எதையும் கேளுங்கள்" },
+                { icon: "📅", title: "தினசரி கணிப்பு", desc: "முக்கிய மாற்றங்களை அறிய" },
+                { icon: "🔮", title: "எங்கள் கணிப்புகள்", desc: "தனிப்பட்ட பலன்கள்" },
+                { icon: "👤", title: "நான் யார்?", desc: "உங்களை கண்டறியவும்" },
+                { icon: "💾", title: "சேமிக்க & தொடர", desc: "எப்போது வேண்டுமானாலும் பார்க்க" }
             ],
-            loginMsg: "முழு அம்சங்களுக்கு தயவுசெய்து உள்நுழைக",
+            ctaTitle: "100+ பயனர்களுடன் இணையுங்கள்",
             loginBtn: "உள்நுழைய",
-            signupBtn: "பதிவு செய்க"
+            signupBtn: "தொடங்கவும் - இது இலவசம்!",
+            guestLink: "விருந்தினராக தொடரவும்"
         },
         forecast: {
             title: "அடுத்த 15 நாட்கள் கணிப்பு (தசை + கோச்சாரம்)",

@@ -104,7 +104,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     // --- Rule Based Answers (Enriched by AI) ---
     const rawJob = predictJobTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, language);
     const rawForeign = predictForeignTravel(planets, ascendant.signIndex, moon.signIndex, agScores, currentDasha, language);
-    const rawMarriageTime = predictDetailedMarriageTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, new Date(birthDate), 'male', dashaPeriods, language);
+    const rawMarriageTime = predictDetailedMarriageTiming(currentDasha, transits, ascendant.signIndex, moon.signIndex, planets, new Date(birthDate), 'male', dashaPeriods, language, agScores);
     const rawMarriageType = predictMarriageType(planets, ascendant.signIndex, agScores, currentDasha, language);
     const rawCareer = predictCareerPath(planets, ascendant.signIndex, agScores, currentDasha, language);
     const rawLoveStatus = predictCurrentLoveStatus(planets, ascendant.signIndex, moon.signIndex, currentDasha, agScores, language); // New Prediction
@@ -112,7 +112,7 @@ const GurujiPredictions: React.FC<GurujiPredictionsProps> = ({ data }) => {
     // Apply AI Refinements if available
     const jobPrediction = aiResponse?.life_guidance?.job_timing ? { ...rawJob, answer: aiResponse.life_guidance.job_timing.answer, reason: aiResponse.life_guidance.job_timing.reason } : rawJob;
     const foreignTravel = rawForeign; // Strictly use Rule-Based logic for Foreign Travel (User Requirement)
-    const marriageTiming = aiResponse?.life_guidance?.marriage_timing ? { ...rawMarriageTime, answer: aiResponse.life_guidance.marriage_timing.answer, reason: aiResponse.life_guidance.marriage_timing.reason } : rawMarriageTime;
+    const marriageTiming = rawMarriageTime; // Strictly use Rule-Based logic for Marriage Timing (User Requirement)
     const marriageType = aiResponse?.life_guidance?.marriage_type ? { ...rawMarriageType, answer: aiResponse.life_guidance.marriage_type.answer, reason: aiResponse.life_guidance.marriage_type.reason } : rawMarriageType;
     const careerPath = rawCareer; // Strictly use Rule-Based logic (New Guruji Rules Update)
     // Note: AI support for loveStatus is not yet in OrchestratorResponse interface, using raw for now or if user expands schema later.

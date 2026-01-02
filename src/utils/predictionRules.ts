@@ -10,6 +10,23 @@ export interface PredictionResult {
     answer: string;
     reason: string;
     isFavorable: boolean;
+    predictionDetails?: {
+        periods: {
+            start: Date;
+            end: Date;
+            dasa: string;
+            bhukti: string;
+            antaram: string;
+            score: number;
+            isPriority1: boolean;
+            isPriority2: boolean;
+            reason?: string;
+        }[];
+        marriageLords?: string[];
+        isLateMarriage?: boolean;
+        lateReasons?: string[];
+    };
+    verdict?: string;
 }
 
 export interface TransitPositions {
@@ -824,6 +841,39 @@ const getSunFavorablePeriods = (startDate: Date, endDate: Date, ascendantSign: n
 };
 
 
+// Helper: Get Marriage Giving Lords (Step 2)
+// Returns ordered priority list: [Primary, Secondary, Tertiary...]
+const getMarriageGivingLords = (lagnaIndex: number, subathuvamScores: Record<string, SubathuvamResult>): string[] => {
+    // 0=Aries, 11=Pisces
+    const lordsMap: Record<number, string[]> = {
+        0: ['Saturn', 'Venus', 'Mercury'],      // Aries
+        1: ['Mars', 'Jupiter'],                 // Taurus
+        2: ['Jupiter', 'Moon', 'Sun'],          // Gemini
+        3: ['Saturn', 'Mercury', 'Venus'],      // Cancer
+        4: ['Saturn', 'Mercury', 'Venus'],      // Leo (Moon added conditionally below)
+        5: ['Jupiter', 'Venus', 'Moon'],        // Virgo
+        6: ['Venus', 'Mercury'],                // Libra (Avoid Mars/Sun)
+        7: ['Mercury', 'Venus', 'Saturn'],      // Scorpio
+        8: ['Mercury', 'Venus'],                // Sagittarius (Saturn 2,3 - ignored as main giver)
+        9: ['Moon', 'Jupiter', 'Mars', 'Saturn'], // Capricorn
+        10: ['Sun', 'Mars'],                    // Aquarius
+        11: ['Mars', 'Mercury']                 // Pisces
+    };
+
+    const specificLords = [...(lordsMap[lagnaIndex] || [])];
+
+    // Special Rule for Leo (Simha) - Moon if Benefic
+    if (lagnaIndex === 4) {
+        // Moon is 12th Lord, can give if benefic (Subathuva)
+        const moonScore = subathuvamScores['Moon'];
+        if (moonScore && moonScore.isSubathuva) {
+            specificLords.push('Moon'); // Added as extra option (usually last priority unless very strong)
+        }
+    }
+
+    return specificLords;
+};
+
 // 2. Detailed Marriage Timing (Precision Engine)
 export const predictDetailedMarriageTiming = (
     currentDasa: { maha: DashaPeriod, bhukti?: DashaPeriod },
@@ -834,7 +884,8 @@ export const predictDetailedMarriageTiming = (
     birthDate: Date,
     gender: 'male' | 'female' = 'male',
     allDashaPeriods: DashaPeriod[] = [],
-    language: 'en' | 'ta' = 'en'
+    language: 'en' | 'ta' = 'en',
+    subathuvamScores: Record<string, SubathuvamResult> = {} // Added parameter
 ): PredictionResult => {
     const isTamil = language === 'ta';
     const question = isTamil ? "எனக்கு எப்போது திருமணம் நடக்கும்?" : "When will I get married?";
@@ -849,113 +900,197 @@ export const predictDetailedMarriageTiming = (
         };
     }
 
-    // --- Step A: Identify Key Planets (The Triangle 3-7-11) ---
-    const house2Sign = (ascendantSign + 1) % 12;
-    const house3Sign = (ascendantSign + 2) % 12; // Initiative
-    const house7Sign = (ascendantSign + 6) % 12; // Marriage
-    const house8Sign = (ascendantSign + 7) % 12; // Added House 8
-    const house11Sign = (ascendantSign + 10) % 12; // Fulfillment
+    const getP = (name: string) => getPlanetPosition(planets, name);
+    const getH = (sign: number) => (sign - ascendantSign + 12) % 12 + 1;
 
-    const lord2 = SIGN_LORDS[house2Sign];
-    const lord3 = SIGN_LORDS[house3Sign];
+    // --- Step 1: Late Marriage Indicators ---
+    let isLateMarriage = false;
+    let lateReasons: string[] = [];
+    let reliefReasons: string[] = [];
+
+    const saturn = getP('Saturn');
+    const jupiter = getP('Jupiter');
+    const house7Sign = (ascendantSign + 6) % 12;
     const lord7 = SIGN_LORDS[house7Sign];
-    const lord11 = SIGN_LORDS[house11Sign];
-    const venus = 'Venus';
-    const jupiter = 'Jupiter';
+    const lord7Planet = getP(lord7);
 
-    const rahu = getPlanetPosition(planets, 'Rahu');
-    const ketu = getPlanetPosition(planets, 'Ketu');
-    // Key Planets for Marriage
-    // Added Lord 3 (Initiative) and Lord 11 (Fulfillment) as Primary Indicators
-    const keyPlanets = [lord7, lord11, lord3, venus, jupiter, lord2];
+    // 1. Saturn Position Check
+    if (saturn) {
+        const saturnHouse = getH(saturn.signIndex);
+        if (saturnHouse === 2 || saturnHouse === 8) {
+            isLateMarriage = true;
+            lateReasons.push(isTamil
+                ? `சனி ${saturnHouse}-ம் வீட்டில் உள்ளார் (தாமத அறிகுறி).`
+                : `Saturn is in ${saturnHouse}th house (Delay Indicator).`);
 
-    if (rahu && [house2Sign, house7Sign, house8Sign].includes(rahu.signIndex)) keyPlanets.push('Rahu');
-    if (ketu && [house2Sign, house7Sign, house8Sign].includes(ketu.signIndex)) keyPlanets.push('Ketu');
+            // Check Relief (Jupiter Aspect)
+            if (jupiter) {
+                const aspect = isAspecting(jupiter.signIndex, saturn.signIndex, [1, 5, 7, 9]);
+                if (aspect) {
+                    reliefReasons.push(isTamil
+                        ? "குருவின் பார்வை சனி மீது உள்ளது (தாமதம் குறையும்)."
+                        : "Jupiter aspects Saturn (Delay reduces).");
+                    isLateMarriage = false; // Relief
+                }
+            }
+            // Check Benefic Conjunction
+            const benefics = ['Jupiter', 'Venus', 'Mercury', 'Moon'];
+            const conj = planets.find(p => benefics.includes(p.name) && p.signIndex === saturn.signIndex);
+            if (conj) {
+                reliefReasons.push(isTamil
+                    ? `${conj.name} கிரகத்துடன் சனி சேர்க்கை (தாமதம் குறையும்).`
+                    : `Saturn conjoined with ${conj.name} (Delay reduces).`);
+                isLateMarriage = false; // Relief
+            }
+        }
+    }
 
-    const isKeyPlanet = (planetName: string) => keyPlanets.includes(planetName);
+    // 2. 7th House/Lord Analysis
+    if (lord7Planet) {
+        const l7House = getH(lord7Planet.signIndex);
+        if ([6, 8, 12].includes(l7House)) {
+            // Ubaya Lagna Exception check could go here, but prompt says "Is 7th Lord in 8th? -> Late"
+            if (l7House === 8) {
+                isLateMarriage = true;
+                lateReasons.push(isTamil
+                    ? "7-ம் அதிபதி 8-ல் உள்ளார்."
+                    : "7th Lord is in 8th House.");
+            } else {
+                lateReasons.push(isTamil
+                    ? `7-ம் அதிபதி ${l7House}-ல் (மறைவு ஸ்தானம்).`
+                    : `7th Lord in ${l7House}th House (Hidden House).`);
+            }
+        }
+    }
 
-    // --- Precision Engine Execution ---
+    // Malefic Aspects on 7th House/Lord
+    const malefics = ['Saturn', 'Mars', 'Rahu', 'Ketu'];
+    const checkMaleficAspect = (targetSign: number) => {
+        return planets.some(p => malefics.includes(p.name) && isAspecting(p.signIndex, targetSign, [1, 4, 7, 8, 10])); // Simplified aspects
+    };
+    if (checkMaleficAspect(house7Sign)) {
+        // Only consider if no relief
+        // For brevity, we just note it
+    }
+
+    // --- Step 2: Identify Marriage-Giving Lords ---
+    let marriageLords = getMarriageGivingLords(ascendantSign, subathuvamScores);
+
+    // Special Rule for Leo (Simha) - Index 4
+    if (ascendantSign === 4 && marriageLords.includes('Moon')) {
+        const moonScore = subathuvamScores['Moon'];
+        if (!moonScore || !moonScore.isSubathuva) {
+            // Remove Moon if not Subathuva
+            marriageLords = marriageLords.filter(lord => lord !== 'Moon');
+            // Optional: Log reason or add to lateReasons/reliefReasons if beneficial for debug
+            // reason += "(Moon removed due to lack of Subathuvam for Leo)"; 
+        }
+    }
+
+    // --- Step 3: Dasa-Bhukti-Antara Scoring ---
+    // Helper to score a period
+    // Returns { score, breakdown }
+    const scorePeriod = (dasa: string, bhukti: string, antaram: string) => {
+        let score = 0;
+        let reasons: string[] = [];
+
+        // Priority Scoring:
+        // Priority 1 Lord in Dasa/Bhukti = +5
+        // Priority 2 Lord in Dasa/Bhukti = +3
+        // Others = +1
+        const getPriorityScore = (planet: string) => {
+            const idx = marriageLords.indexOf(planet);
+            if (idx === 0) return 5; // Best Lord (e.g., Saturn for Leo)
+            if (idx === 1) return 3; // Second Best
+            if (idx > 1) return 2;   // Others
+            return 0; // Not in list
+        };
+
+        const dasaP = getPriorityScore(dasa);
+        if (dasaP > 0) { score += dasaP; reasons.push(`Dasa Priority ${marriageLords.indexOf(dasa) + 1}`); }
+
+        const bhuktiP = getPriorityScore(bhukti);
+        if (bhuktiP > 0) { score += bhuktiP; reasons.push(`Bhukti Priority ${marriageLords.indexOf(bhukti) + 1}`); }
+
+        const antaramP = getPriorityScore(antaram);
+        if (antaramP > 0) { score += 1; }
+
+        // Placement Match (2, 7, 11)
+        const checkPlace = (pName: string) => {
+            const p = getP(pName);
+            if (!p) return 0;
+            const h = getH(p.signIndex);
+            if ([2, 7, 11].includes(h)) return 1;
+            return 0;
+        };
+
+        if (checkPlace(dasa)) score += 1;
+        if (checkPlace(bhukti)) score += 1;
+        if (checkPlace(antaram)) score += 1;
+
+        // Venus Priority (Universal)
+        if (dasa === 'Venus' || bhukti === 'Venus') score += 2;
+
+        // Subathuvam Check
+        if (subathuvamScores[dasa]?.isSubathuva) score += 1;
+        if (subathuvamScores[bhukti]?.isSubathuva) score += 1;
+
+        return score;
+    };
+
+    // Find High Probability Periods
     const now = new Date();
     // Convert birthDate to Date object if it's not already
     const birthDateObj = birthDate instanceof Date ? birthDate : new Date(birthDate);
-    const currentAge = now.getFullYear() - birthDateObj.getFullYear();
     const age21Date = new Date(birthDateObj.getFullYear() + 21, birthDateObj.getMonth(), birthDateObj.getDate());
 
-    const pastFavorableYears = new Set<number>();
-    const futureFavorableYears = new Set<number>();
-    const pastDetails: string[] = [];
-    const futureDetails: string[] = [];
+    // Limits
+    const endScanDate = new Date(now.getFullYear() + 10, 0, 1); // Audit next 10 years
 
-    // Store ALL potential periods
+    const validPeriods: {
+        start: Date,
+        end: Date,
+        dasa: string,
+        bhukti: string,
+        antaram: string,
+        score: number,
+        isPriority1: boolean
+    }[] = [];
+
     if (allDashaPeriods.length > 0) {
         for (const maha of allDashaPeriods) {
-            // Skip periods completely before Age 21
-            if (maha.endDate < age21Date) continue;
+            if (maha.endDate < now) continue; // Skip past
+            if (maha.startDate > endScanDate) break; // Stop at limit
 
             if (maha.subPeriods) {
                 for (const bhukti of maha.subPeriods) {
-                    if (bhukti.endDate < age21Date) continue;
+                    if (bhukti.endDate < now) continue;
 
-                    // Age Check
-                    const bhuktiMidDate = new Date((bhukti.startDate.getTime() + bhukti.endDate.getTime()) / 2);
-                    const ageAtBhukti = bhuktiMidDate.getFullYear() - birthDateObj.getFullYear();
-                    // Double check age
-                    if (ageAtBhukti < 21) continue;
+                    if (bhukti.subPeriods) {
+                        for (const antaram of bhukti.subPeriods) {
+                            if (antaram.endDate < now) continue;
+                            if (antaram.endDate < age21Date) continue; // Skip childhood
 
-                    // Step 1: Check if Bhukti Lord is connected to 3, 7, 11 OR is Venus/Jupiter
-                    // Connection Types:
-                    // 1. Is the Lord itself (e.g., Running 7th Lord Bhukti)
-                    // 2. Is in the House (e.g., Planet in 7th)
-                    // 3. Conjoined with Lord (e.g., With 7th Lord) - (Simplification: using sign index from planet list if available, else strict name match)
+                            // STRICT RULE: Antaram Lord MUST be a Marriage-Giving Lord
+                            // Even if Dasa/Bhukti are strong, the event usually triggers when a relevant Antaram runs.
+                            if (!marriageLords.includes(antaram.planet)) continue;
 
-                    // We primarily check Name Match first as established in KeyPlanets
-                    if (isKeyPlanet(bhukti.planet)) {
+                            const s = scorePeriod(maha.planet, bhukti.planet, antaram.planet);
 
-                        // Step 2: Jupiter Filter (Year Check)
-                        const jupiterWindows = getJupiterFavorablePeriods(
-                            bhukti.startDate,
-                            bhukti.endDate,
-                            ascendantSign,
-                            moonSign,
-                            house7Sign
-                        );
+                            // Check if this period involves the Priority 1 Lord
+                            const p1Lord = marriageLords[0];
+                            const isP1 = (maha.planet === p1Lord || bhukti.planet === p1Lord);
 
-                        if (jupiterWindows.length > 0) {
-                            for (const jWindow of jupiterWindows) {
-                                const year = jWindow.start.getFullYear();
-                                const isPast = jWindow.end < now;
-
-                                // Step 3: Sun Filter (Month Check) within valid Jupiter window
-                                const sunWindows = getSunFavorablePeriods(
-                                    jWindow.start,
-                                    jWindow.end,
-                                    ascendantSign,
-                                    house7Sign
-                                );
-
-                                if (sunWindows.length > 0) {
-                                    sunWindows.forEach(sw => {
-                                        // Format details
-                                        const startStr = sw.start.toLocaleDateString(language, { month: 'short', year: 'numeric' });
-                                        const endStr = sw.end.toLocaleDateString(language, { month: 'short', year: 'numeric' });
-
-                                        const detail = isTamil
-                                            ? `**${sw.start.getFullYear()}**: ${startStr} - ${endStr} (புத்தி: ${bhukti.planet})`
-                                            : `**${sw.start.getFullYear()}**: ${startStr} - ${endStr} (Bhukti: ${bhukti.planet})`;
-
-                                        if (isPast) {
-                                            pastFavorableYears.add(year);
-                                            // Keep simplified list for past
-                                            if (!pastDetails.includes(detail)) pastDetails.push(detail);
-                                        } else {
-                                            futureFavorableYears.add(year);
-                                            // Limit future suggestions to reasonable count
-                                            if (futureDetails.length < 5 && !futureDetails.includes(detail)) {
-                                                futureDetails.push(detail);
-                                            }
-                                        }
-                                    });
-                                }
+                            if (s >= 4) {
+                                validPeriods.push({
+                                    start: (antaram.startDate < now) ? now : antaram.startDate, // Cap at now if running
+                                    end: antaram.endDate,
+                                    dasa: maha.planet,
+                                    bhukti: bhukti.planet,
+                                    antaram: antaram.planet,
+                                    score: s,
+                                    isPriority1: isP1
+                                });
                             }
                         }
                     }
@@ -964,96 +1099,165 @@ export const predictDetailedMarriageTiming = (
         }
     }
 
-    // --- Construct Answer ---
-    let answer = "";
-    let reason = "";
-    let isFavorable = false;
 
-    // Filter Logic:
-    // 1. If User Age > 40, prioritize Past Dates diagnosis + Next Immediate Future.
-    // 2. If User Age < 30, prioritize Future Dates.
 
-    const sortedFutureYears = Array.from(futureFavorableYears).sort((a, b) => a - b);
-    const sortedPastYears = Array.from(pastFavorableYears).sort((a, b) => b - a); // Descending (recent past first)
+    // --- Sequence Logic ---
+    // "Saturn (P1) will main check near... if not then use Mercury (P2)"
+    // We should filter validPeriods to prefer P1 periods if they exist within a reasonable time.
+    // Otherwise show P2.
 
-    // Filter far future dates (e.g. > current_year + 10)
-    const realisticFutureYears = sortedFutureYears.filter(y => y <= now.getFullYear() + 10);
-    const farFutureYears = sortedFutureYears.filter(y => y > now.getFullYear() + 10);
+    let finalPeriods: typeof validPeriods = [];
+    const p1Lord = marriageLords[0];
 
-    const hasStrongFuture = realisticFutureYears.length > 0;
-    const hasStrongPast = sortedPastYears.length > 0;
+    // Find if there are any P1 periods in the next 5 years?
+    const p2Lord = marriageLords[1];
 
-    if (hasStrongFuture) {
-        const topYears = realisticFutureYears.slice(0, 3).join(", ");
-        answer = isTamil
-            ? `திருமணம் நடக்க வாய்ப்புள்ள ஆண்டுகள்: **${topYears}**\n\n`
-            : `Most Likely Marriage Years: **${topYears}**\n\n`;
+    // Filter sets
+    const p1Periods = validPeriods.filter(p => p.dasa === p1Lord || p.bhukti === p1Lord);
+    const p2Periods = validPeriods.filter(p => p.dasa === p2Lord || p.bhukti === p2Lord);
 
-        // Add details corresponding to these years
-        const relevantDetails = futureDetails.filter(d => realisticFutureYears.some(y => d.includes(y.toString()))).slice(0, 3);
-        answer += isTamil ? `குறிப்பிட்ட காலங்கள்:\n${relevantDetails.join("\n")}` : `Specific Favorable Periods:\n${relevantDetails.join("\n")}`;
+    // --- Sequence Logic (Waterfall with Smart Gap Fill) ---
+    // User Requirement: "Saturn (P1) near... if gap (e.g. 2026 to 2041) find intermediate valid periods"
 
-        isFavorable = true;
-    } else {
-        // No immediate future. Check Past and provide next best future years.
-        if (hasStrongPast) {
-            const pastTop = sortedPastYears.slice(0, 3).join(", ");
+    // Sort all by date first
+    p1Periods.sort((a, b) => a.start.getTime() - b.start.getTime());
+    p2Periods.sort((a, b) => a.start.getTime() - b.start.getTime());
+    validPeriods.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-            // Always show next possible future years, not just past
-            if (farFutureYears.length > 0) {
-                const nextYears = farFutureYears.slice(0, 3).join(", ");
-                if (currentAge > 35) {
-                    answer = isTamil
-                        ? `முன்பு **${pastTop}** ஆண்டுகளில் வலுவான யோகம் இருந்தது, ஆனால் அவை கடந்துவிட்டன.\n\n**அடுத்த வாய்ப்பு:** ${nextYears}\n\n(பரிகாரங்கள் செய்வது சிறந்தது)`
-                        : `Previous strong periods were in **${pastTop}**, but those have passed.\n\n**Next Opportunities:** ${nextYears}\n\n(Remedies recommended)`;
-                } else {
-                    answer = isTamil
-                        ? `அடுத்த நல்ல காலம்: **${nextYears}**\n\n(தற்போது 5-7 ஆண்டுகளில் வலுவான யோகம் இல்லை)`
-                        : `Next favorable period: **${nextYears}**\n\n(No strong indication in immediate 5-7 years)`;
-                }
-                isFavorable = true; // Changed to true since we're giving future years
-            } else {
-                // Truly no future years at all
-                if (currentAge > 35) {
-                    answer = isTamil
-                        ? `ஜாதகப்படி **${pastTop}** ஆண்டுகளில் வலுவான யோகம் இருந்தது.\n\nதற்போது அடுத்த 15 ஆண்டுகளில் தெளிவான யோகம் இல்லை. பரிகாரங்கள் அவசியம்.`
-                        : `Strong periods were in **${pastTop}**.\n\nNo clear indications in the next 15 years. Remedies strongly recommended.`;
-                } else {
-                    answer = isTamil
-                        ? `அடுத்த 15 ஆண்டுகளில் குறிப்பிடத்தக்க யோகம் தெரியவில்லை.\n\nபரிகாரங்கள் மூலம் சாதகமாக்கலாம்.`
-                        : `No significant indications in the next 15 years.\n\nRemedies can help create favorable conditions.`;
-                }
-                isFavorable = false;
+    // 1. Start with P1 periods as the baseline.
+    let selectedPeriods = [...p1Periods];
+
+    // 2. Gap Analysis & Fill
+    // If P1 is empty, or has large gaps, fill with P2 or General Valid.
+    const GAP_THRESHOLD_YEARS = 3.5;
+
+    const nowTime = now.getTime();
+    const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
+
+    // A. Initial Gap Check (Now to First P1)
+    if (selectedPeriods.length === 0 || (selectedPeriods[0].start.getTime() - nowTime) / msPerYear > GAP_THRESHOLD_YEARS) {
+        // Find fillers before the first P1
+        const endLimit = selectedPeriods.length > 0 ? selectedPeriods[0].start : new Date(now.getFullYear() + 10, 0, 1);
+
+        // Prefer P2 fillers first
+        const p2Fillers = p2Periods.filter(p => !p.isPriority1 && p.start >= now && p.start < endLimit);
+        // If no P2, us generic valid fillers
+        const genericFillers = validPeriods.filter(p => !p.isPriority1 && p.start >= now && p.start < endLimit);
+
+        const fillers = p2Fillers.length > 0 ? p2Fillers : genericFillers;
+
+        fillers.forEach(f => {
+            // Add unique
+            if (!selectedPeriods.some(sp => sp.dasa === f.dasa && sp.bhukti === f.bhukti && sp.antaram === f.antaram)) {
+                selectedPeriods.push(f);
             }
-        } else {
-            // No past, but check if there are far future years
-            if (farFutureYears.length > 0) {
-                const nextYears = farFutureYears.slice(0, 3).join(", ");
-                answer = isTamil
-                    ? `திருமணம் நடக்க வாய்ப்புள்ள ஆண்டுகள்: **${nextYears}**\n\n(தற்போது அருகில் வலுவான யோகம் இல்லை, ஆனால் எதிர்காலத்தில் வாய்ப்பு உள்ளது)`
-                    : `Likely Marriage Years: **${nextYears}**\n\n(No immediate strong periods, but future opportunities exist)`;
-                isFavorable = true;
-            } else {
-                // Truly weak chart for marriage
-                answer = isTamil
-                    ? "ஜாதகத்தில் திருமண யோகம் தாமதமாக உள்ளது.\n\nபரிகாரங்கள் மற்றும் ஜோதிடர் ஆலோசனை பெறுவது நல்லது."
-                    : "Marriage indications are delayed in this chart.\n\nRemedies and astrologer consultation recommended.";
-                isFavorable = false;
+        });
+    }
+
+    // B. Inter-Period Gap Check (Between P1s)
+    // We iterate through valid periods and check if they fall into any "empty" space between P1s
+    // Simple heuristic: If a valid period is > 2 years away from ANY P1 period, include it.
+    const otherHighQuality = validPeriods.filter(p => !p.isPriority1);
+
+    otherHighQuality.forEach(other => {
+        // Is this 'other' period useful? 
+        // useful if it occupies a time slot where NO P1 period exists within +/- 2 years.
+        const isCoveredByP1 = p1Periods.some(p1 => {
+            const diffYears = Math.abs(p1.start.getTime() - other.start.getTime()) / msPerYear;
+            return diffYears < 2.5; // If within 2.5 years of a P1, assume P1 covers it.
+        });
+
+        if (!isCoveredByP1) {
+            // Add only if not already added
+            if (!selectedPeriods.some(sp => sp.dasa === other.dasa && sp.bhukti === other.bhukti && sp.antaram === other.antaram)) {
+                selectedPeriods.push(other);
             }
         }
+    });
+
+    finalPeriods = selectedPeriods;
+
+    // Fallback: If absolutely nothing selected (rare), revert to validPeriods
+    if (finalPeriods.length === 0) {
+        finalPeriods = validPeriods;
     }
 
-    if (isTamil) {
-        reason = `விதி: 3, 7, 11 (திருமண முக்கோணம்) மற்றும் சுக்ரன், குரு தசை/புத்திகள்.\n- முக்கிய கிரகங்கள்: ${keyPlanets.join(', ')}\n- தற்போதைய தசை: ${currentDasa?.maha?.planet || 'Unknown'}/${currentDasa.bhukti?.planet || 'Unknown'}`;
+    // Final Sort by Date
+    finalPeriods.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    // --- Step 4: Final Prediction Output ---
+    let answer = "";
+    let reason = "";
+
+    // Late Marriage Text
+    if (isLateMarriage && lateReasons.length > 0) {
+        answer += isTamil
+            ? `**தாமத திருமணம் வாய்ப்பு:**\n${lateReasons.join('\n')}\n(ஆனால் சரியான பரிகாரம் மற்றும் தசை காலத்தில் திருமணம் கைகூடும்).\n\n`
+            : `**Indication of Delayed Marriage:**\n${lateReasons.join('\n')}\n(Marriage is possible during favorable Dasa/Bhukti).\n\n`;
+    } else if (reliefReasons.length > 0) {
+        answer += isTamil
+            ? `**தடைகள் இருந்தாலும் திருமணம் நடக்கும்:**\n${reliefReasons.join('\n')}\n\n`
+            : `**Marriage possible despite delays:**\n${reliefReasons.join('\n')}\n\n`;
     } else {
-        reason = `Rule: 3-7-11 Marriage Triangle Logic (Initiative, Marriage, Fulfillment). Timing matches with Jupiter/Sun Transits.\n- Key Planets Checked: ${keyPlanets.join(', ')}\n- Current Status: Running ${currentDasa?.maha?.planet || 'Unknown'}/${currentDasa.bhukti?.planet || 'Unknown'}`;
+        answer += isTamil
+            ? `**திருமண காலம்:** ஜாதக அமைப்புப்படி சரியான காலத்தில் திருமணம் நடக்கும்.\n\n`
+            : `**Marriage Timing:** Favorable alignment for marriage at right age.\n\n`;
     }
+
+    const verdict = answer;
+
+    // Periods List
+    if (finalPeriods.length > 0) {
+        // Take top 3 distinct periods
+        const topPeriods = finalPeriods.slice(0, 3);
+
+        const periodTexts = topPeriods.map(p => {
+            const startStr = p.start.toLocaleDateString(language, { month: 'short', year: 'numeric' });
+            const endStr = p.end.toLocaleDateString(language, { month: 'short', year: 'numeric' });
+            const scoreLabel = isTamil ? "மதிப்பெண்" : "Score";
+            const priorityLabel = p.isPriority1 ? (isTamil ? "(முக்கிய காலம்)" : "(Primary Period)") : "";
+            return `**${startStr} - ${endStr}**: ${p.dasa}/${p.bhukti}/${p.antaram} ${priorityLabel}`;
+        });
+
+        answer += isTamil
+            ? `திருமணம் நடக்க வாய்ப்புள்ள வலுவான காலங்கள்:\n${periodTexts.join('\n')}`
+            : `Strongest High Probability Periods:\n${periodTexts.join('\n')}`;
+    } else {
+        answer += isTamil
+            ? "அடுத்த சில ஆண்டுகளில் மிக வலுவான திருமண தசை குறிப்புகள் இல்லை. பரிகாரங்கள் தேவைப்படலாம்."
+            : "No very strong (>4 score) Dasa periods found in the near future. Remedies might be needed.";
+    }
+
+    // Reason Text
+    const lordNames = marriageLords.slice(0, 3).join(', '); // Show top 3 expected
+    reason = isTamil
+        ? `**எதிர்பார்க்கப்படும் கிரகங்கள் (வரிசைப்படி):** ${lordNames}\n\n**கணிப்பு முறை:**\n- இந்த லக்னத்திற்குரிய முக்கிய திருமண கிரகம் (${p1Lord || 'None'} போன்ற) முதலில் தேடுகிறோம்.\n- அது அமைந்த தசை/புத்திகளுக்கு கூடுதல் மதிப்பெண்கள் வழங்கப்பட்டுள்ளன.`
+        : `**Expected Lords (In Priority Order):** ${lordNames}\n\n**Logic Used:**\n- We check for the Primary Marriage Lord (${p1Lord || 'None'}) first.\n- Periods involving this lord get Priority Bonus points.`;
+
+    const structuredPeriods = finalPeriods.map((p: any) => ({
+        start: p.start,
+        end: p.end,
+        dasa: p.dasa,
+        bhukti: p.bhukti,
+        antaram: p.antaram,
+        score: p.score || 0,
+        isPriority1: p.isPriority1 || false,
+        isPriority2: p.isPriority2 || false,
+        reason: p.reason
+    }));
 
     return {
         question,
         answer,
         reason,
-        isFavorable
+        isFavorable: validPeriods.length > 0,
+        predictionDetails: {
+            periods: structuredPeriods,
+            marriageLords,
+            isLateMarriage,
+            lateReasons
+        },
+        verdict
     };
 };
 

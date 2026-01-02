@@ -17,6 +17,7 @@ import MarriageMatching from './pages/MarriageMatching';
 import ComprehensiveMarriageMatching from './pages/ComprehensiveMarriageMatching';
 import ComprehensiveResultsPage from './pages/ComprehensiveResultsPage';
 import MatchingResults from './pages/MatchingResults';
+import MarriageTools from './pages/MarriageTools';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -176,6 +177,12 @@ const AppRoutes = () => {
         <ProtectedRoute requireAuth={false}>
           <SEO title="Marriage Matching - 7 Guruji Rules" />
           <ComprehensiveMarriageMatching />
+        </ProtectedRoute>
+      } />
+      <Route path="/marriage-tools" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Marriage Tools - Matching & Timing" />
+          <MarriageTools />
         </ProtectedRoute>
       } />
       <Route path="/marriage-results" element={
