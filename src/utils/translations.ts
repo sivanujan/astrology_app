@@ -1,11 +1,12 @@
 export const translations = {
     en: {
-        appTitle: "SivaAstro",
+        appTitle: "AstroZen",
         nav: {
             birthDetails: "Birth Details",
             chart: "Vedic Chart",
             analysis: "Analysis",
-            predictions: "AI Insights",
+            predictions: "AI Chat",
+            dailySnapshot: "Next 15 Days Forecast",
             dashboard: "Dashboard",
             login: "Login",
             signup: "Sign Up"
@@ -26,7 +27,14 @@ export const translations = {
             verifyEmail: "Check Your Email!",
             verifySubtitle: "We've sent a verification link to",
             resend: "Resend Verification Email",
-            backToLogin: "Back to Login"
+            backToLogin: "Back to Login",
+            checkSpam: "Please also check your spam/junk folder.",
+            disposableEmail: "Temporary/Disposable emails are not allowed.",
+            emailInUse: "Account already exists. Please login or check existing verification email.",
+            verificationRequired: "Email Verification Required",
+            verificationRequiredMsg: "Please verify your email address to access this feature.",
+            passwordTooShort: "Password must be at least 8 characters",
+            passwordRequirements: "Password must satisfy criteria (A-Z, a-z, 0-9, special char)"
         },
         dashboard: {
             title: "My Cosmic Dashboard",
@@ -36,7 +44,10 @@ export const translations = {
             noChartsSub: "Create your first birth chart to begin your cosmic journey",
             getStarted: "Get Started",
             viewChart: "View Chart",
-            loading: "Loading your charts..."
+            loading: "Loading your charts...",
+            createNew: "Create New Chart",
+            savedCharts: "Saved Charts",
+            createFirst: "Create your first birth chart to reveal planetary insights."
         },
         input: {
             title: "Discover Your Cosmic Blueprint",
@@ -47,7 +58,14 @@ export const translations = {
             pob: "Place of Birth",
             searchPlaceholder: "Search city...",
             generateBtn: "Generate Vedic Chart",
-            generating: "Calculating Planetary Positions..."
+            generating: "Calculating Planetary Positions...",
+            gender: "Gender",
+            male: "Male",
+            female: "Female",
+            other: "Other",
+            unknownTime: "I don't know my birth time",
+            estimatedLagna: "Estimated Lagna",
+            confidence: "confidence"
         },
         chart: {
             title: "South Indian Chart",
@@ -72,7 +90,7 @@ export const translations = {
         },
         predictions: {
             title: "AI Astrologer",
-            subtitle: "Powered by Claude 3.5 Sonnet",
+            subtitle: "Powered by Astrozen 1.0",
             apiKeyLabel: "Enter Anthropic API Key",
             apiKeyPlaceholder: "sk-ant-...",
             generateBtn: "Generate Full Reading",
@@ -137,15 +155,114 @@ export const translations = {
             Rahu: "Rahu",
             Ketu: "Ketu",
             Ascendant: "Ascendant"
-        }
+        },
+        featurePopup: {
+            title: "Unlock Your Cosmic Potential",
+            subtitle: "You're currently exploring:",
+            freeFeatures: [
+                { icon: "📝", title: "Birth Details", desc: "Enter & generate chart" },
+                { icon: "📊", title: "Vedic Chart", desc: "View Rasi chart" },
+                { icon: "⏰", title: "Dasha Periods", desc: "Timeline analysis" },
+                { icon: "💑", title: "Marriage Date", desc: "Find timing" },
+                { icon: "💕", title: "Compatibility", desc: "Match making" }
+            ],
+            premiumTitle: "Sign up FREE to unlock:",
+            premiumFeatures: [
+                { icon: "🏠", title: "12 House Analysis", desc: "Complete life areas breakdown" },
+                { icon: "🤖", title: "AI Astrologer Chat", desc: "Ask unlimited questions 24/7" },
+                { icon: "📅", title: "Daily Predictions", desc: "Never miss important transits" },
+                { icon: "🔮", title: "Our Predictions", desc: "Personalized insights" },
+                { icon: "👤", title: "Who Am I", desc: "Discover yourself" },
+                { icon: "💾", title: "Save & Track", desc: "Access charts anytime" }
+            ],
+            ctaTitle: "Join 100+ Happy Users",
+            loginBtn: "Login",
+            signupBtn: "Get Started - It's FREE!",
+            guestLink: "Continue as Guest"
+        },
+        forecast: {
+            title: "Next 15 Days Forecast (Dasa + Gocharam)",
+            dasaContext: "Current Dasa Context"
+        },
+        gocharam: {
+            status: {
+                Excellent: "Excellent",
+                Good: "Good",
+                Moderate: "Moderate",
+                Difficult: "Difficult",
+                SadeSati: "Sade Sati",
+                Ashtama: "Ashtama Sani",
+                Ardhastama: "Ardhastama Sani",
+                Danger: "Danger",
+                Caution: "Caution",
+                Average: "Average"
+            },
+            description: {
+                favorable: "{planet} is in a favorable position (House {house}). Expect positive results.",
+                unfavorable: "{planet} is in a challenging position (House {house}). Caution advised.",
+                neutral: "{planet} gives mixed or neutral results (House {house}).",
+                vedhai: "{planet} is in a favorable position (House {house}), but obstructed (Vedhai) by another planet. Results will be muted.",
+                sadeSatiJanma: "Janma Sani (Peak Sade Sati). Intense pressure, mental stress. Stay disciplined.",
+                sadeSatiViraya: "Viraya Sani (Start of Sade Sati). Expenses and wandering.",
+                sadeSatiPada: "Pada Sani (End of Sade Sati). Family / Financial stress.",
+                ashtama: "Ashtama Sani (8th House). Critical time. Avoid insults, new ventures.",
+                ardhastama: "Ardhastama Sani (4th House). Domestic concerns, mother's health.",
+                aspectProtection: "However, Jupiter's aspect on {aspects} provides strong protection."
+            },
+            predictions: {
+                great: "Excellent alignment of Dasa and Transits favors success in endeavors. A productive day awaiting you.",
+                good: "Favorable gocharam flows support your Dasa. Good progress in daily activities expected.",
+                danger: "High alert. Both Moon and Saturn are in challenging positions. Keep a low profile and avoid risks.",
+                stress: "Planetary positions indicate potential friction. Avoid arguments and postpone major decisions.",
+                mixed: "Mixed results expected. Outcomes depend on your effort and patience today."
+            },
+            factors: {
+                chandrashtama: "Chandrashtama (Moon in 8th) - Avoid new decisions.",
+                dasaHidden: "{dasa} (Dasa Lord) in hidden house {house}.",
+                dasaStrong: "{dasa} (Dasa Lord) strongly placed.",
+                transitGood: "{planet} in {house} (Good)",
+                transitBad: "{planet} in {house} (Challenging)",
+                transitNeutral: "{planet} in {house} (Avg)",
+                transitMixed: "{planet} in {house}",
+                taraGood: "Star: {star} - {tara} (Favorable)",
+                taraBad: "Star: {star} - {tara} (Unfavorable)"
+            },
+            verdicts: {
+                dontWorry: "Don't Worry!",
+                dontWorryMsg: "Your Dasa is Strong (Master). Bad transit effects (Messenger) will be minimal.",
+                golden: "Golden Period!",
+                goldenMsg: "Both Dasa (Master) and Gocharam (Messenger) are Excellent! Capitalize on this.",
+                doubleTrouble: "Double Trouble - High Alert",
+                doubleTroubleMsg: "Weak Dasa + Bad Transit. Stay very low profile. Avoid risks.",
+                tempRelief: "Temporary Relief",
+                tempReliefMsg: "Dasa is weak, but Gocharam brings some 'rain' to dry land.",
+                caution: "Caution",
+                cautionMsg: "Average Dasa with challenging Transits. Be careful.",
+                goodProgress: "Good Progress",
+                goodProgressMsg: "Transits are supporting average Dasa."
+            },
+            taraBala: {
+                janma: "Janma (Body Stress)",
+                sampath: "Sampath (Wealth/Prosperity)",
+                vipat: "Vipat (Danger/Obstacle)",
+                kshema: "Kshema (Well-being)",
+                pratyak: "Pratyak (Obstruction)",
+                sadhana: "Sadhana (Success)",
+                naidhana: "Naidhana (Danger/Loss)",
+                mitra: "Mitra (Friendly)",
+                paramaMitra: "Parama Mitra (Supreme Friend)"
+            }
+        },
+
     },
     ta: {
-        appTitle: "சிவா அஸ்ட்ரோ",
+        appTitle: "AstroZen",
         nav: {
             birthDetails: "பிறப்பு விவரங்கள்",
             chart: "ஜாதக கட்டம்",
             analysis: "பலன்கள்",
-            predictions: "AI கணிப்புகள்",
+            predictions: "AI உரையாடல்",
+            dailySnapshot: "அடுத்த 15 நாட்கள் கணிப்பு",
             dashboard: "முகப்பு",
             login: "உள்நுழைய",
             signup: "பதிவு செய்ய"
@@ -166,7 +283,14 @@ export const translations = {
             verifyEmail: "மின்னஞ்சலை சரிபார்க்கவும்!",
             verifySubtitle: "நாங்கள் ஒரு சரிபார்ப்பு இணைப்பை அனுப்பியுள்ளோம்",
             resend: "சரிபார்ப்பு மின்னஞ்சலை மீண்டும் அனுப்பு",
-            backToLogin: "உள்நுழைவுக்கு திரும்பவும்"
+            backToLogin: "உள்நுழைவுக்கு திரும்பவும்",
+            checkSpam: "தயவுசெய்து உங்கள் ஸ்பேம் (Spam) ஃபோல்டரையும் சரிபார்க்கவும்.",
+            disposableEmail: "தற்காலிக மின்னஞ்சல்கள் அனுமதிக்கப்படாது.",
+            emailInUse: "கணக்கு ஏற்கனவே உள்ளது. உள்நுழையவும் அல்லது மின்னஞ்சலைச் சரிபார்க்கவும்.",
+            verificationRequired: "மின்னஞ்சல் சரிபார்ப்பு தேவை",
+            verificationRequiredMsg: "இந்த அம்சத்தை அணுக உங்கள் மின்னஞ்சலை சரிபார்க்கவும்.",
+            passwordTooShort: "கடவுச்சொல் குறைந்தது 8 எழுத்துக்கள் இருக்க வேண்டும்",
+            passwordRequirements: "கடவுச்சொல் வலிமையாக இருக்க வேண்டும் (A-Z, a-z, 0-9, special char)"
         },
         dashboard: {
             title: "எனது ஜாதகங்கள்",
@@ -176,7 +300,10 @@ export const translations = {
             noChartsSub: "உங்கள் ஜோதிட பயணத்தைத் தொடங்க முதல் ஜாதகத்தை உருவாக்கவும்",
             getStarted: "தொடங்கவும்",
             viewChart: "ஜாதகத்தை பார்க்க",
-            loading: "ஜாதகங்கள் ஏற்றப்படுகின்றன..."
+            loading: "ஜாதகங்கள் ஏற்றப்படுகின்றன...",
+            createNew: "புதிய ஜாதகம்",
+            savedCharts: "சேமிக்கப்பட்ட ஜாதகங்கள்",
+            createFirst: "உங்கள் முதல் ஜாதகத்தை உருவாக்கி பலன்களை அறியவும்."
         },
         input: {
             title: "உங்கள் ஜாதகத்தை கண்டறியவும்",
@@ -187,7 +314,14 @@ export const translations = {
             pob: "பிறந்த இடம்",
             searchPlaceholder: "நகரத்தை தேடவும்...",
             generateBtn: "ஜாதகம் கணிக்கவும்",
-            generating: "கோள்களின் நிலை கணக்கிடப்படுகிறது..."
+            generating: "கோள்களின் நிலை கணக்கிடப்படுகிறது...",
+            gender: "பாலினம்",
+            male: "ஆண்",
+            female: "பெண்",
+            other: "பிற",
+            unknownTime: "எனது பிறந்த நேரம் தெரியாது",
+            estimatedLagna: "மதிப்பீட்டு லக்னம்",
+            confidence: "நம்பிக்கை"
         },
         chart: {
             title: "இராசி கட்டம்",
@@ -212,7 +346,7 @@ export const translations = {
         },
         predictions: {
             title: "AI ஜோதிடர்",
-            subtitle: "Claude 3.5 Sonnet மூலம் இயங்குகிறது",
+            subtitle: "Astrozen 1.0 மூலம் இயங்குகிறது",
             apiKeyLabel: "Anthropic API குறியீட்டை உள்ளிடவும்",
             apiKeyPlaceholder: "sk-ant-...",
             generateBtn: "முழு பலன்களை கணிக்கவும்",
@@ -277,6 +411,103 @@ export const translations = {
             Rahu: "ராகு",
             Ketu: "கேது",
             Ascendant: "லக்னம்"
+        },
+        featurePopup: {
+            title: "உங்கள் முழு திறனை திறக்கவும்",
+            subtitle: "நீங்கள் தற்போது ஆராய்வது:",
+            freeFeatures: [
+                { icon: "📝", title: "பிறப்பு விவரங்கள்", desc: "ஜாதகத்தை கணிக்க" },
+                { icon: "📊", title: "வேத ஜாதகம்", desc: "இராசி கட்டம்" },
+                { icon: "⏰", title: "தசா புக்தி", desc: "காலவரிசை ஆய்வு" },
+                { icon: "💑", title: "திருமண காலம்", desc: "நேரத்தை கண்டறிய" },
+                { icon: "💕", title: "திருமண பொருத்தம்", desc: "பொருத்தம் பார்க்க" }
+            ],
+            premiumTitle: "இலவசமாக பதிவு செய்து பெறுங்கள்:",
+            premiumFeatures: [
+                { icon: "🏠", title: "12 பாவ ஆய்வு", desc: "வாழ்க்கையின் முழுமையான பார்வை" },
+                { icon: "🤖", title: "AI ஜோதிடர்", desc: "எதையும் கேளுங்கள்" },
+                { icon: "📅", title: "தினசரி கணிப்பு", desc: "முக்கிய மாற்றங்களை அறிய" },
+                { icon: "🔮", title: "எங்கள் கணிப்புகள்", desc: "தனிப்பட்ட பலன்கள்" },
+                { icon: "👤", title: "நான் யார்?", desc: "உங்களை கண்டறியவும்" },
+                { icon: "💾", title: "சேமிக்க & தொடர", desc: "எப்போது வேண்டுமானாலும் பார்க்க" }
+            ],
+            ctaTitle: "100+ பயனர்களுடன் இணையுங்கள்",
+            loginBtn: "உள்நுழைய",
+            signupBtn: "தொடங்கவும் - இது இலவசம்!",
+            guestLink: "விருந்தினராக தொடரவும்"
+        },
+        forecast: {
+            title: "அடுத்த 15 நாட்கள் கணிப்பு (தசை + கோச்சாரம்)",
+            dasaContext: "தற்போதைய தசை சூழல்"
+        },
+        gocharam: {
+            status: {
+                Excellent: "மிகச்சிறப்பு",
+                Good: "நன்று",
+                Moderate: "மத்திமம்",
+                Difficult: "கடினம்",
+                SadeSati: "ஏழரை சனி",
+                Ashtama: "அஷ்டம சனி",
+                Ardhastama: "அர்த்தாஷ்டம சனி",
+                Danger: "ஆபத்து",
+                Caution: "எச்சரிக்கை",
+                Average: "சராசரி"
+            },
+            descriptions: {
+                favorable: "{planet} சாதகமான நிலையில் (இடம் {house}) உள்ளது. நல்ல பலன்கள் எதிர்பார்க்கலாம்.",
+                unfavorable: "{planet} கடினமான நிலையில் (இடம் {house}) உள்ளது. கவனம் தேவை.",
+                neutral: "{planet} கலவையான பலன்களைத் தரும் (இடம் {house}).",
+                vedhai: "{planet} நல்ல நிலையில் (இடம் {house}) இருந்தாலும், வேதை (தடை) உள்ளது. பலன்கள் குறையும்.",
+                sadeSatiJanma: "ஜென்ம சனி (ஏழரை சனி உச்சம்). அதிக அழுத்தம், மன உளைச்சல். கட்டுப்பாடு தேவை.",
+                sadeSatiViraya: "விரய சனி (ஏழரை சனி ஆரம்பம்). செலவுகள் மற்றும் அலைச்சல்.",
+                sadeSatiPada: "பாத சனி (ஏழரை சனி முடிவு). குடும்பம் / நிதி ரீதியான அழுத்தம்.",
+                ashtama: "அஷ்டம சனி (8-ம் இடம்). மிக முக்கிய நேரம். அவமானங்கள், புதிய முயற்சிகளில் கவனம்.",
+                ardhastama: "அர்த்தாஷ்டம சனி (4-ம் இடம்). குடும்ப கவலைகள், தாயார் உடல்நலம்.",
+                aspectProtection: "இருப்பினும், குருவின் பார்வை {aspects} இடங்களின் மீது உள்ளதால் நல்ல பாதுகாப்பு கிடைக்கும்."
+            },
+            predictions: {
+                great: "தசா மற்றும் கோச்சார நிலைகள் சிறப்பாக உள்ளன. முயற்சிகளில் வெற்றி கிட்டும். பயனுள்ள நாள்.",
+                good: "சாதகமான கோச்சார சூழல் உங்கள் தசையை ஆதரிக்கிறது. நல்ல முன்னேற்றம் உண்டு.",
+                danger: "எச்சரிக்கை. சந்திரன் மற்றும் சனி ஆகிய இரு கிரக நிலைகளும் சரியில்லை. அமைதி காக்கவும்.",
+                stress: "கிரக நிலைகள் சற்று சாதகமற்றதாக உள்ளன. விவாதங்களைத் தவிர்க்கவும், முக்கிய முடிவுகளை ஒத்திவைக்கவும்.",
+                mixed: "கலவையான பலன்கள் எதிர்பார்க்கலாம். உங்கள் முயற்சியைப் பொறுத்தே இன்றைய பலன் அமையும்."
+            },
+            factors: {
+                chandrashtama: "சந்திராஷ்டமம் (8-ல் சந்திரன்) - புதிய முடிவுகளை தவிர்க்கவும்.",
+                dasaHidden: "{dasa} (தசை நாதன்) மறைவு ஸ்தானத்தில் {house}.",
+                dasaStrong: "{dasa} (தசை நாதன்) வலுவாக உள்ளார்.",
+                transitGood: "{planet} {house}-ல் (நன்று)",
+                transitBad: "{planet} {house}-ல் (சிரமம்)",
+                transitNeutral: "{planet} {house}-ல் (சராசரி)",
+                transitMixed: "{planet} {house}-ல்",
+                taraGood: "நட்சத்திரம்: {star} - {tara} (சாதகம்)",
+                taraBad: "நட்சத்திரம்: {star} - {tara} (சாதகமற்றது)"
+            },
+            verdicts: {
+                dontWorry: "கவலை வேண்டாம்!",
+                dontWorryMsg: "உங்கள் தசை வலுவாக உள்ளது (Master). கோச்சார பாதிப்புகள் (Messenger) குறைவாகவே இருக்கும்.",
+                golden: "பொற்காலம்!",
+                goldenMsg: "தசை (Master) மற்றும் கோச்சாரம் (Messenger) இரண்டும் சிறப்பாக உள்ளன! இதை பயன்படுத்திக்கொள்ளுங்கள்.",
+                doubleTrouble: "இரட்டை ஆபத்து - எச்சரிக்கை",
+                doubleTroubleMsg: "பலவீனமான தசை + மோசமான கோச்சாரம். மிகவும் கவனமாக இருக்கவும்.",
+                tempRelief: "தற்காலிக நிம்மதி",
+                tempReliefMsg: "தசை பலவீனமாக உள்ளது, ஆனால் கோச்சாரம் சிறிது ஆறுதல் தருகிறது.",
+                caution: "எச்சரிக்கை",
+                cautionMsg: "சராசரி தசை மற்றும் கடினமான கோச்சாரம். கவனமாக இருக்கவும்.",
+                goodProgress: "நல்ல முன்னேற்றம்",
+                goodProgressMsg: "கோச்சாரம் தசையை ஆதரிக்கிறது."
+            },
+            taraBala: {
+                janma: "ஜென்மம் (உடல் சோர்வு)",
+                sampath: "சம்பத்து (செல்வம்/வரவு)",
+                vipat: "விபத்து (ஆபத்து/தடை)",
+                kshema: "ஷேமம் (நலம்)",
+                pratyak: "பிரத்யக் (தடை/எதிர்ப்பு)",
+                sadhana: "சாதனா (வெற்றி)",
+                naidhana: "வதை (ஆபத்து/இழப்பு)",
+                mitra: "மித்ரம் (நட்பு)",
+                paramaMitra: "பரம மித்ரம் (சிறந்த நட்பு)"
+            }
         }
     }
 };
@@ -313,4 +544,10 @@ export const TAMIL_NAKSHATRAS = [
     "அஸ்தம்", "சித்திரை", "சுவாதி", "விசாகம்", "அனுஷம்", "கேட்டை",
     "மூலம்", "பூராடம்", "உத்திராடம்", "திருவோணம்", "அவிட்டம்",
     "சதயம்", "பூரட்டாதி", "உத்திரட்டாதி", "ரேவதி"
+];
+
+export const TAMIL_RASI_NAMES = [
+    "மேஷம்", "ரிஷபம்", "மிதுனம்", "கடகம்",
+    "சிம்மம்", "கன்னி", "துலாம்", "விருச்சிகம்",
+    "தனுசு", "மகரம்", "கும்பம்", "மீனம்"
 ];

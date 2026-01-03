@@ -7,17 +7,20 @@ import {
     GoogleAuthProvider,
     signOut,
     onAuthStateChanged,
-    sendEmailVerification,
-    UserCredential
+    UserCredential,
+    setPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import API_CONFIG, { apiCall } from '../config/api';
 
 interface AuthContextType {
     user: User | null;
     loading: boolean;
     register: (email: string, password: string, name: string) => Promise<UserCredential>;
-    login: (email: string, password: string) => Promise<UserCredential>;
+    login: (email: string, password: string, rememberMe?: boolean) => Promise<UserCredential>;
     loginWithGoogle: () => Promise<UserCredential>;
     logout: () => Promise<void>;
     resendVerification: () => Promise<void>;
@@ -55,22 +58,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         console.log('User created:', userCredential.user.uid);
 
-        // Send email verification
+        // Send custom email verification via backend
         if (userCredential.user) {
-            console.log('Sending verification email...');
-            const actionCodeSettings = {
-                url: `${window.location.origin}/login?verified=true`,
-                handleCodeInApp: false,
-            };
+            console.log('Sending custom verification email...');
 
             try {
-                await sendEmailVerification(userCredential.user, actionCodeSettings);
-                console.log('Verification email sent successfully');
+                // Call YOUR backend API that uses the custom HTML template
+                const result = await apiCall(API_CONFIG.endpoints.auth.sendVerification, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        email: userCredential.user.email,
+                        userId: userCredential.user.uid
+                    })
+                });
+
+                if (result.success) {
+                    console.log('✅ Custom verification email sent successfully!');
+                } else {
+                    console.error('Failed to send verification email:', result.message);
+                }
             } catch (emailError) {
                 console.error('Error sending verification email:', emailError);
             }
 
             // Create user document in Firestore
+            const ip = await getIpAddress();
             await setDoc(doc(db, 'users', userCredential.user.uid), {
                 firebase_uid: userCredential.user.uid,
                 profile: {
@@ -82,6 +94,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     plan: 'free',
                     is_active: false
                 },
+                ip_address: ip,
+                last_login_ip: ip,
                 createdAt: new Date(),
                 updatedAt: new Date()
             });
@@ -91,13 +105,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 
 
-    const login = async (email: string, password: string): Promise<UserCredential> => {
+    const login = async (email: string, password: string, rememberMe: boolean = false): Promise<UserCredential> => {
+        // Set persistence based on rememberMe preference (Local = Remember, Session = Don't Remember)
+        await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
         // Check if email is verified
         if (!userCredential.user.emailVerified) {
             await signOut(auth);
             throw new Error('Please verify your email before logging in. Check your inbox.');
+        }
+
+        // Update IP on login
+        try {
+            const ip = await getIpAddress();
+            await setDoc(doc(db, 'users', userCredential.user.uid), {
+                last_login_ip: ip,
+                last_login: new Date()
+            }, { merge: true });
+        } catch (e) {
+            console.error("Failed to update login IP", e);
         }
 
         return userCredential;
@@ -114,7 +142,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Check if user document exists, if not create one
         const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
 
-        if (!userDoc.exists()) {
+        if (userDoc.exists()) {
+            // Update Last Login & IP
+            try {
+                const ip = await getIpAddress();
+                await setDoc(doc(db, 'users', userCredential.user.uid), {
+                    last_login_ip: ip,
+                    last_login: new Date()
+                }, { merge: true });
+            } catch (e) { console.error("Failed to update login stats", e); }
+        } else {
+            const ip = await getIpAddress();
             await setDoc(doc(db, 'users', userCredential.user.uid), {
                 firebase_uid: userCredential.user.uid,
                 profile: {
@@ -126,6 +164,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     plan: 'free',
                     is_active: false
                 },
+                ip_address: ip, // Registration IP
+                last_login_ip: ip,
                 createdAt: new Date(),
                 updatedAt: new Date()
             });
@@ -134,17 +174,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return userCredential;
     };
 
+    // Helper to get IP
+    const getIpAddress = async (): Promise<string> => {
+        try {
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json();
+            return data.ip;
+        } catch (error) {
+            console.error('Failed to get IP', error);
+            return 'Unknown';
+        }
+    };
+
     const logout = async () => {
         await signOut(auth);
     };
 
     const resendVerification = async () => {
         if (auth.currentUser) {
-            const actionCodeSettings = {
-                url: `${window.location.origin}/login?verified=true`,
-                handleCodeInApp: false,
-            };
-            await sendEmailVerification(auth.currentUser, actionCodeSettings);
+            try {
+                // Call YOUR backend API for custom verification email
+                const result = await apiCall(API_CONFIG.endpoints.auth.sendVerification, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        email: auth.currentUser.email,
+                        userId: auth.currentUser.uid
+                    })
+                });
+
+                if (!result.success) {
+                    throw new Error(result.message || 'Failed to send verification email');
+                }
+
+                console.log('✅ Verification email resent successfully!');
+            } catch (error) {
+                console.error('Error resending verification email:', error);
+                throw error;
+            }
         } else {
             throw new Error('No user logged in');
         }

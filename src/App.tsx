@@ -1,8 +1,10 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
 import { ChartProvider, useChartData } from './contexts/ChartContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 import Layout from './components/Layout';
 import InputForm from './components/InputForm';
 import SouthIndianChart from './components/SouthIndianChart';
@@ -11,96 +13,216 @@ import AIPredictions from './components/AIPredictions';
 import DashaPeriods from './components/DashaPeriods';
 import GurujiPredictions from './components/GurujiPredictions';
 import DailySnapshot from './components/DailySnapshot';
+import MarriageMatching from './pages/MarriageMatching';
+import ComprehensiveMarriageMatching from './pages/ComprehensiveMarriageMatching';
+import ComprehensiveResultsPage from './pages/ComprehensiveResultsPage';
+import MatchingResults from './pages/MatchingResults';
+import MarriageTools from './pages/MarriageTools';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import EmailVerification from './pages/EmailVerification';
 import Dashboard from './pages/Dashboard';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
+import DashaPredictionsPage from './pages/DashaPredictionsPage';
+import SEO from './components/SEO';
+import InstallPWA from './components/InstallPWA';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import NotFound from './pages/NotFound';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
 
-  // Robust hydration check: If context is empty but storage has data, restore it immediately
-  // This prevents the "Redirect to /" flash when reloading on protected pages
-  React.useEffect(() => {
-    if (!chartData) {
-      try {
-        const saved = localStorage.getItem('astrology_chart_data');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setChartData(parsed);
-        }
-      } catch (e) {
-        console.error("Hydration failed", e);
-      }
-    }
-  }, [chartData, setChartData]);
-
-  // Helper check for routing
+  // ... (existing hydration logic)
   const hasData = chartData || localStorage.getItem('astrology_chart_data');
 
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<InputForm />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/" element={
+        <>
+          <SEO title="Free Horoscope & Astrology Predictions" description="Generate your complete Vedic Astrology chart and get instant predictions about career, marriage, and health." />
+          <InputForm />
+        </>
+      } />
+      <Route path="/login" element={
+        <PublicRoute>
+          <SEO title="Login" />
+          <Login />
+        </PublicRoute>
+      } />
+      <Route path="/register" element={
+        <PublicRoute>
+          <SEO title="Create Account" />
+          <Register />
+        </PublicRoute>
+      } />
+      <Route path="/forgot-password" element={
+        <>
+          <SEO title="Forgot Password" />
+          <ForgotPassword />
+        </>
+      } />
+      <Route path="/verify-email" element={
+        <>
+          <SEO title="Verify Email" />
+          <EmailVerification />
+        </>
+      } />
+      <Route path="/privacy" element={
+        <>
+          <SEO title="Privacy Policy" />
+          <PrivacyPolicy />
+        </>
+      } />
+      <Route path="/terms" element={
+        <>
+          <SEO title="Terms of Service" />
+          <TermsOfService />
+        </>
+      } />
+
+
+      {/* Admin Routes */}
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/login" element={
+        <>
+          <SEO title="Admin Login" />
+          <AdminLogin />
+        </>
+      } />
+      <Route path="/admin/dashboard" element={
+        <>
+          <SEO title="Admin Dashboard" />
+          <AdminDashboard />
+        </>
+      } />
 
       {/* Semi-Protected / Public but needs data */}
       <Route
         path="/chart"
-        element={hasData ? <SouthIndianChart data={chartData} /> : <Navigate to="/" />}
+        element={hasData ? (
+          <>
+            <SEO title="Your Birth Chart (Rasi & Navamsa)" />
+            <SouthIndianChart data={chartData} />
+          </>
+        ) : <Navigate to="/" />}
       />
 
       {/* Protected Routes */}
       <Route path="/dashboard" element={
         <ProtectedRoute>
+          <SEO title="Dashboard - Your Astrology Profile" />
           <Dashboard />
         </ProtectedRoute>
       } />
 
       <Route path="/analysis" element={
         <ProtectedRoute>
-          {hasData ? <ChartAnalysis data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="Detailed Chart Analysis" />
+              <ChartAnalysis data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/dasha" element={
-        <ProtectedRoute>
-          {hasData ? <DashaPeriods data={chartData} /> : <Navigate to="/" />}
-        </ProtectedRoute>
+        hasData ? (
+          <>
+            <SEO title="Dasa Bhukti Periods - Timeline" />
+            <DashaPeriods data={chartData} />
+          </>
+        ) : <Navigate to="/" />
       } />
 
       <Route path="/predictions" element={
         <ProtectedRoute>
-          {hasData ? <AIPredictions data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="AI Predictions - Chat & Guidance" />
+              <AIPredictions data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/predictions-faq" element={
         <ProtectedRoute>
-          {hasData ? <GurujiPredictions data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="Life Guidance & Remedies" />
+              <GurujiPredictions data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
 
       <Route path="/daily-snapshot" element={
         <ProtectedRoute>
-          {hasData ? <DailySnapshot data={chartData} /> : <Navigate to="/" />}
+          {hasData ? (
+            <>
+              <SEO title="Daily Horoscope Snapshot" />
+              <DailySnapshot data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
         </ProtectedRoute>
       } />
-    </Routes>
+
+
+      <Route path="/marriage-matching" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Marriage Matching - 7 Guruji Rules" />
+          <ComprehensiveMarriageMatching />
+        </ProtectedRoute>
+      } />
+      <Route path="/marriage-tools" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Marriage Tools - Matching & Timing" />
+          <MarriageTools />
+        </ProtectedRoute>
+      } />
+      <Route path="/marriage-results" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Marriage Matching Results" />
+          <ComprehensiveResultsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/comprehensive-results" element={
+        <ProtectedRoute requireAuth={false}>
+          <SEO title="Comprehensive Marriage Results" />
+          <ComprehensiveResultsPage />
+        </ProtectedRoute>
+      } />
+
+      {/* 404 Route */}
+      <Route path="*" element={
+        <>
+          <SEO title="Page Not Found - Saturn Blocked This!" />
+          <NotFound />
+        </>
+      } />
+    </Routes >
   );
 };
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <ChartProvider>
-          <Layout>
-            <AppRoutes />
-          </Layout>
-        </ChartProvider>
-      </AuthProvider>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <AuthProvider>
+          <ChartProvider>
+            <Layout>
+              <AppRoutes />
+              <InstallPWA />
+            </Layout>
+          </ChartProvider>
+        </AuthProvider>
+      </Router>
+    </HelmetProvider>
   );
 }
 

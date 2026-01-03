@@ -1,0 +1,7 @@
+    // Calculate Dasa periods for next 15 years
+    // Dasha is calculated from Moon position, not Ascendant
+    const boyMoon = boyChart.planets.find((p: any) => p.name === 'Moon');
+    const girlMoon = girlChart.planets.find((p: any) => p.name === 'Moon');
+    
+    const boyDasaPeriods = boyMoon ? calculateVimshottariDasha(boyMoon.longitude, boyChart.birthDate || new Date(), 15) : [];
+    const girlDasaPeriods = girlMoon ? calculateVimshottariDasha(girlMoon.longitude, girlChart.birthDate || new Date(), 15) : [];

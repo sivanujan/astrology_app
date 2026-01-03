@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { OrchestratorResponse } from '../utils/aiOrchestrator';
 
 // Helper to generate a consistent ID for the chart based on birth details and language
@@ -51,8 +51,6 @@ export const predictionService = {
         } catch (error) {
             console.error("Error saving prediction:", error);
         }
-<<<<<<< Updated upstream
-=======
     },
 
     // Log Chat Interaction (For Admin Dashboard)
@@ -76,13 +74,12 @@ export const predictionService = {
     },
 
     // --- DAILY FORECAST CACHING ---
-    getStoredDailyForecast: async (userId: string, date: string, language: string = 'en', contextKey: string = ''): Promise<string | null> => {
+    getStoredDailyForecast: async (userId: string, date: string, language: string = 'en'): Promise<string | null> => {
         try {
-            // ID Format: userId_yyyy-mm-dd_context_lang
+            // ID Format: userId_yyyy-mm-dd_lang
+            // date string should be consistently formatted (e.g. YYYY-MM-DD from toDateString or ISO split)
             const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
-            const cleanContext = contextKey.replace(/[^a-zA-Z0-9-]/g, ''); // Ensure safe ID
-            const docId = `${userId}_${cleanDate}_${cleanContext}_${language}`;
-
+            const docId = `${userId}_${cleanDate}_${language}`;
             const docRef = doc(db, `daily_forecasts/${docId}`);
             const docSnap = await getDoc(docRef);
 
@@ -96,24 +93,20 @@ export const predictionService = {
         }
     },
 
-    saveDailyForecast: async (userId: string, date: string, prediction: string, language: string = 'en', contextKey: string = ''): Promise<void> => {
+    saveDailyForecast: async (userId: string, date: string, prediction: string, language: string = 'en'): Promise<void> => {
         try {
             const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
-            const cleanContext = contextKey.replace(/[^a-zA-Z0-9-]/g, '');
-            const docId = `${userId}_${cleanDate}_${cleanContext}_${language}`;
-
+            const docId = `${userId}_${cleanDate}_${language}`;
             const docRef = doc(db, `daily_forecasts/${docId}`);
             await setDoc(docRef, {
                 userId,
                 date,
                 prediction,
                 language,
-                contextKey,
                 timestamp: serverTimestamp()
             });
         } catch (error) {
             console.error("Error saving daily forecast:", error);
         }
->>>>>>> Stashed changes
     }
 };

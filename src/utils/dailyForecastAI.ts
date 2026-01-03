@@ -93,13 +93,10 @@ export const getOrGenerateDailyForecast = async (
 ): Promise<string> => {
     // 1. Check Cache
     const dateStr = data.date.toDateString(); // "Tue Dec 30 2025"
-    // Create a context key from Dasa/Bhukti to avoid collisions (e.g. for Guest users)
-    const contextKey = `${data.dasaLord}-${data.bhuktiLord}`;
-
-    const cached = await predictionService.getStoredDailyForecast(userId, dateStr, language, contextKey);
+    const cached = await predictionService.getStoredDailyForecast(userId, dateStr, language);
 
     if (cached && cached.length > 10) {
-        console.log(`[DailyForecastAI] Cache hit for ${dateStr} (${language}) [Context: ${contextKey}]`);
+        console.log(`[DailyForecastAI] Cache hit for ${dateStr} (${language})`);
         return cached;
     }
 
@@ -124,7 +121,7 @@ export const getOrGenerateDailyForecast = async (
 
     // 4. Save to Cache if successful
     if (prediction && prediction.length > 10) {
-        await predictionService.saveDailyForecast(userId, dateStr, prediction, language, contextKey);
+        await predictionService.saveDailyForecast(userId, dateStr, prediction, language);
     }
 
     return prediction || data.verdict; // Fallback to simple verdict if AI fails

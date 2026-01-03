@@ -1,4 +1,6 @@
 import { calculateNavamsa, getNakshatra, NAKSHATRA_LORDS } from './astrology';
+import { ZODIAC_SIGNS } from './constants';
+import { calculateSubathuvamPavathuvam } from './subathuvam';
 
 export interface SubathuvamResult {
     planet: string;
@@ -6,7 +8,10 @@ export interface SubathuvamResult {
     navamsaScore: number;
     totalScore: number;
     isSubathuva: boolean;
+    isNeutral: boolean; // NEW: True if malefic achieved Subathuvam (through Jupiter)
     details: string[];
+    hasSookshmaValu?: boolean;
+    sookshmaValuReason?: string;
 }
 
 // Helper to calculate moon phase and light
@@ -48,70 +53,70 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
         moonStatus = calculateMoonPhase(moon.longitude, sun.longitude);
     }
 
+    // NEW: Pre-check if benefics have power (before giving conjunction bonuses)
+    // குரு/சுக்ரன் சக்தி சோதனை
+    const isBeneficAfflictedEarly = (benefic: any, beneficName: string): boolean => {
+        if (!benefic || !sun) return false;
+
+        const malefics = ['Saturn', 'Mars', 'Rahu', 'Ketu'];
+
+        // Check combustion
+        const combustionRanges: Record<string, number> = {
+            'Jupiter': 11, 'Venus': 10, 'Mercury': 14, 'Moon': 12
+        };
+
+        if (combustionRanges[beneficName]) {
+            const sunDiff = Math.abs(benefic.longitude - sun.longitude);
+            const actualDiff = Math.min(sunDiff, 360 - sunDiff);
+            if (actualDiff < combustionRanges[beneficName]) {
+                return true; // Combusted
+            }
+        }
+
+        // Check malefic conjunction
+        for (const malefic of rasiPlanets.filter(p => malefics.includes(p.name))) {
+            const conjDiff = Math.abs(benefic.longitude - malefic.longitude);
+            const actualDiff = Math.min(conjDiff, 360 - conjDiff);
+            if (actualDiff <= 10) {
+                return true; // Conjoined with malefic
+            }
+        }
+
+        return false;
+    };
+
+    const jupiterHasPower = jupiter ? !isBeneficAfflictedEarly(jupiter, 'Jupiter') : false;
+    const venusHasPower = venus ? !isBeneficAfflictedEarly(venus, 'Venus') : false;
+
+    // Calculate Simple Subathuvam/Pavathuvam FIRST (for Rasi base)
+    const simpleSubathuvam = calculateSubathuvamPavathuvam(rasiPlanets, 'en');
+
     rasiPlanets.forEach(planet => {
-        let rasiScore = 0;
         let navamsaScore = 0;
         const details: string[] = [];
         let isSubathuva = false;
 
-        // --- Step A: Rasi Chart Subathuvam (Base Strength) ---
+        // --- Step A: Rasi Score = Simple Subathuvam - Simple Pavathuvam ---
+        // This ensures consistency between two tables!
 
-        // Rule 1: Jupiter's Aspect (Guru Drishti) - +40 Marks
-        if (jupiter && planet.name !== 'Jupiter') {
-            const signDiff = (planet.signIndex - jupiter.signIndex + 12) % 12;
-            const houseDist = signDiff + 1;
+        const simpleScore = simpleSubathuvam[planet.name];
+        const subathuvamScore = simpleScore?.subathuvam?.score || 0;
+        const pavathuvamScore = simpleScore?.pavathuvam?.score || 0;
 
-            if ([5, 7, 9].includes(houseDist)) {
-                rasiScore += 40;
-                details.push("Jupiter Aspect (+40)");
+        // Rasi Score = Positive (Subathuvam) - Negative (Pavathuvam)
+        let rasiScore = subathuvamScore - pavathuvamScore;
+
+        // Add details from simple calculation
+        if (simpleScore) {
+            if (simpleScore.subathuvam.details.length > 0) {
+                details.push(...simpleScore.subathuvam.details.map((d: string) => `✅ ${d}`));
+            }
+            if (simpleScore.pavathuvam.details.length > 0) {
+                details.push(...simpleScore.pavathuvam.details.map((d: string) => `❌ ${d}`));
             }
         }
 
-        // Rule 2: Conjunction with Benefics - +20 Marks
-        // Benefics: Jupiter, Venus, Waxing Moon (Guru, Sukra, Valarpirai Chandran)
-        if (planet.name !== 'Jupiter' && jupiter && planet.signIndex === jupiter.signIndex) {
-            rasiScore += 20;
-            details.push("Conjoined Jupiter (+20)");
-        }
-        if (planet.name !== 'Venus' && venus && planet.signIndex === venus.signIndex) {
-            rasiScore += 20;
-            details.push("Conjoined Venus (+20)");
-        }
-
-        // Moon Special Rule: Waxing Moon acts as Benefic
-        if (planet.name !== 'Moon' && moon && moonStatus.isBenefic && planet.signIndex === moon.signIndex) {
-            rasiScore += 15; // Slightly less than Jupiter/Venus
-            details.push(`Conjoined Waxing Moon (${Math.round(moonStatus.lightPercentage)}% Light) (+15)`);
-        }
-
-        // Rule 3: Star Lord (Nakshatra) - +10 Marks
-        const nakshatraInfo = getNakshatra(planet.longitude);
-        if (nakshatraInfo.index >= 0 && nakshatraInfo.index < NAKSHATRA_LORDS.length) {
-            const starLord = NAKSHATRA_LORDS[nakshatraInfo.index];
-            if (['Jupiter', 'Venus'].includes(starLord)) {
-                rasiScore += 10;
-                details.push(`Star of ${starLord} (+10)`);
-            }
-            // Moon Star: Only if Waxing
-            if (starLord === 'Moon' && moonStatus.isBenefic) {
-                rasiScore += 10;
-                details.push(`Star of Waxing Moon (+10)`);
-            }
-        }
-
-        // --- Moon Specific Subathuvam Logic ---
-        if (planet.name === 'Moon') {
-            rasiScore += moonStatus.lightPercentage; // Direct add of light %
-            details.push(`${moonStatus.phaseName}: ${Math.round(moonStatus.lightPercentage)}% Light (+${Math.round(moonStatus.lightPercentage)})`);
-
-            if (!moonStatus.isBenefic) {
-                details.push("Low Light: Treated as Malefic (Saturn-like)");
-                // If extremely dark (<20%), maybe subtract or flag as Pavathuvam?
-                // For now, low score reflects this.
-            }
-        }
-
-        // --- Step B: Navamsa Chart Subathuvam (Hidden Strength) ---
+        // --- Step B: Navamsa Chart Subathuvam (Advanced Aditya Guruji Rules) ---
 
         const navamsa = calculateNavamsa(planet.longitude);
         const navamsaSignIndex = navamsa.signIndex;
@@ -122,16 +127,56 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
             details.push("Vargottama (+30)");
         }
 
-        // Rule 5: Placement in Benefic Houses
-        if ([1, 6, 8, 11].includes(navamsaSignIndex)) {
-            navamsaScore += 20;
-            details.push("Navamsa Benefic Sign (+20)");
+        // Rule 5: Navamsa House Rankings (Detailed as per yesterday's chat)
+        const navamsaRankings: Record<number, number> = {
+            8: 100,   // Sagittarius (Jupiter's sign) - Best
+            11: 90,   // Pisces (Jupiter's sign)
+            6: 80,    // Libra (Venus exaltation)
+            1: 70,    // Taurus (Venus sign)
+            3: 60,    // Cancer (Moon, conditional)
+            2: 55,    // Gemini (Mercury, conditional)
+            5: 55,    // Virgo (Mercury, conditional)
+            // Remaining houses get lower or zero
+        };
+
+        const navamsaBonus = navamsaRankings[navamsaSignIndex] || 0;
+        if (navamsaBonus > 0) {
+            navamsaScore += navamsaBonus;
+            const signName = ZODIAC_SIGNS[navamsaSignIndex];
+            details.push(`Navamsa in ${signName} (+${navamsaBonus})`);
         }
+
+        // Navamsa Conjunctions (if in same Navamsa sign)
+        rasiPlanets.forEach(otherPlanet => {
+            if (otherPlanet.name === planet.name) return;
+            const otherNavamsa = calculateNavamsa(otherPlanet.longitude);
+
+            if (otherNavamsa.signIndex === navamsaSignIndex) {
+                if (otherPlanet.name === 'Jupiter' && jupiterHasPower) {
+                    navamsaScore += 30;
+                    details.push("Navamsa Conj. with Jupiter (+30)");
+                } else if (otherPlanet.name === 'Venus' && venusHasPower) {
+                    navamsaScore += 25;
+                    details.push("Navamsa Conj. with Venus (+25)");
+                } else if (otherPlanet.name === 'Ketu') {
+                    navamsaScore += 15;
+                    details.push("Navamsa Conj. with Ketu (+15)");
+                }
+            }
+        });
+
+        // NOTE: Navamsa has NO negative marks - only positive bonuses!
+        // Negative influences (debilitation, malefic houses) apply to RASI only.
+
 
         // --- Step C: Final Calculation & Identification ---
 
-        let totalScore = rasiScore + navamsaScore;
-        if (totalScore > 100) totalScore = 100;
+        // Cap individual scores at 100
+        rasiScore = Math.min(rasiScore, 100);
+        navamsaScore = Math.min(navamsaScore, 100);
+
+        // Total = Average of Rasi and Navamsa
+        let totalScore = Math.round((rasiScore + navamsaScore) / 2);
 
         // Definition of Subathuva:
         // Usually > 50.
@@ -140,14 +185,52 @@ export const calculateAdityaGurujiSubathuvam = (rasiPlanets: any[]): Record<stri
 
         isSubathuva = totalScore >= 50;
 
+        // UPDATED: Check if malefic achieved Subathuvam (= Neutral)
+        // சுபத்துவம் அடைந்த பாவி = நடுநிலை (BUT only if Jupiter has power!)
+        let isNeutral = false;
+        const isMalefic = ['Saturn', 'Mars', 'Sun', 'Rahu', 'Ketu'].includes(planet.name);
+
+        if (isMalefic && jupiter && jupiterHasPower) { // Jupiter must have power!
+            // Check if this malefic has Jupiter conjunction (already counted in rasiScore)
+            const conjDiff = Math.abs(planet.longitude - jupiter.longitude);
+            const actualDiff = Math.min(conjDiff, 360 - conjDiff);
+            const hasJupiterConj = actualDiff <= 10;
+
+            // Check if Jupiter aspects this malefic (5th, 7th, 9th)
+            const signDiff = (planet.signIndex - jupiter.signIndex + 12) % 12;
+            const houseDist = signDiff + 1;
+            const hasJupiterAspect = [5, 7, 9].includes(houseDist);
+
+            // If malefic has Subathuvam through POWERFUL Jupiter = Neutral
+            if ((hasJupiterConj || hasJupiterAspect) && isSubathuva) {
+                isNeutral = true;
+                details.push("நடுநிலை (Neutral - Subathuvam achieved through Jupiter)");
+            }
+        } else if (isMalefic && jupiter && !jupiterHasPower) {
+            // Jupiter is afflicted - cannot purify malefics
+            details.push("குரு பலவீனம் (Jupiter afflicted - cannot purify)");
+        }
+
         results[planet.name] = {
             planet: planet.name,
-            rasiScore,
-            navamsaScore,
-            totalScore,
+            rasiScore: Math.round(rasiScore),
+            navamsaScore: Math.round(navamsaScore),
+            totalScore: Math.round(totalScore),
             isSubathuva,
+            isNeutral,
             details
         };
+
+        // FINAL DEBUG for Saturn
+        if (planet.name === 'Saturn') {
+            console.log('🪐 SATURN FINAL RESULT:', {
+                totalScore: Math.round(totalScore),
+                isSubathuva,
+                isNeutral,
+                detailsArray: details,
+                detailsCount: details.length
+            });
+        }
     });
 
     return results;
@@ -317,14 +400,47 @@ export interface FunctionalStatus {
     planet: string;
     nature: string; // "Yogakaraka", "Benefic", "Malefic", "Maraka", "Neutral"
     roles: string[]; // e.g., ["Lord of 1", "Lord of 5"]
+    lordOfHouses?: number[]; // Numeric house numbers
+    karakatvam?: string[]; // Natural significations
+    affectedPersons?: string[]; // Derived from 9th=Father etc.
+    combinedEffect?: string; // Summary
 }
 
-export const getFunctionalNature = (ascendantSignIndex: number): Record<string, FunctionalStatus> => {
+const PLANET_KARAKAS: Record<string, string[]> = {
+    'Sun': ['Father', 'Soul', 'Government', 'Health', 'Right Eye'],
+    'Moon': ['Mother', 'Mind', 'Emotions', 'Travel', 'Left Eye'],
+    'Mars': ['Siblings', 'Courage', 'Land', 'Blood', 'Enemies'],
+    'Mercury': ['Intelligence', 'Education', 'Speech', 'Business', 'Maternal Uncle'],
+    'Jupiter': ['Children', 'Wealth', 'Wisdom', 'Guru', 'Husband (for Female)'],
+    'Venus': ['Spouse', 'Luxury', 'Vehicles', 'Arts', 'Semen'],
+    'Saturn': ['Longevity', 'Karma', 'Servants', 'Sorrow', 'Oil'],
+    'Rahu': ['Foreign', 'Illusion', 'Technology', 'Paternal Grandfather'],
+    'Ketu': ['Moksha', 'Spirituality', 'Occult', 'Maternal Grandfather']
+};
+
+export const getFunctionalNature = (ascendantSignIndex: number, language: 'en' | 'ta' = 'en'): Record<string, FunctionalStatus> => {
     const results: Record<string, FunctionalStatus> = {};
+
+    // Translation helper
+    const translateNature = (nature: string): string => {
+        if (language !== 'ta') return nature;
+        const translations: Record<string, string> = {
+            'Yogakaraka': 'யோககாரகன்',
+            'Benefic': 'சுபன்',
+            'Malefic': 'பாபன்',
+            'Maraka': 'மாரகன்',
+            'Neutral': 'நடுநிலை'
+        };
+        return translations[nature] || nature;
+    };
+
+    const translateRole = (house: number): string => {
+        return language === 'ta' ? `${house} வீட்டின் அதிபதி` : `Lord of ${house}`;
+    };
 
     Object.entries(OWN_SIGNS).forEach(([planet, signs]) => {
         const houses = signs.map(sign => (sign - ascendantSignIndex + 12) % 12 + 1);
-        const roles = houses.map(h => `Lord of ${h}`);
+        const roles = houses.map(h => translateRole(h));
 
         let nature = "Neutral";
 
@@ -348,16 +464,47 @@ export const getFunctionalNature = (ascendantSignIndex: number): Record<string, 
             nature = "Malefic";
         }
 
+        // Populate new fields
+        const karakas = PLANET_KARAKAS[planet] || [];
+        const affected = [...karakas];
+
+        // Add house based relations
+        if (houses.includes(4)) affected.push("Mother (4th House)");
+        if (houses.includes(9)) affected.push("Father (9th House)");
+        if (houses.includes(5)) affected.push("Children (5th House)");
+        if (houses.includes(7)) affected.push("Spouse (7th House)");
+        if (houses.includes(3)) affected.push("Siblings (3th House)");
+
         results[planet] = {
             planet,
-            nature,
-            roles
+            nature: translateNature(nature),
+            roles,
+            lordOfHouses: houses,
+            karakatvam: karakas,
+            affectedPersons: affected,
+            combinedEffect: `${translateNature(nature)} (${roles.join(', ')}) - Signifies: ${karakas.slice(0, 3).join(', ')}`
         };
     });
 
     // Nodes are usually Malefic unless in Kendra/Trikona with Lord
-    results['Rahu'] = { planet: 'Rahu', nature: 'Malefic', roles: [] };
-    results['Ketu'] = { planet: 'Ketu', nature: 'Malefic', roles: [] };
+    results['Rahu'] = {
+        planet: 'Rahu',
+        nature: 'Malefic',
+        roles: [],
+        lordOfHouses: [],
+        karakatvam: PLANET_KARAKAS['Rahu'],
+        affectedPersons: [],
+        combinedEffect: "Shadow Planet (Malefic) - Agent of Karma"
+    };
+    results['Ketu'] = {
+        planet: 'Ketu',
+        nature: 'Malefic',
+        roles: [],
+        lordOfHouses: [],
+        karakatvam: PLANET_KARAKAS['Ketu'],
+        affectedPersons: [],
+        combinedEffect: "Shadow Planet (Malefic) - Agent of Moksha"
+    };
 
     return results;
 };

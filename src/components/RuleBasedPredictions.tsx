@@ -144,11 +144,9 @@ const RuleBasedPredictions: React.FC<RuleBasedPredictionsProps> = ({ data, langu
                 {predictions.map((pred, index) => (
                     <div key={index} className="glass-panel p-6 relative overflow-hidden group hover:bg-slate-800/60 transition-colors">
                         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            {index === 0 && <Briefcase className="w-12 h-12" />}
-                            {index === 1 && <Heart className="w-12 h-12" />}
-                            {index === 2 && <HelpCircle className="w-12 h-12" />}
-                            {index === 3 && <Star className="w-12 h-12" />}
-                            {index === 4 && <Globe className="w-12 h-12" />}
+                            {(pred.question.includes('Job') || pred.question.includes('Career') || pred.question.includes('வேலை')) && <Briefcase className="w-12 h-12" />}
+                            {(pred.question.includes('Married') || pred.question.includes('Marriage') || pred.question.includes('திருமணம்')) && <Heart className="w-12 h-12" />}
+                            {(pred.question.includes('Abroad') || pred.question.includes('Foreign') || pred.question.includes('வெளிநாடு')) && <Globe className="w-12 h-12" />}
                         </div>
 
                         <h3 className="text-lg font-semibold text-purple-300 mb-2">{pred.question}</h3>
