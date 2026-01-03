@@ -104,7 +104,13 @@ const InputForm: React.FC = () => {
             if (numM > 0 && numM <= 12 && numD > 0 && numD <= 31 && numY > 1900 && numY < 2100) {
                 const isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
                 setFormData(prev => ({ ...prev, date: isoDate }));
+            } else {
+                // Invalid date numbers (e.g. month 13), clear the date
+                setFormData(prev => ({ ...prev, date: '' }));
             }
+        } else {
+            // Incomplete or invalid format, clear the date to prevent stale state
+            setFormData(prev => ({ ...prev, date: '' }));
         }
     };
 
@@ -193,7 +199,12 @@ const InputForm: React.FC = () => {
 
         // Validate inputs before creating Date
         if (!formData.date || !formData.time) {
-            alert("Please enter both date and time.");
+            // More specific error message
+            if (displayDate && !formData.date) {
+                alert("Invalid date format. Please check date is valid and in DD/MM/YYYY format.");
+            } else {
+                alert("Please enter both date and time.");
+            }
             setIsGenerating(false);
             return;
         }
