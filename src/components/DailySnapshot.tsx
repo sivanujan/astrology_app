@@ -7,7 +7,7 @@ import {
     getCurrentDasha,
     calculateFullTransitChart
 } from '../utils/astrology';
-import { getFunctionalNature } from '../utils/adityaGurujiSubathuvam';
+import { getFunctionalNature, calculateAdityaGurujiSubathuvam } from '../utils/adityaGurujiSubathuvam';
 import { getDailySnapshot } from '../utils/gocharam';
 import { getOrGenerateDailyForecast } from '../utils/dailyForecastAI';
 import ChartGrid from './ChartGrid';
@@ -44,24 +44,53 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
         }
     }
 
-    //1. Calculate Dasa Status
+    // 1. Calculate Dasa Status
     const dashaPeriods = calculateDashaPeriods(birthDate, moon.longitude);
     const currentDasha = getCurrentDasha(dashaPeriods);
 
     let dasaStatus: 'Good' | 'Bad' | 'Neutral' = 'Neutral';
     let dasaDescription = "Neutral Period";
 
+    // ADITYA GURUJI LOGIC: Dasa Strength is King
+    // If Dasa Lord is Subathuva (Score > 50 or isSubathuva), it protects.
     if (currentDasha && currentDasha.maha) {
-        const dasaLord = currentDasha.maha.planet;
-        const functionalNature = getFunctionalNature(ascendant.signIndex);
-        const nature = functionalNature[dasaLord]?.nature;
+        const dasaLordName = currentDasha.maha.planet;
 
-        if (nature === 'Yogakaraka' || nature === 'Benefic') {
-            dasaStatus = 'Good';
-            dasaDescription = `${dasaLord} Dasa (Benefic)`;
-        } else if (nature === 'Malefic' || nature === 'Maraka') {
-            dasaStatus = 'Bad';
-            dasaDescription = `${dasaLord} Dasa (Malefic)`;
+        // Calculate Subathuvam for the whole chart to check Dasa Lord
+        const subathuvamResults = calculateAdityaGurujiSubathuvam(data.planets);
+        const dasaLordStats = subathuvamResults[dasaLordName];
+
+        if (dasaLordStats) {
+            if (dasaLordStats.isSubathuva || dasaLordStats.totalScore >= 50) {
+                dasaStatus = 'Good';
+                dasaDescription = `${dasaLordName} (Subathuvam - Strong)`;
+            } else if (dasaLordStats.totalScore < 30) {
+                // Check if it's a Functional Benefic at least?
+                const functionalNature = getFunctionalNature(ascendant.signIndex);
+                const nature = functionalNature[dasaLordName]?.nature;
+
+                if (nature === 'Yogakaraka') {
+                    dasaStatus = 'Good'; // Yogakaraka gives good results even if weakish
+                    dasaDescription = `${dasaLordName} (Yogakaraka - Good)`;
+                } else {
+                    dasaStatus = 'Bad';
+                    dasaDescription = `${dasaLordName} (Papathuvam - Weak)`;
+                }
+            } else {
+                dasaStatus = 'Neutral';
+                dasaDescription = `${dasaLordName} (Moderate)`;
+            }
+        } else {
+            // Fallback to old Functional Nature logic if Subathuvam fails
+            const functionalNature = getFunctionalNature(ascendant.signIndex);
+            const nature = functionalNature[dasaLordName]?.nature;
+            if (nature === 'Yogakaraka' || nature === 'Benefic') {
+                dasaStatus = 'Good';
+                dasaDescription = `${dasaLordName} (Functional Benefic)`;
+            } else if (nature === 'Malefic' || nature === 'Maraka') {
+                dasaStatus = 'Bad';
+                dasaDescription = `${dasaLordName} (Functional Malefic)`;
+            }
         }
     }
 
@@ -111,6 +140,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                             date: day.date,
                             dasaLord: day.dasaLord,
                             bhuktiLord: day.bhuktiLord,
+                            antaramLord: day.antaramLord,
                             dasaStatus: day.verdict === 'Danger' ? 'Danger' : 'Neutral', // Approximation map
                             transitStatus: day.verdict === 'Excellent' || day.verdict === 'Good' ? 'Good' : 'Neutral',
                             starRating: day.starRating,
@@ -236,6 +266,42 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                 </div>
             </div>
 
+            {/* 15-Day Forecast Section */}
+            {
+                snapshot.forecast15Days && snapshot.forecast15Days.length > 0 && (
+                    <div className="mt-12">
+                        <h3 className="text-xl font-bold text-slate-300 mb-6 flex items-center gap-2 border-l-4 border-blue-500 pl-3">
+                            <span className="bg-blue-500/10 p-1 rounded">📅</span>
+                            {t.forecast?.title || "Next 15 Days Forecast (Dasa + Gocharam)"}
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {snapshot.forecast15Days.map((day, idx) => {
+                                const isExtended = !!day.extended;
+                                return (
+                                    <ForecastDayCard
+                                        key={idx}
+                                        date={new Date(day.date)}
+                                        dayName={new Date(day.date).toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-GB', { weekday: 'long' })}
+                                        fullDate={day.dateString}
+                                        verdict={day.verdict}
+                                        score={day.extended?.totalScore || day.starRating}
+                                        dasa={`${day.dasaLord}-${day.bhuktiLord}`}
+                                        prediction={day.prediction}
+                                        keyFactors={day.keyFactors}
+                                        lifeAreas={day.extended?.lifeAreas}
+                                        aiPrediction={aiPredictions[day.dateString]?.text}
+                                        isGeneratingAI={generatingDate === day.dateString}
+                                        luckyTime={day.extended?.luckyTime}
+                                        nakshatra={day.extended?.nakshatra}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                )
+            }
+
             {/* Unified Planetary Transits Grid */}
             <h3 className="text-xl font-bold text-slate-300 mt-8 mb-4 border-l-4 border-purple-500 pl-3">
                 {t.analysis.planets} (Gocharam)
@@ -274,41 +340,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                 </span>
             </div>
 
-            {/* 15-Day Forecast Section */}
-            {
-                snapshot.forecast15Days && snapshot.forecast15Days.length > 0 && (
-                    <div className="mt-12">
-                        <h3 className="text-xl font-bold text-slate-300 mb-6 flex items-center gap-2 border-l-4 border-blue-500 pl-3">
-                            <span className="bg-blue-500/10 p-1 rounded">📅</span>
-                            {t.forecast?.title || "Next 15 Days Forecast (Dasa + Gocharam)"}
-                        </h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {snapshot.forecast15Days.map((day, idx) => {
-                                const isExtended = !!day.extended;
-                                return (
-                                    <ForecastDayCard
-                                        key={idx}
-                                        date={new Date(day.date)}
-                                        dayName={new Date(day.date).toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-GB', { weekday: 'long' })}
-                                        fullDate={day.dateString}
-                                        verdict={day.verdict}
-                                        score={day.extended?.totalScore || day.starRating}
-                                        dasa={`${day.dasaLord}-${day.bhuktiLord}`}
-                                        prediction={day.prediction}
-                                        keyFactors={day.keyFactors}
-                                        lifeAreas={day.extended?.lifeAreas}
-                                        aiPrediction={aiPredictions[day.dateString]?.text}
-                                        isGeneratingAI={generatingDate === day.dateString}
-                                        luckyTime={day.extended?.luckyTime}
-                                        nakshatra={day.extended?.nakshatra}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </div>
-                )
-            }
         </div >
     );
 };// End of component

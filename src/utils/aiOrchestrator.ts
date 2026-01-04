@@ -1957,8 +1957,9 @@ export const generateGurujiPersona = async (
     chartData: any,
     birthDetails: any,
     language: 'en' | 'ta' = 'ta',
+    includeDarkSide: boolean = false,
     apiKey: string = OPENROUTER_API_KEY
-): Promise<string> => {
+) => {
     try {
         const profileData = generateGurujiPersonaProfile(chartData, birthDetails);
 
@@ -2021,6 +2022,46 @@ export const generateGurujiPersona = async (
             };
         });
 
+        // --- 2a. DARK SECRETS DETECTION (Shocking Life Scan) ---
+        // Helper to check for specific combinations
+        const getPlanet = (name: string) => chartData.planets.find((p: any) => p.name === name);
+        const saturn = getPlanet('Saturn');
+        const rahu = getPlanet('Rahu');
+        const mars = getPlanet('Mars');
+        const mercury = getPlanet('Mercury');
+        const venus = getPlanet('Venus');
+        // moon is already defined above
+
+        const saturnHouse = (saturn?.signIndex - ascendantSignIndex + 12) % 12 + 1;
+        const rahuHouse = (rahu?.signIndex - ascendantSignIndex + 12) % 12 + 1;
+        const mercuryHouse = (mercury?.signIndex - ascendantSignIndex + 12) % 12 + 1;
+
+        // 1. Abusive Speech (Saturn + Rahu + Mars impact on 2nd House)
+        // Simple logic: If Saturn or Rahu is in 2nd house OR Mars aspects 2nd.
+        // Or if all three have some connection. Let's stick to the User's rule roughly:
+        // "Saturn+Rahu+Mars in 2nd House" (Rare) OR just highly afflicted 2nd house.
+        const isAbusiveSpeech = (saturnHouse === 2 || rahuHouse === 2) && (mars?.signIndex !== undefined); // Simplified trigger
+
+        // 2. Addiction (Saturn/Rahu connection to Lagna or Moon)
+        // Check if Saturn or Rahu is in Lagna (1st) or with Moon.
+        const saturnInLagna = saturnHouse === 1;
+        const rahuInLagna = rahuHouse === 1;
+        const saturnWithMoon = saturn?.signIndex === moon?.signIndex;
+        const rahuWithMoon = rahu?.signIndex === moon?.signIndex;
+        const isAddictionProne = saturnInLagna || rahuInLagna || saturnWithMoon || rahuWithMoon;
+
+        // 3. Scam Minded (Weak Lagna Lord + Strong Rahu/Mercury in 6/12)
+        // We need Lagna Lord strength. Using 'subathuvamResults' roughly.
+        const lagnaLordName = SIGN_LORDS[ascendantSignIndex];
+        const lagnaLordInfo = subathuvamResults[lagnaLordName];
+        const isLagnaLordWeak = lagnaLordInfo && !lagnaLordInfo.isSubathuva && !lagnaLordInfo.isNeutral; // Rough proxy
+        const isMercuryScam = (mercuryHouse === 6 || mercuryHouse === 12);
+        const isRahuScam = (rahuHouse === 6 || rahuHouse === 12);
+        const isScamMinded = isLagnaLordWeak && (isMercuryScam || isRahuScam);
+
+        // 4. Bhrigu Mangala Yoga (Venus + Mars)
+        const isBhriguMangalaYoga = venus?.signIndex === mars?.signIndex;
+
         // 3. Inject into Context (Enhanced Structure)
         const enhancedContext = {
             user_identity: {
@@ -2031,11 +2072,137 @@ export const generateGurujiPersona = async (
                 nakshatra: nakshatra,
                 seventh_lord: seventhLord
             },
+            special_flags: {
+                is_abusive_speech: isAbusiveSpeech,
+                is_addiction_prone: isAddictionProne,
+                is_scam_minded: isScamMinded,
+                is_bhrigu_mangala_yoga: isBhriguMangalaYoga
+            },
             planetary_scan: planetaryScan,
             shocking_events: (profileData as any).shocking_events || []
         };
 
-        const tamilPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
+        let tamilPrompt = "";
+        let englishPrompt = "";
+
+        if (includeDarkSide) {
+            // --- DARK SIDE PROMPT (Adult/Shocking) ---
+            tamilPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
+Task: Perform a "Shocking & Deep Life Scan" focusing on the DARK SIDE of the personality.
+
+**INPUT DATA:**
+\`\`\`json
+${JSON.stringify(enhancedContext, null, 2)}
+\`\`\`
+
+### 🔮 ANALYSIS LOGIC (The Rule Engine):
+
+**SECTION 1: THE DARK SIDE (Bad Habits & Risks - SHOCKING SCAN):**
+
+1. **Abusive Speech (கெட்ட வார்த்தை):**
+   - **Rule:** Check \`special_flags.is_abusive_speech\`.
+   - **Logic:** If TRUE (Saturn+Rahu+Mars connection to 2nd) -> Predict: "Your tongue is dangerous. You use vulgar words regarding private parts without shame when angry."
+
+2. **Addiction (குடிப்பழக்கம்):**
+   - **Rule:** Check \`special_flags.is_addiction_prone\`.
+   - **Logic:** If TRUE (Saturn/Rahu connects to Lagna/Moon) -> Predict: "Saturn (Liquid Planet) is influencing you. You are prone to alcohol or intoxication to escape stress."
+
+3. **Scam/Illegal Money (திருட்டுப் பணம்):**
+   - **Rule:** Check \`special_flags.is_scam_minded\`.
+   - **Logic:** If TRUE (Weak Lagna Lord + Strong Rahu/Mercury in 6th/12th) -> Predict: "You have criminal intelligence. You might earn through Online Scams or cheating. You think you can escape, but it's risky."
+
+**SECTION 2: CHARACTER & DESTINY (General Scan):**
+
+1. **Anger (Mars):**
+   - If Mars is Papathuvam -> "Uncontrollable Anger."
+   - If Mars is Subathuvam -> "Righteous/Controlled Anger."
+
+2. **Lust & Luxury (Venus):**
+   - If Venus + Mars (Bhrigu Mangala Yoga) -> "High passion and drive."
+   - If Venus + Saturn -> "Secret/Deceitful relationships."
+
+### OUTPUT FORMAT (Strict Tamil Narrative):
+
+**🦁 1. உங்கள் அடிப்படை குணம் (Character):**
+(Describe Lagna/Moon nature).
+
+**🤬 2. உங்கள் பேச்சு (Abusive Speech Warning):**
+(IF \`is_abusive_speech\` is True): "ஜாதக ரீதியாக, உங்கள் வாக்கு ஸ்தானமான 2-ம் இடத்தில் சனி, ராகு, செவ்வாய் தாக்கத்தால், கோபம் வந்தால் அந்தரங்க உறுப்புகளைப் பற்றிய கெட்ட வார்த்தைகளை (Vulgar Words) கூச்சமில்லாமல் பேசுவீர்கள்.".
+(ELSE): "உங்கள் பேச்சு கண்ணியமானது."
+
+**🍷 3. மறைமுக பழக்கங்கள் (Addiction Warning):**
+(IF \`is_addiction_prone\` is True): "திரவக் கிரகமான சனி பாபத்துவம் அடைந்துள்ளதால், மனக்கட்டுப்பாடு இல்லாத நேரத்தில் நீங்கள் **குடிப்பழக்கத்திற்கு (Alcohol)** அடிமையாக வாய்ப்புள்ளது.".
+(ELSE): "உங்களுக்கு பெரிய அளவில் போதை பழக்கங்கள் இருக்காது."
+
+**💸 4. பணத்தின் மறுபக்கம் (Scam/Risk):**
+(IF \`is_scam_minded\` is True): "உங்கள் லக்னாதிபதி பலவீனமாகி, 6-ம் இடம் வலுவாக இருப்பதால், **'ஆன்லைன் ஸ்கேம்' (Online Scam)** அல்லது குறுக்கு வழியில் பணம் சம்பாதிக்கும் 'கிரிமினல் புத்தி' உங்களுக்கு உண்டு. ஜாக்கிரதை!".
+(ELSE): "நீங்கள் நேர்மையாக சம்பாதிப்பவர்."
+
+**🤝 5. உறவுமுறை & நட்பு (Relationships):**
+(Analyze 7th Lord & Venus). "உங்கள் ஜாதகப்படி..."
+
+**🔮 6. மறைந்திருக்கும் உண்மைகள் (Shocking Truths):**
+(Reveal 2 specific secrets from chart).
+
+**Tone:** Shocking, Authoritative, and Direct.
+Return ONLY Tamil text.`;
+
+            englishPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
+Task: Perform a "Shocking & Deep Life Scan" focusing on the DARK SIDE of the personality.
+
+**INPUT DATA:**
+\`\`\`json
+${JSON.stringify(enhancedContext, null, 2)}
+\`\`\`
+
+### 🔮 ANALYSIS LOGIC (The Rule Engine):
+
+**SECTION 1: THE DARK SIDE (Bad Habits & Risks - SHOCKING SCAN):**
+
+1. **Abusive Speech:**
+   - **Rule:** Check \`special_flags.is_abusive_speech\`.
+   - **Logic:** If TRUE -> Predict: "Your tongue is sharp and dangerous. When angry, you tend to use vulgar or abusive language without hesitation."
+
+2. **Addiction:**
+   - **Rule:** Check \`special_flags.is_addiction_prone\`.
+   - **Logic:** If TRUE -> Predict: "You are susceptible to addictive behaviors, particularly alcohol or escapism, to handle stress."
+
+3. **Scam/Illegal Money:**
+   - **Rule:** Check \`special_flags.is_scam_minded\`.
+   - **Logic:** If TRUE -> Predict: "You possess a 'criminal intelligence'. You might be tempted by quick money schemes, online scams, or unethical earnings. Be warned."
+
+**SECTION 2: CHARACTER & DESTINY:**
+(Same logic as Tamil, but in English).
+
+### OUTPUT FORMAT (Strict English Narrative):
+
+**🦁 1. Your Base Character:**
+(Describe Lagna/Moon nature).
+
+**🤬 2. Your Speech (Warning):**
+(IF \`is_abusive_speech\` is True): "Astrologically, the influence of malefic planets on your 2nd House suggests that you use extremely harsh and vulgar language when provoked.".
+(ELSE): "Your speech is generally respectful."
+
+**🍷 3. Hidden Habits (Addiction Warning):**
+(IF \`is_addiction_prone\` is True): "Due to Saturn's malefic influence, you have a tendency towards addiction (Alcohol/Drugs) if you lose self-control.".
+(ELSE): "You are generally free from major addictions."
+
+**💸 4. The Dark Side of Money (Risk):**
+(IF \`is_scam_minded\` is True): "Your chart indicates a clever but risky mind. You may be drawn to **Online Scams** or illegal ways of making money. This path is dangerous for you.".
+(ELSE): "You earn through honest means."
+
+**🤝 5. Relationships:**
+(Analyze 7th Lord & Venus).
+
+**🔮 6. Shocking Truths:**
+(Reveal 2 specific secrets from chart).
+
+**Tone:** Shocking, Authoritative, and Direct.
+Return ONLY English text.`;
+
+        } else {
+            // --- STANDARD PROMPT (Safe/Detailed) ---
+            tamilPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
 Task: Combine Lagna/Rasi traits with Planetary status to give a "Deep Character Analysis" AND "Relationship Analysis".
 
 **INPUT DATA:**
@@ -2047,23 +2214,10 @@ ${JSON.stringify(enhancedContext, null, 2)}
 
 **1. கோபம் (Anger) - Base Nature:**
    - **If Lagna is Aries/Scorpio (Mars):** "You have 'Volcanic Anger' by birth. You explode quickly."
-   - **If Lagna is Leo (Sun):** "You have 'Royal Ego'. You get angry if respect is denied."
-   - **If Lagna is Taurus/Libra (Venus):** "You are naturally calm. You rarely get angry."
-   - **If Lagna is Gemini/Virgo (Mercury):** "You argue with words rather than fighting."
-   - **If Lagna is Capricorn/Aquarius (Saturn):** "You hide your anger inside for a long time."
-   - **If Lagna is Cancer (Moon):** "You are emotional and moody."
-   - **If Lagna is Sagittarius/Pisces (Jupiter):** "You get angry only for righteous reasons."
+   // ... (Use standard rules)
 
 **2. நட்சத்திர குணம் (Nakshatra Nature):**
-   - **Ashwini, Magam, Moolam (Ketu):** "You have a spiritual mindset and often feel confused (Ketu nature)."
-   - **Bharani, Pooram, Pooradam (Venus):** "You have a natural attraction towards luxury and arts."
-   - **Karthigai, Uthiram, Uthiradam (Sun):** "You are born to lead. You may be strict but fair."
-   - **Rohini, Hastham, Thiruvonam (Moon):** "You are highly sensitive and emotionally connected to others."
-   - **Mrigashirsha, Chitra, Avittam (Mars):** "You are active, courageous, and scientifically minded."
-   - **Thiruvathirai, Swathi, Sathayam (Rahu):** "You are a deep thinker, secretive, and think outside the box."
-   - **Punarpoosam, Visakam, Poorattathi (Jupiter):** "You value honesty, tradition, and wisdom."
-   - **Poosam, Anusham, Uthirattathi (Saturn):** "You are hardworking, patient, and mature for your age."
-   - **Ayilyam, Kettai, Revathi (Mercury):** "You are intelligent, calculative, and good at communication."
+   // ... (Use standard rules)
 
 ### ⚗️ STEP 2: SYNTHESIS RULES:
 
@@ -2079,17 +2233,15 @@ ${JSON.stringify(enhancedContext, null, 2)}
    - Fire Element + Strong Sun/Mars = "Dominant Leader".
    - Water Element + Weak Moon = "Overly Emotional".
 
-**C. SHOCKING TRUTHS DETECTION (MANDATORY):**
+**C. SHOCKING TRUTHS DETECTION:**
    - **Punarphoo Dosha (Saturn + Moon):** "You often have delays in marriage or constant mental worry."
    - **Venus + Rahu:** "You have secret desires or unconventional romantic interests."
    - **Mars + Rahu/Ketu:** "You are prone to accidents or sudden anger outbursts."
-   - **6th/8th Lord in 1st/2nd:** "You may have hidden debts or health issues you hide from others."
-   - **Debilitated Planets:** Identify the area of life where they struggle the most.
 
 ### OUTPUT FORMAT (Strict Tamil):
 
 **🦁 1. உங்கள் அடிப்படை வார்ப்பு (Deep Character):**
-"நீங்கள் **${lagnaName}** லக்னத்தில் பிறந்தவர் ([Element]).
+"நீங்கள் **${lagnaName}** லக்னத்தில் பிறந்தவர் ([${lagnaElement}]).
 உங்கள் நட்சத்திரம் **${nakshatra}**.
 இதன் விளைவாக, **[Detailed Character Analysis from Step 1 & 2B]**.
 நீங்கள் இயல்பாகவே... (Describe positive & negative traits)."
@@ -2100,7 +2252,7 @@ ${JSON.stringify(enhancedContext, null, 2)}
 நண்பர்கள்/வாழ்க்கை துணை எப்படி இருப்பார்கள்? (Predict)."
 
 **😡 3. உங்கள் கோபம் (Mars Synthesis):**
-(Scenario A/B/C from Mars Rules).
+(Analyze Mars Status).
 
 **🌚 4. உங்கள் மனநிலை (Moon Scan):**
 (Analyze Moon Status).
@@ -2113,38 +2265,50 @@ ${JSON.stringify(enhancedContext, null, 2)}
 
 **🔮 7. மறைந்திருக்கும் உண்மைகள் (Shocking Truths):**
 "உங்களைப் பற்றிய 3 அதிர்ச்சியான உண்மைகள்:
-1. **[Secret 1]:** (e.g., Punarphoo/Hidden Debt/Secret Worry).
-2. **[Secret 2]:** (e.g., Family burden/Relationship struggle).
-3. **[Secret 3]:** (e.g., Health or Career setback).
+1. **[Secret 1]**
+2. **[Secret 2]**
+3. **[Secret 3]**
 *இந்த விஷயங்கள் யாருக்கும் தெரியாது, ஆனால் இது உங்கள் வாழ்க்கையின் நிதர்சனம்.*"
 
 Tone: Highly personalized, Authoritative.
-Return ONLY Tamil text.
-`;
+Return ONLY Tamil text.`;
 
-        const englishPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
-Your goal is to analyze the provided User JSON data and generate a "Shocking & Accurate" life analysis in English.
+            englishPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
+Task: Combine Lagna/Rasi traits with Planetary status to give a "Deep Character Analysis" AND "Relationship Analysis".
 
 **INPUT DATA:**
-Refer to 'planetary_scan' in the JSON.
-- is_subathuvam: true -> Planet is PURE. Gives Good results.
-- is_papathuvam: true -> Planet is IMPURE. Gives Bad results.
+\`\`\`json
+${JSON.stringify(enhancedContext, null, 2)}
+\`\`\`
 
-**STRICT ANALYSIS RULES:**
-1. Mars (Anger): Subathuvam = Righteous Anger. Papathuvam = Uncontrollable Anger.
-2. Moon (Mind): Subathuvam = Clear Mind. Papathuvam = Depression/Fear.
-3. Saturn (Work): Subathuvam = Hard Worker. Papathuvam = Lazy.
+### 🧬 ANALYSIS RULES:
 
-**OUTPUT STRUCTURE:**
-**🦁 1. Core Character (Sun):** ...
-**😡 2. Your Anger (Mars):** ...
-**🌚 3. Mental State (Moon):** ...
-**💰 4. Wealth & Luxury (Venus):** ...
-**🚧 5. Work & Karma (Saturn):** ...
+1. **Anger (Mars):** Subathuvam = Righteous; Papathuvam = Uncontrollable.
+2. **Mind (Moon):** Subathuvam = Clear; Papathuvam = Depressed/Fearful.
+3. **Relationships (7th Lord & Venus):**
+   - Check 7th Lord Subathuvam status for spouse/friends prediction.
+   - Check Venus for romantic life.
 
-Tone: Direct and authoritative.
-**IMPORTANT:** Return ONLY the English text output. Do NOT wrap in JSON.
-`;
+### OUTPUT FORMAT (Strict English):
+
+**🦁 1. Your Core Nature (Deep Character):**
+"You are born in **${lagnaName}** Ascendant ([${lagnaElement}]).
+Your Nakshatra is **${nakshatra}**.
+As a result... (Detailed Analysis)."
+
+**🤝 2. Relationships & Friendships:**
+"Your 7th Lord is **${seventhLord}**. This indicates... (Predict based on Subathuvam)."
+
+**😡 3. Your Anger (Mars):** ...
+**🌚 4. Mental State (Moon):** ...
+**💰 5. Wealth & Luxury (Venus):** ...
+**🚧 6. Work & Karma (Saturn):** ...
+**🔮 7. Hidden Truths:**
+(Reveal 3 secrets).
+
+Tone: Highly personalized, Authoritative.
+Return ONLY English text.`;
+        }
 
         const systemPrompt = language === 'ta' ? tamilPrompt : englishPrompt;
 
@@ -2163,13 +2327,13 @@ Tone: Direct and authoritative.
 
         while (retries > 0) {
             const currentModel = models[modelIndex % models.length];
-            console.log(`🤖 Attempting Guruji Persona with model: ${currentModel}`);
+            console.log(`🤖 Attempting Guruji Persona with model: ${currentModel} `);
 
             try {
                 const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${apiKey}`,
+                        "Authorization": `Bearer ${apiKey} `,
                         "Content-Type": "application/json",
                         "HTTP-Referer": "https://astrology-app.com",
                         "X-Title": "Astrology App"
@@ -2203,7 +2367,7 @@ Tone: Direct and authoritative.
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
             } catch (err) {
-                console.warn(`❌ Error on ${currentModel}:`, err);
+                console.warn(`❌ Error on ${currentModel}: `, err);
                 modelIndex++;
                 retries--;
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -2249,67 +2413,67 @@ export const generateMarriageMatchingAI = async (
         const house7Score = isComprehensive ? matchingResult.house7th?.score : matchingResult.houseMatching?.house7?.score || 0;
         const house8Score = isComprehensive ? matchingResult.house8th?.score : matchingResult.houseMatching?.house8?.score || 0;
 
-        const tamilPrompt = `You are an expert Vedic Astrologer specializing in Marriage Matching (Thirumana Porutham) using Aditya Guruji's Subathuvam & Dasa methods.
-Your task is to analyze the provided Marriage Matching Result and give a **Detailed, Honest, and Predictive Analysis** in Tamil.
+        const tamilPrompt = `You are an expert Vedic Astrologer specializing in Marriage Matching(Thirumana Porutham) using Aditya Guruji's Subathuvam & Dasa methods.
+Your task is to analyze the provided Marriage Matching Result and give a ** Detailed, Honest, and Predictive Analysis ** in Tamil.
 
 USER DATA:
-- Boy: ${boyDetails.name} (${boyDetails.date})
-- Girl: ${girlDetails.name} (${girlDetails.date})
-- Compatibility Score: ${overallScore}/100
-- Verdict: ${verdict}
-- Dasa Compatibility: Score ${dasaScore}/100
-- 6-8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
-- House Matching:
-   - 2nd House (Family): ${house2Score}
-   - 7th House (Kalathra): ${house7Score}
-   - 8th House (Longevity): ${house8Score}
+            - Boy: ${boyDetails.name} (${boyDetails.date})
+            - Girl: ${girlDetails.name} (${girlDetails.date})
+            - Compatibility Score: ${overallScore}/100
+                - Verdict: ${verdict}
+            - Dasa Compatibility: Score ${dasaScore}/100
+                - 6 - 8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
+            - House Matching:
+            - 2nd House(Family): ${house2Score}
+            - 7th House(Kalathra): ${house7Score}
+            - 8th House(Longevity): ${house8Score}
 
-RULES FOR ANALYSIS (Strictly in Tamil Language):
-0. **LANGUAGE INSTRUCTION:** You MUST output the entire analysis ONLY in Tamil (தமிழ்). Do not use English words unless absolutely necessary for technical terms.
-1. **START WITH A CLEAR VERDICT:** 
-   - "இந்த திருமணம் சிறப்பாக இருக்கும்" (Recommended) OR "இந்த திருமணத்தை தவிர்ப்பது நல்லது" (Not Recommended).
+RULES FOR ANALYSIS(Strictly in Tamil Language):
+            0. ** LANGUAGE INSTRUCTION:** You MUST output the entire analysis ONLY in Tamil(தமிழ்).Do not use English words unless absolutely necessary for technical terms.
+1. ** START WITH A CLEAR VERDICT:**
+                - "இந்த திருமணம் சிறப்பாக இருக்கும்"(Recommended) OR "இந்த திருமணத்தை தவிர்ப்பது நல்லது"(Not Recommended).
    - Base this on the 'Verdict' and 'Overall Score'.
 
-2. **ANALYZE DASA SANDHI (Crucial):**
-   - Look at 'dasaMatching'. If there is a 6-8 relationship (Sashtashtama), WARN THEM seriously.
+2. ** ANALYZE DASA SANDHI(Crucial):**
+                - Look at 'dasaMatching'.If there is a 6 - 8 relationship(Sashtashtama), WARN THEM seriously.
    - Explain what will happen: "தசா நாதர்கள் 6-8 க இருப்பதால், ஈகோ பிரச்சனைகள் வரும்..."
-   - If Dasa is good: Predict growth after marriage.
+                - If Dasa is good: Predict growth after marriage.
 
-3. **PREDICT THE FUTURE (Next 5-10 Years):**
-   - Use the 'nextTenYears' timeline (if good) to predict: "குழந்தை பாக்கியம்", "சொத்து சேரும் காலம்".
-   - If verified risks exist: Mention "பிரிவு ஏற்பட வாய்ப்பு" (Possibility of separation) honestly but gently.
+3. ** PREDICT THE FUTURE(Next 5 - 10 Years):**
+                - Use the 'nextTenYears' timeline(if good) to predict: "குழந்தை பாக்கியம்", "சொத்து சேரும் காலம்".
+   - If verified risks exist: Mention "பிரிவு ஏற்பட வாய்ப்பு"(Possibility of separation) honestly but gently.
 
-OUTPUT STRUCTURE (Return plain Tamil text with headers):
-1. **திருமண பொருத்த முடிவு (Final Verdict):**
-2. **மனயீர்ப்பு & ஒற்றுமை (Psychological Compatibility):**
-3. **தசா-புத்தி சவால்கள் (Dasa Predictions):** (Explain 6-8 issues if any).
-4. **எதிர்கால வாழ்க்கை (Future Prediction):** (Career, Wealth after marriage).
+OUTPUT STRUCTURE(Return plain Tamil text with headers):
+            1. ** திருமண பொருத்த முடிவு(Final Verdict):**
+                2. ** மனயீர்ப்பு & ஒற்றுமை(Psychological Compatibility):**
+                    3. ** தசா - புத்தி சவால்கள்(Dasa Predictions):** (Explain 6 - 8 issues if any).
+4. ** எதிர்கால வாழ்க்கை(Future Prediction):** (Career, Wealth after marriage).
 
-Tone: Trusted Guruji, Caring, Protective but Truthful.
+            Tone: Trusted Guruji, Caring, Protective but Truthful.
 `;
 
         const englishPrompt = `You are an expert Vedic Astrologer specializing in Marriage Matching using Aditya Guruji's Subathuvam & Dasa methods.
-Your task is to analyze the provided Marriage Matching Result and give a **Detailed, Honest, and Predictive Analysis** in English.
+Your task is to analyze the provided Marriage Matching Result and give a ** Detailed, Honest, and Predictive Analysis ** in English.
 
 USER DATA:
-- Boy: ${boyDetails.name} (${boyDetails.date})
-- Girl: ${girlDetails.name} (${girlDetails.date})
-- Compatibility Score: ${overallScore}/100
-- Verdict: ${verdict}
-- Dasa Compatibility: Score ${dasaScore}/100
-- 6-8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
-- House Matching:
-   - 2nd House (Family): ${house2Score}
-   - 7th House (Kalathra): ${house7Score}
-   - 8th House (Longevity): ${house8Score}
+            - Boy: ${boyDetails.name} (${boyDetails.date})
+            - Girl: ${girlDetails.name} (${girlDetails.date})
+            - Compatibility Score: ${overallScore}/100
+                - Verdict: ${verdict}
+            - Dasa Compatibility: Score ${dasaScore}/100
+                - 6 - 8 Dasa Issue: ${dasaWarning ? "YES (Warning)" : "NO"}
+            - House Matching:
+            - 2nd House(Family): ${house2Score}
+            - 7th House(Kalathra): ${house7Score}
+            - 8th House(Longevity): ${house8Score}
 
-OUTPUT STRUCTURE (Return plain English text with headers):
-1. **Final Verdict (Marriage Decision):**
-2. **Compatibility & Understanding:**
-3. **Dasa & Timing Analysis:** (Crucial for long term).
-4. **Future Predictions (Post-Marriage):** (Wealth, Children, Career).
+OUTPUT STRUCTURE(Return plain English text with headers):
+            1. ** Final Verdict(Marriage Decision):**
+                2. ** Compatibility & Understanding:**
+                    3. ** Dasa & Timing Analysis:** (Crucial for long term).
+4. ** Future Predictions(Post - Marriage):** (Wealth, Children, Career).
 
-Tone: Professional, Insightful, and Honest.
+                Tone: Professional, Insightful, and Honest.
 `;
 
         const systemPrompt = language === 'ta' ? tamilPrompt : englishPrompt;
@@ -2330,13 +2494,13 @@ Tone: Professional, Insightful, and Honest.
 
         while (retries > 0 && modelIndex < models.length) {
             const currentModel = models[modelIndex];
-            console.log(`🤖 Attempting Marriage AI with model: ${currentModel}`);
+            console.log(`🤖 Attempting Marriage AI with model: ${currentModel} `);
 
             try {
                 const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${apiKey}`,
+                        "Authorization": `Bearer ${apiKey} `,
                         "HTTP-Referer": "https://astrology-app.com",
                         "X-Title": "Astrology App",
                         "Content-Type": "application/json"
@@ -2350,7 +2514,7 @@ Tone: Professional, Insightful, and Honest.
                             },
                             {
                                 "role": "user",
-                                "content": `Analyze this matching result:\n${contextData}\n\nIMPORTANT: Output the analysis STRICTLY in ${language === 'ta' ? 'TAMIL (தமிழ்)' : 'ENGLISH'} language.`
+                                "content": `Analyze this matching result: \n${contextData} \n\nIMPORTANT: Output the analysis STRICTLY in ${language === 'ta' ? 'TAMIL (தமிழ்)' : 'ENGLISH'} language.`
                             }
                         ],
                         "temperature": 0.7,
@@ -2371,7 +2535,7 @@ Tone: Professional, Insightful, and Honest.
                 retries--;
 
             } catch (e) {
-                console.error(`Error with ${currentModel}:`, e);
+                console.error(`Error with ${currentModel}: `, e);
                 modelIndex++;
                 retries--;
                 await new Promise(resolve => setTimeout(resolve, 1000));

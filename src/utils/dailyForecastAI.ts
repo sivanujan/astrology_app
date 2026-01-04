@@ -93,17 +93,21 @@ export const getOrGenerateDailyForecast = async (
 ): Promise<string> => {
     // 1. Check Cache
     const dateStr = data.date.toDateString(); // "Tue Dec 30 2025"
-    const cached = await predictionService.getStoredDailyForecast(userId, dateStr, language);
+    // Use Dasa-Bhukti-Antaram as context
+    const contextKey = `${data.dasaLord}-${data.bhuktiLord}-${data.antaramLord || ''}`;
+
+    // Pass contextKey to getStoredDailyForecast
+    const cached = await predictionService.getStoredDailyForecast(userId, dateStr, language, contextKey);
 
     if (cached && cached.length > 10) {
-        console.log(`[DailyForecastAI] Cache hit for ${dateStr} (${language})`);
+        console.log(`[DailyForecastAI] Cache hit for ${dateStr} (${language}) [${contextKey}]`);
         return cached;
     }
 
     // 2. Construct Prompt
     const prompt = `
     Date: ${data.date.toLocaleDateString()}
-    Dasa Context: Running ${data.dasaLord} Dasa, ${data.bhuktiLord} Bhukti. Dasa Status: ${data.dasaStatus}.
+    Dasa Context: Running ${data.dasaLord} Dasa, ${data.bhuktiLord} Bhukti${data.antaramLord ? `, ${data.antaramLord} Antaram` : ''}. Dasa Status: ${data.dasaStatus}.
     Transit (Gocharam) Context: Transit Score ${data.starRating}/5. Status: ${data.transitStatus}.
     Key Influences: ${data.keyTransits.join(', ')}.
     Moon/Tara Bala: ${data.taraBala.type} (Score: ${data.taraBala.score}).
@@ -121,7 +125,8 @@ export const getOrGenerateDailyForecast = async (
 
     // 4. Save to Cache if successful
     if (prediction && prediction.length > 10) {
-        await predictionService.saveDailyForecast(userId, dateStr, prediction, language);
+        // Pass contextKey to saveDailyForecast
+        await predictionService.saveDailyForecast(userId, dateStr, prediction, language, contextKey);
     }
 
     return prediction || data.verdict; // Fallback to simple verdict if AI fails

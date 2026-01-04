@@ -16,6 +16,7 @@ export interface DayForecast {
     dateString: string;
     dasaLord: string;
     bhuktiLord: string;
+    antaramLord: string; // Added for advanced prediction context
     starRating: number; // 0 to 5
     verdict: string;
     prediction: string;
@@ -312,6 +313,12 @@ export const generate15DayForecast = (
     const lagnaSign = birthData.ascendant?.signIndex || 0;
 
     const dashaPeriods = calculateDashaPeriods(birthData.birthDate, moonLong);
+    console.log('[Generate15Day] Debug:', {
+        birthDate: birthData.birthDate,
+        moonLong,
+        firstDasa: dashaPeriods[0]?.planet,
+        dasaCount: dashaPeriods.length
+    });
 
     for (let i = 0; i < 15; i++) {
         const currentDate = new Date(startDate);
@@ -319,6 +326,7 @@ export const generate15DayForecast = (
 
         // 1. DASA ANALYSIS (60%)
         const currentDasa = getCurrentDasha(dashaPeriods, currentDate);
+        // console.log(`[Generate15Day] Day ${i} Dasa:`, currentDasa?.maha.planet, currentDasa?.bhukti?.planet);
         const dasaLord = currentDasa?.maha.planet || 'Unknown';
         const bhuktiLord = currentDasa?.bhukti?.planet || 'Unknown';
         const antaramLord = currentDasa?.antaram?.planet || 'Unknown';
@@ -441,6 +449,7 @@ export const generate15DayForecast = (
             dateString: currentDate.toDateString(),
             dasaLord,
             bhuktiLord,
+            antaramLord,
             starRating: rating,
             verdict: getStr(lang, `gocharam.status.${verdictKey}`), // Reuse/ensure keys exist
             prediction: generateDailyPrediction(

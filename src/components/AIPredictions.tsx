@@ -364,7 +364,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600'}`}>
                                 {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <span className="text-xl">🔮</span>}
                             </div>
-                            <div className={`rounded-2xl p-5 max-w-[80%] shadow-lg text-base md:text-lg leading-relaxed ${msg.role === 'user' ? 'bg-blue-600/40 border border-blue-500/30 shadow-blue-500/10 text-blue-50' : 'bg-indigo-900/30 border border-indigo-500/20 shadow-indigo-500/10 text-slate-100'}`} style={{ fontFamily: 'Noto Sans Tamil, sans-serif' }}>
+                            <div className={`rounded-2xl p-5 max-w-[80%] shadow-lg text-sm md:text-base leading-relaxed ${msg.role === 'user' ? 'bg-blue-600/40 border border-blue-500/30 shadow-blue-500/10 text-blue-50' : 'bg-indigo-900/30 border border-indigo-500/20 shadow-indigo-500/10 text-slate-100'}`} style={{ fontFamily: 'Noto Sans Tamil, sans-serif' }}>
                                 {msg.content}
                                 {msg.details?.bava_analysis_report && (
                                     <div className="mt-6 space-y-4">
