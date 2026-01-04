@@ -27,7 +27,12 @@ const PushOptIn: React.FC<PushOptInProps> = ({ uid }) => {
     const { language } = useLanguage();
     const isTamil = language === 'ta';
 
-    const [permission, setPermission] = useState(Notification.permission);
+    const [permission, setPermission] = useState(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            return Notification.permission;
+        }
+        return 'default';
+    });
     const [loading, setLoading] = useState(false);
     const [subscribed, setSubscribed] = useState(false);
 

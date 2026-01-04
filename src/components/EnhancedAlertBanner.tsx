@@ -58,7 +58,7 @@ const EnhancedAlertBanner: React.FC<EnhancedAlertBannerProps> = ({
             className={`${config.bgColor} border-2 ${config.borderColor} rounded-xl p-6 mb-6`}
         >
             {/* Header */}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <Icon className={`w-8 h-8 ${config.textColor} animate-pulse`} />
                 <div className="flex-1">
                     <h3 className={`text-xl font-bold ${config.textColor}`}>

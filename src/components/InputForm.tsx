@@ -327,7 +327,7 @@ const InputForm: React.FC = () => {
                                             }
                                         }));
                                     }}
-                                    className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
+                                    className="w-full min-w-0 appearance-none bg-slate-800/60 border border-slate-600 rounded-lg px-3 md:px-4 py-3 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
                                     placeholder="e.g. Arjuna"
                                 />
                                 {formData.name && validationStates.name.isValid && (
@@ -390,7 +390,7 @@ const InputForm: React.FC = () => {
                                         }}
                                         placeholder="dd/mm/yyyy"
                                         maxLength={10}
-                                        className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pr-20 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
+                                        className="w-full min-w-0 appearance-none bg-slate-800/60 border border-slate-600 rounded-lg px-3 md:px-4 py-3 pr-12 md:pr-20 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
                                     />
 
                                     {/* Validation Icons */}
@@ -444,7 +444,7 @@ const InputForm: React.FC = () => {
                                                 }
                                             }));
                                         }}
-                                        className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white [color-scheme:dark]"
+                                        className="w-full min-w-0 appearance-none bg-slate-800/60 border border-slate-600 rounded-lg px-3 md:px-4 py-3 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white [color-scheme:dark]"
                                     />
                                     {formData.time && validationStates.time.isValid && (
                                         <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-400" />
@@ -505,7 +505,7 @@ const InputForm: React.FC = () => {
                                             }));
                                         }
                                     }}
-                                    className="w-full bg-slate-800/60 border border-slate-600 rounded-lg px-4 py-3 pl-10 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
+                                    className="w-full min-w-0 appearance-none bg-slate-800/60 border border-slate-600 rounded-lg px-3 md:px-4 py-3 pl-10 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
                                     placeholder="Search city..."
                                 />
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />

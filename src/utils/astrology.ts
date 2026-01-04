@@ -533,9 +533,8 @@ export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) =>
     const birthLord = NAKSHATRA_LORDS[nakshatraIndex];
     if (!birthLord) {
         console.error("Invalid nakshatra index or lord:", nakshatraIndex, birthLord);
-        // Fallback: Return a default short dasha starting now, to prevent crash
         return [{
-            planet: 'Ketu', // Default
+            planet: 'Ketu',
             startDate: new Date(),
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
             durationYears: 1,
@@ -543,54 +542,124 @@ export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) =>
         }];
     }
 
-    const birthLordIndexInOrder = DASHA_ORDER.indexOf(birthLord);
-
     const birthDashaTotalYears = DASHA_YEARS[birthLord];
     const birthDashaBalanceYears = birthDashaTotalYears * percentageRemaining;
+    const birthDashaElapsedYears = birthDashaTotalYears * percentagePassed;
 
     const periods: DashaPeriod[] = [];
-    let currentDate = new Date(birthDate);
 
-    // 2. Generate Maha Dashas for 120 years
-    // First period (Balance)
-    let endDate = addSiderealYears(currentDate, birthDashaBalanceYears);
+    // 3. Generate Maha Dashas for 120 years
+
+    // --- SPECIAL HANDLING FOR FIRST DASHA (JANMA DASA) ---
+    // Start Date of the First Dasa is theoretically in the past
+    // Actual Start: BirthDate - ElapsedYears
+    const janmaDasaTheoreticalStartDate = addSiderealYears(birthDate, -birthDashaElapsedYears);
+    const janmaDasaEndDate = addSiderealYears(birthDate, birthDashaBalanceYears);
+
+    // Generate Sub-Periods for the FULL First Dasa (as if it started in the past)
+    // Then filter them to match birth date
+    const fullFirstDasaSubPeriods = generateSubPeriods(
+        birthLord,
+        janmaDasaTheoreticalStartDate,
+        birthDashaTotalYears,
+        'Bhukti'
+    );
+
+    // Filter sub-periods: Only include those that end AFTER birth date
+    // And clamp the start date of the first one to birth date
+    const validFirstDasaSubPeriods = fullFirstDasaSubPeriods.filter(sp => sp.endDate > birthDate).map(sp => {
+        // If it started before birth, clamp it
+        if (sp.startDate < birthDate) {
+            return {
+                ...sp,
+                startDate: new Date(birthDate),
+                // Recalculate duration for this partial period?
+                // Visual Duration = End - Birth. 
+                // Core logic durationYears is still the 'astrological' weight, but UI might use dates.
+                // Let's keep durationYears as is (full weight) or adjust? 
+                // Better to keep full weight or user sees confusion? 
+                // Actually, durationYears is widely used for scaling next levels. 
+                // This is a partial period. Let's leave durationYears as the full period length for consistency 
+                // or update it to reflect partialness?
+                // Let's update duration to reflect the portion remaining.
+                durationYears: (sp.endDate.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+            };
+        }
+        return sp;
+    });
+
+    // Also regenerate Antarams for the CLAMPED Bhuktis
+    validFirstDasaSubPeriods.forEach(bhukti => {
+        // If it was clamped, we need to regenerate its sub-sub periods (Antarams) properly too?
+        // Yes, the Antaram list for the first Bhukti is also partial.
+
+        // Regenerate FULL Antarams for this Bhukti (using its ORIGINAL start date logic if possible?)
+        // Recover original starts:
+        // Actually, we don't have the original start easily here if we mutated in map.
+        // Better: Generate Antarams for the *original* Bhukti, then filter efficiently.
+
+        // This is getting complex. Simplified approach:
+        // Use the generic generator on the ADJUSTED Bhukti?
+        // No, if we use adjusted, it treats it as a full period starting now.
+        // We must re-filter the Antarams of the original bhukti.
+
+        // Let's reconstruct the original Bhukti to get its full Antarams
+        const originalStart = fullFirstDasaSubPeriods.find(p => p.planet === bhukti.planet)?.startDate || bhukti.startDate;
+        const originalDuration = (birthDashaTotalYears * DASHA_YEARS[bhukti.planet]) / 120; // Re-calc standard duration
+
+        const fullAntarams = generateSubPeriods(bhukti.planet, originalStart, originalDuration, 'Antaram', birthLord);
+
+        // Filter Antarams similar to Bhuktis
+        bhukti.subPeriods = fullAntarams.filter(ap => ap.endDate > birthDate).map(ap => {
+            if (ap.startDate < birthDate) {
+                return {
+                    ...ap,
+                    startDate: new Date(birthDate),
+                    durationYears: (ap.endDate.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+                };
+            }
+            return ap;
+        });
+    });
+
     periods.push({
         planet: birthLord,
-        startDate: new Date(currentDate),
-        endDate: new Date(endDate),
+        startDate: new Date(birthDate),
+        endDate: new Date(janmaDasaEndDate),
         durationYears: birthDashaBalanceYears,
-        level: 'Maha'
+        level: 'Maha',
+        subPeriods: validFirstDasaSubPeriods
     });
-    currentDate = endDate;
 
+    let currentDate = janmaDasaEndDate;
     const birthLordIndex = DASHA_ORDER.indexOf(birthLord);
 
-    // Continue cycle from next planet
+    // Continue cycle from next planet (Rest are normal)
     for (let i = 1; i <= 9; i++) {
         const nextIndex = (birthLordIndex + i) % 9;
         const planet = DASHA_ORDER[nextIndex];
         const duration = DASHA_YEARS[planet];
 
-        endDate = addSiderealYears(currentDate, duration);
+        let endDate = addSiderealYears(currentDate, duration);
+
+        // Generate Standard Sub-periods
+        const subPeriods = generateSubPeriods(planet, currentDate, duration, 'Bhukti');
+
+        // Generate Antarams
+        subPeriods.forEach(bhukti => {
+            bhukti.subPeriods = generateSubPeriods(bhukti.planet, bhukti.startDate, bhukti.durationYears, 'Antaram', planet);
+        });
+
         periods.push({
             planet,
             startDate: new Date(currentDate),
             endDate: new Date(endDate),
             durationYears: duration,
-            level: 'Maha'
+            level: 'Maha',
+            subPeriods
         });
         currentDate = endDate;
     }
-
-    // 3. Generate Bhuktis and Antarams for each Maha Dasha
-    periods.forEach(maha => {
-        maha.subPeriods = generateSubPeriods(maha.planet, maha.startDate, maha.durationYears, 'Bhukti');
-
-        // Generate Antarams for current Bhukti
-        maha.subPeriods.forEach(bhukti => {
-            bhukti.subPeriods = generateSubPeriods(bhukti.planet, bhukti.startDate, bhukti.durationYears, 'Antaram', maha.planet);
-        });
-    });
 
     return periods;
 };

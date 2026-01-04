@@ -7,7 +7,9 @@ import { useAuth } from '../contexts/AuthContext';
 import PlanetaryBackground from './PlanetaryBackground';
 import Logo from '/logo2.png';
 import FeatureAccessPopup from './FeatureAccessPopup';
+import WelcomeFeaturesModal from './WelcomeFeaturesModal';
 import Footer from './Footer';
+import DevToolsBlocker from './DevToolsBlocker';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
@@ -16,6 +18,24 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     const { user } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
     const [showFeaturePopup, setShowFeaturePopup] = React.useState(false);
+    const [showWelcomeModal, setShowWelcomeModal] = React.useState(false);
+
+    React.useEffect(() => {
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault();
+        };
+        document.addEventListener('contextmenu', handleContextMenu);
+        return () => document.removeEventListener('contextmenu', handleContextMenu);
+    }, []);
+
+    React.useEffect(() => {
+        const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
+        if (!hasSeenWelcome) {
+            // Small delay to ensure smooth entrance
+            const timer = setTimeout(() => setShowWelcomeModal(true), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     const navItems = [
         { type: 'link', path: '/', label: t.nav.birthDetails, icon: MapPin, color: 'text-blue-400' },
@@ -39,6 +59,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950 text-white selection:bg-purple-500/30">
+            {/* Advanced Security Shield */}
+            <DevToolsBlocker />
+
             {/* Animated Star Field */}
             <div className="fixed inset-0 z-0 pointer-events-none">
                 {[...Array(100)].map((_, i) => (
@@ -360,6 +383,14 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <FeatureAccessPopup
                 isOpen={showFeaturePopup}
                 onClose={() => setShowFeaturePopup(false)}
+            />
+
+            <WelcomeFeaturesModal
+                isOpen={showWelcomeModal}
+                onClose={() => {
+                    setShowWelcomeModal(false);
+                    localStorage.setItem('hasSeenWelcome', 'true');
+                }}
             />
         </div>
     );

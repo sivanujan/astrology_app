@@ -111,7 +111,7 @@ const GurujiPersonaModal: React.FC<GurujiPersonaModalProps> = ({ isOpen, onClose
                     className="bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden shadow-2xl shadow-purple-900/50 flex flex-col"
                 >
                     {/* Header */}
-                    <div className={`p-6 border-b border-white/10 flex justify-between items-center bg-gradient-to-r ${isDarkSideActivated ? 'from-red-900/60 to-slate-900' : 'from-purple-900/40 to-slate-900'}`}>
+                    <div className={`p-4 md:p-6 border-b border-white/10 flex justify-between items-start gap-4 bg-gradient-to-r ${isDarkSideActivated ? 'from-red-900/60 to-slate-900' : 'from-purple-900/40 to-slate-900'}`}>
                         <div className="flex items-center gap-3">
                             <Sparkles className={`w-6 h-6 ${isDarkSideActivated ? 'text-red-500' : 'text-yellow-400'} animate-pulse`} />
                             <h2 className="text-xl md:text-2xl font-bold text-white">
@@ -123,7 +123,11 @@ const GurujiPersonaModal: React.FC<GurujiPersonaModalProps> = ({ isOpen, onClose
                                 </span>
                             </h2>
                         </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                        <button
+                            onClick={onClose}
+                            className="p-2 -mr-2 text-slate-400 hover:text-white transition-colors shrink-0 rounded-full hover:bg-white/10"
+                            aria-label="Close"
+                        >
                             <X className="w-6 h-6" />
                         </button>
                     </div>
@@ -203,6 +207,16 @@ const GurujiPersonaModal: React.FC<GurujiPersonaModalProps> = ({ isOpen, onClose
                                                 {language === 'ta' ? 'எச்சரிக்கை: அதிர்ச்சியான உண்மைகளைக் காட்டு' : 'WARNING: Show Shocking Secrets'}
                                             </button>
                                         </div>
+                                        {!loading && (
+                                            <div className="pt-8 pb-4 flex justify-center">
+                                                <button
+                                                    onClick={onClose}
+                                                    className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full text-sm font-medium transition-colors border border-slate-700"
+                                                >
+                                                    {language === 'ta' ? 'மூடுக' : 'Close'}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

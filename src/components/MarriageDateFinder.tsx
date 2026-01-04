@@ -112,14 +112,14 @@ const MarriageDateFinder: React.FC = () => {
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white/5 rounded-2xl p-6 md:p-8 backdrop-blur-xl border border-white/10"
+                className="bg-white/5 rounded-2xl p-4 md:p-8 backdrop-blur-xl border border-white/10 relative z-20"
             >
                 <div className="flex items-center gap-3 mb-6">
                     <div className="p-3 bg-purple-500/20 rounded-xl text-purple-400">
                         <Calendar className="w-8 h-8" />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl md:text-2xl font-bold text-white">
                             {isTamil ? 'திருமண காலம் அறிய' : 'Find Marriage Timing'}
                         </h2>
                         <p className="text-slate-400 text-sm">
@@ -140,7 +140,7 @@ const MarriageDateFinder: React.FC = () => {
                             type="text"
                             value={details.name}
                             onChange={(e) => setDetails({ ...details, name: e.target.value })}
-                            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                            className="w-full min-w-0 appearance-none px-3 md:px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-base text-white"
                         />
                     </div>
 
@@ -152,7 +152,7 @@ const MarriageDateFinder: React.FC = () => {
                         <select
                             value={details.gender}
                             onChange={(e) => setDetails({ ...details, gender: e.target.value as 'male' | 'female' })}
-                            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                            className="w-full min-w-0 appearance-none px-3 md:px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-base text-white"
                         >
                             <option value="male">{isTamil ? 'ஆண்' : 'Male'}</option>
                             <option value="female">{isTamil ? 'பெண்' : 'Female'}</option>
@@ -168,7 +168,7 @@ const MarriageDateFinder: React.FC = () => {
                             type="date"
                             value={details.date}
                             onChange={(e) => setDetails({ ...details, date: e.target.value })}
-                            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                            className="w-full min-w-0 appearance-none px-3 md:px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-base text-white"
                         />
                     </div>
 
@@ -181,7 +181,7 @@ const MarriageDateFinder: React.FC = () => {
                             type="time"
                             value={details.time}
                             onChange={(e) => setDetails({ ...details, time: e.target.value })}
-                            className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                            className="w-full min-w-0 appearance-none px-3 md:px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-base text-white"
                         />
                     </div>
 

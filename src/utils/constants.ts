@@ -35,6 +35,11 @@ export const PLANET_SYMBOLS = {
     Jupiter: "Ju", Venus: "Ve", Saturn: "Sa", Rahu: "Ra", Ketu: "Ke"
 };
 
+export const PLANET_UNICODE = {
+    Sun: "☉", Moon: "☽", Mars: "♂", Mercury: "☿",
+    Jupiter: "♃", Venus: "♀", Saturn: "♄", Rahu: "🐲", Ketu: "🐍"
+};
+
 // 0=Aries, 1=Taurus, ... 11=Pisces
 export const SIGN_LORDS = [
     "Mars",    // Aries

@@ -31,14 +31,14 @@ const PersonForm: React.FC<{
     <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`bg-gradient-to-br ${color} rounded-2xl p-6 shadow-2xl border border-white/10`}
+        className={`bg-gradient-to-br ${color} rounded-2xl p-4 md:p-6 shadow-2xl border border-white/10`}
     >
         <div className="flex items-center gap-3 mb-6">
             <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
                 <Icon className="w-8 h-8" />
             </div>
             <div>
-                <h2 className="text-2xl font-bold">{isTamil ? titleTamil : title}</h2>
+                <h2 className="text-xl md:text-2xl font-bold">{isTamil ? titleTamil : title}</h2>
                 <p className="text-sm opacity-75">
                     {isTamil ? 'பிறப்பு விவரங்கள்' : 'Birth Details'}
                 </p>
@@ -55,7 +55,7 @@ const PersonForm: React.FC<{
                     type="text"
                     value={person.name}
                     onChange={(e) => setPerson({ ...person, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-white placeholder-white/50"
+                    className="w-full min-w-0 appearance-none px-3 md:px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-base text-white placeholder-white/50"
                     placeholder={isTamil ? 'பெயரை உள்ளிடவும்' : 'Enter name'}
                 />
             </div>
@@ -69,7 +69,7 @@ const PersonForm: React.FC<{
                     type="date"
                     value={person.date}
                     onChange={(e) => setPerson({ ...person, date: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-white"
+                    className="w-full min-w-0 appearance-none px-3 md:px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-base text-white"
                 />
             </div>
 
@@ -82,11 +82,11 @@ const PersonForm: React.FC<{
                     type="time"
                     value={person.time}
                     onChange={(e) => setPerson({ ...person, time: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-white"
+                    className="w-full min-w-0 appearance-none px-3 md:px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-base text-white"
                 />
             </div>
 
-            <div>
+            <div className="relative z-20">
                 <PlaceSearch
                     value={person.birthPlace}
                     onChange={(place) => setPerson({
@@ -100,7 +100,7 @@ const PersonForm: React.FC<{
                 />
             </div>
 
-            <div>
+            <div className="relative z-10">
                 <PlaceSearch
                     value={person.currentPlace}
                     onChange={(place) => setPerson({
@@ -180,8 +180,8 @@ const ComprehensiveMarriageMatching: React.FC<{ embedded?: boolean }> = ({ embed
     };
 
     return (
-        <div className={embedded ? "" : "min-h-screen p-4"}>
-            <div className={embedded ? "max-w-7xl mx-auto" : "max-w-7xl mx-auto py-8"}>
+        <div className={embedded ? "" : "min-h-screen p-3 md:p-4"}>
+            <div className={embedded ? "max-w-7xl mx-auto" : "max-w-7xl mx-auto py-4 md:py-8 pb-24"}>
                 {/* Page Header - Only show if not embedded */}
                 {!embedded && (
                     <motion.div

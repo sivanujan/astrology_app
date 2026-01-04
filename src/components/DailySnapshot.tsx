@@ -24,88 +24,189 @@ interface DailySnapshotProps {
 
 const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
     const { t, language } = useLanguage();
+    const [localData, setLocalData] = React.useState<any>(data);
+    const [isLoading, setIsLoading] = React.useState(!data);
 
-    if (!data) return null;
+    React.useEffect(() => {
+        if (data) {
+            setLocalData(data);
+            setIsLoading(false);
+        } else {
+            // Try to hydrate from localStorage if prop is missing
+            try {
+                const stored = localStorage.getItem('astrology_chart_data');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    console.log('[DailySnapshot] Hydrated from localStorage');
+                    setLocalData(parsed);
+                }
+            } catch (e) {
+                console.error('Failed to parse chart data', e);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    }, [data]);
 
-    const { planets, ascendant, userDetails } = data;
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-4">
+                <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-slate-400 animate-pulse">Loading planetary data...</p>
+            </div>
+        );
+    }
+
+    if (!localData) {
+        return (
+            <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center">
+                <AlertTriangle className="w-12 h-12 text-slate-600 mb-4" />
+                <h3 className="text-xl font-bold text-slate-300 mb-2">
+                    {language === 'ta' ? 'ஜாதகத் தரவுகள் இல்லை' : 'No Chart Data Found'}
+                </h3>
+                <p className="text-slate-400 mb-6">
+                    {language === 'ta'
+                        ? 'தொடர தயவுசெய்து உங்கள் பிறந்த விவரங்களை மீண்டும் உள்ளிடவும்.'
+                        : 'Please enter your birth details again to continue.'}
+                </p>
+                <a href="/" className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors">
+                    {language === 'ta' ? 'முகப்பு பக்கம்' : 'Go Home'}
+                </a>
+            </div>
+        );
+    }
+
+    const { planets, ascendant, userDetails } = localData;
     const moon = planets.find((p: any) => p.name === 'Moon');
 
     if (!moon) return <div className="text-center p-8 text-slate-400">Moon position not found.</div>;
 
-    // Reconstruct birthDate if needed (same fix as DashaPeriods)
-    let birthDate = data.birthDate;
+    // Reconstruct birthDate safely for iOS (Safari hates mismatched date strings)
+    let birthDate = localData.birthDate;
     if (!birthDate || typeof birthDate === 'string' || !(birthDate instanceof Date) || isNaN(birthDate.getTime())) {
         if (userDetails?.date && userDetails?.time) {
-            birthDate = new Date(`${userDetails.date}T${userDetails.time}`);
-            console.log('[DailySnapshot] Reconstructed birthDate from userDetails:', birthDate);
+            try {
+                // Manual parsing to satisfy iOS Safari
+                const dPart = userDetails.date.includes('T') ? userDetails.date.split('T')[0] : userDetails.date;
+                const [y, m, d] = dPart.split(/[-/]/).map(Number);
+                const [hr, min] = userDetails.time.split(':').map(Number);
+
+                // Note: Month is 0-indexed in JS Date
+                birthDate = new Date(y, m - 1, d, hr, min);
+                console.log('[DailySnapshot] Reconstructed birthDate manually:', birthDate);
+            } catch (e) {
+                console.error('[DailySnapshot] Manual date parse failed, falling back to string:', e);
+                birthDate = new Date(`${userDetails.date}T${userDetails.time}`);
+            }
         } else {
             console.error('[DailySnapshot] Cannot reconstruct birthDate - missing userDetails');
             return <div className="text-center p-8 text-slate-400">Birth date information missing.</div>;
         }
     }
 
-    // 1. Calculate Dasa Status
-    const dashaPeriods = calculateDashaPeriods(birthDate, moon.longitude);
-    const currentDasha = getCurrentDasha(dashaPeriods);
 
-    let dasaStatus: 'Good' | 'Bad' | 'Neutral' = 'Neutral';
-    let dasaDescription = "Neutral Period";
 
-    // ADITYA GURUJI LOGIC: Dasa Strength is King
-    // If Dasa Lord is Subathuva (Score > 50 or isSubathuva), it protects.
-    if (currentDasha && currentDasha.maha) {
-        const dasaLordName = currentDasha.maha.planet;
-
-        // Calculate Subathuvam for the whole chart to check Dasa Lord
-        const subathuvamResults = calculateAdityaGurujiSubathuvam(data.planets);
-        const dasaLordStats = subathuvamResults[dasaLordName];
-
-        if (dasaLordStats) {
-            if (dasaLordStats.isSubathuva || dasaLordStats.totalScore >= 50) {
-                dasaStatus = 'Good';
-                dasaDescription = `${dasaLordName} (Subathuvam - Strong)`;
-            } else if (dasaLordStats.totalScore < 30) {
-                // Check if it's a Functional Benefic at least?
-                const functionalNature = getFunctionalNature(ascendant.signIndex);
-                const nature = functionalNature[dasaLordName]?.nature;
-
-                if (nature === 'Yogakaraka') {
-                    dasaStatus = 'Good'; // Yogakaraka gives good results even if weakish
-                    dasaDescription = `${dasaLordName} (Yogakaraka - Good)`;
-                } else {
-                    dasaStatus = 'Bad';
-                    dasaDescription = `${dasaLordName} (Papathuvam - Weak)`;
-                }
-            } else {
-                dasaStatus = 'Neutral';
-                dasaDescription = `${dasaLordName} (Moderate)`;
-            }
-        } else {
-            // Fallback to old Functional Nature logic if Subathuvam fails
-            const functionalNature = getFunctionalNature(ascendant.signIndex);
-            const nature = functionalNature[dasaLordName]?.nature;
-            if (nature === 'Yogakaraka' || nature === 'Benefic') {
-                dasaStatus = 'Good';
-                dasaDescription = `${dasaLordName} (Functional Benefic)`;
-            } else if (nature === 'Malefic' || nature === 'Maraka') {
-                dasaStatus = 'Bad';
-                dasaDescription = `${dasaLordName} (Functional Malefic)`;
-            }
-        }
+    // Final validation of birthDate
+    if (!birthDate || isNaN(birthDate.getTime())) {
+        return (
+            <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center">
+                <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+                <h3 className="text-xl font-bold text-slate-300 mb-2">Invalid Date</h3>
+                <p className="text-slate-400 mb-4">Could not understand the birth date format.</p>
+                <button
+                    onClick={() => {
+                        localStorage.removeItem('astrology_chart_data');
+                        window.location.reload();
+                    }}
+                    className="px-6 py-2 bg-slate-700 text-white rounded-lg"
+                >
+                    Reset Data
+                </button>
+            </div>
+        );
     }
 
-    // 2. Calculate Transits
-    const fullTransitChart = calculateFullTransitChart();
+    // WRAPPING CALCULATIONS IN TRY-CATCH TO PREVENT CRASHES
+    let snapshot;
+    let dasaStatus: 'Good' | 'Bad' | 'Neutral' = 'Neutral';
+    let dasaDescription = "Neutral Period";
+    let fullTransitChart;
 
-    // 3. Get Snapshot
-    const snapshot = getDailySnapshot(
-        moon.signIndex,
-        ascendant.signIndex,
-        dasaStatus,
-        fullTransitChart,
-        { ...data, birthDate },
-        language as 'en' | 'ta'
-    );
+    try {
+        // 1. Calculate Dasa Status
+        const dashaPeriods = calculateDashaPeriods(birthDate, moon.longitude);
+        const currentDasha = getCurrentDasha(dashaPeriods);
+
+        // ADITYA GURUJI LOGIC: Dasa Strength is King
+        // If Dasa Lord is Subathuva (Score > 50 or isSubathuva), it protects.
+        if (currentDasha && currentDasha.maha) {
+            const dasaLordName = currentDasha.maha.planet;
+
+            // Calculate Subathuvam for the whole chart to check Dasa Lord
+            const subathuvamResults = calculateAdityaGurujiSubathuvam(localData.planets);
+            const dasaLordStats = subathuvamResults[dasaLordName];
+
+            if (dasaLordStats) {
+                if (dasaLordStats.isSubathuva || dasaLordStats.totalScore >= 50) {
+                    dasaStatus = 'Good';
+                    dasaDescription = `${dasaLordName} (Subathuvam - Strong)`;
+                } else if (dasaLordStats.totalScore < 30) {
+                    // Check if it's a Functional Benefic at least?
+                    const functionalNature = getFunctionalNature(ascendant.signIndex);
+                    const nature = functionalNature[dasaLordName]?.nature;
+
+                    if (nature === 'Yogakaraka') {
+                        dasaStatus = 'Good'; // Yogakaraka gives good results even if weakish
+                        dasaDescription = `${dasaLordName} (Yogakaraka - Good)`;
+                    } else {
+                        dasaStatus = 'Bad';
+                        dasaDescription = `${dasaLordName} (Papathuvam - Weak)`;
+                    }
+                } else {
+                    dasaStatus = 'Neutral';
+                    dasaDescription = `${dasaLordName} (Moderate)`;
+                }
+            } else {
+                // Fallback to old Functional Nature logic if Subathuvam fails
+                const functionalNature = getFunctionalNature(ascendant.signIndex);
+                const nature = functionalNature[dasaLordName]?.nature;
+                if (nature === 'Yogakaraka' || nature === 'Benefic') {
+                    dasaStatus = 'Good';
+                    dasaDescription = `${dasaLordName} (Functional Benefic)`;
+                } else if (nature === 'Malefic' || nature === 'Maraka') {
+                    dasaStatus = 'Bad';
+                    dasaDescription = `${dasaLordName} (Functional Malefic)`;
+                }
+            }
+        }
+
+        // 2. Calculate Transits
+        fullTransitChart = calculateFullTransitChart();
+
+        // 3. Get Snapshot
+        snapshot = getDailySnapshot(
+            moon.signIndex,
+            ascendant.signIndex,
+            dasaStatus,
+            fullTransitChart,
+            { ...localData, birthDate },
+            language as 'en' | 'ta'
+        );
+    } catch (calcError) {
+        console.error("Critical calculation error in DailySnapshot:", calcError);
+        return (
+            <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 text-center">
+                <AlertTriangle className="w-12 h-12 text-red-400 mb-4" />
+                <h3 className="text-xl font-bold text-slate-300 mb-2">Calculation Error</h3>
+                <p className="text-slate-400 mb-4">
+                    Something went wrong while calculating your forecast.
+                </p>
+                <div className="bg-slate-900/50 p-4 rounded text-left text-xs font-mono text-red-300 mb-6 max-w-sm overflow-auto">
+                    {String(calcError)}
+                </div>
+            </div>
+        );
+    }
 
     const getStatusColor = (type: string) => {
         switch (type) {
@@ -135,7 +236,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                 setGeneratingDate(dateKey);
                 try {
                     const prediction = await getOrGenerateDailyForecast(
-                        data.userDetails?.uid || "anonymous",
+                        localData.userDetails?.uid || "anonymous",
                         {
                             date: day.date,
                             dasaLord: day.dasaLord,
@@ -196,7 +297,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
     const riskLevel: 'high' | 'medium' | 'low' = snapshot?.verdict.type === 'danger' ? 'high' : snapshot?.verdict.type === 'warning' ? 'medium' : 'low';
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-8 px-4 md:px-0">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -212,7 +313,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
 
                 {/* Push Notification Trigger */}
                 <div className="mt-4 flex justify-center">
-                    <PushOptIn uid={data.userDetails?.uid || "anonymous"} />
+                    <PushOptIn uid={localData.userDetails?.uid || "anonymous"} />
                 </div>
             </motion.div>
 
