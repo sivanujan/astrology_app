@@ -36,7 +36,18 @@ const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
 
   // ... (existing hydration logic)
-  const hasData = chartData || localStorage.getItem('astrology_chart_data');
+  // Check if we have data in state, storage, or URL params (for sharing)
+  // Check if we have data in state, storage, or URL params (for sharing)
+  // Use useMemo to check synchronously on first render
+  const urlParamsValid = React.useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.has('n') && params.has('d') && params.has('t');
+    }
+    return false;
+  }, []); // Empty dependency array means it checks once on mount, which is fine for initial route check
+
+  const hasData = chartData || localStorage.getItem('astrology_chart_data') || urlParamsValid;
 
   return (
     <Routes>
@@ -120,14 +131,12 @@ const AppRoutes = () => {
       } />
 
       <Route path="/analysis" element={
-        <ProtectedRoute>
-          {hasData ? (
-            <>
-              <SEO title="Detailed Chart Analysis" />
-              <ChartAnalysis data={chartData} />
-            </>
-          ) : <Navigate to="/" />}
-        </ProtectedRoute>
+        hasData ? (
+          <>
+            <SEO title="Detailed Chart Analysis" />
+            <ChartAnalysis data={chartData} />
+          </>
+        ) : <Navigate to="/" />
       } />
 
       <Route path="/dasha" element={

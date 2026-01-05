@@ -47,8 +47,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             items: [
                 { path: '/chart', label: t.nav.chart, icon: Moon, color: 'text-yellow-300' },
                 { path: '/dasha', label: t.dasha.title, icon: Clock, color: 'text-green-400' },
-                { path: '/daily-snapshot', label: t.nav.dailySnapshot, icon: Sun, color: 'text-orange-400', protected: true },
-                { path: '/analysis', label: t.analysis.title, icon: FileText, color: 'text-pink-400', protected: true }
+                { path: '/analysis', label: t.analysis.title, icon: FileText, color: 'text-pink-400', protected: true },
+                { path: '/daily-snapshot', label: t.nav.dailySnapshot, icon: Sun, color: 'text-orange-400', protected: true }
             ]
         },
         { type: 'link', path: '/predictions', label: t.nav.predictions, icon: Sparkles, color: 'text-teal-400', protected: true },

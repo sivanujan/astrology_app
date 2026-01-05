@@ -11,6 +11,7 @@ const FunctionalStatusAnalysis = React.lazy(() => import('./analysis/FunctionalS
 const SpecialPredictionsAnalysis = React.lazy(() => import('./analysis/SpecialPredictionsAnalysis'));
 const ShadowPlanetAnalysis = React.lazy(() => import('./analysis/ShadowPlanetAnalysis'));
 import { ChevronDown, ChevronUp, Star, AlertTriangle, Crown, Activity, Eye, ArrowRight, Share2 } from 'lucide-react';
+import ShareChartButton from './ShareChartButton';
 import { NAKSHATRAS, ZODIAC_SIGNS, TAMIL_RASI_NAMES, PLANET_SYMBOLS } from '../utils/constants';
 import {
     getNakshatra,
@@ -94,35 +95,6 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
     const { planets, ascendant } = activeChart;
     const userDetails = activeChart.userDetails || {}; // Fallback for name
 
-    const handleShare = async () => {
-        try {
-            const { generateSingleChartShareLink } = await import('../utils/urlUtils');
-            // Assuming we have access to user details from somewhere, but data might be clean chart data.
-            // If data came from context, we might rely on props passed down or context state. 
-            // For now, if hydrated, we have details. If from props? 
-            // Ideally ChartAnalysis receives 'userDetails' in data prop too.
-            if (activeChart.userDetails) {
-                const link = generateSingleChartShareLink('/analysis', activeChart.userDetails);
-                await navigator.clipboard.writeText(link);
-                alert(language === 'ta' ? 'இணைப்பு நகலெடுக்கப்பட்டது!' : 'Link copied to clipboard!');
-            } else {
-                alert("Cannot share this chart (missing details)");
-            }
-        } catch (e) {
-            console.error("Share failed", e);
-        }
-    };
-
-    // Header with Share Button (Only if details exist)
-    const ShareButton = () => (
-        <button
-            onClick={handleShare}
-            className="mb-6 flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors border border-blue-500/30 w-fit"
-        >
-            <Share2 className="w-5 h-5" />
-            {language === 'ta' ? 'பகிர்' : 'Share Chart'}
-        </button>
-    );
     const [expandedSection, setExpandedSection] = useState<string | null>('planets');
 
 
@@ -164,7 +136,7 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
                 <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-orange-500">
                     {language === 'ta' ? 'ஜாதக ஆய்வு' : 'Chart Analysis'}
                 </h2>
-                {activeChart.userDetails && <ShareButton />}
+                {activeChart.userDetails && <ShareChartButton />}
             </div>
             <motion.div
                 initial={{ opacity: 0, y: 20 }}

@@ -12,6 +12,7 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'fire
 import { Save, CheckCircle, AlertCircle, Share2 } from 'lucide-react';
 import ShareModal from './ShareModal';
 import { ShareData } from '../utils/shareUtils';
+import ShareChartButton from './ShareChartButton';
 
 interface SouthIndianChartProps {
     data: any;
@@ -139,6 +140,9 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
 
             {user && (
                 <div className="flex justify-end gap-3 mb-4 px-4">
+                    {/* Share Link Button */}
+                    <ShareChartButton />
+
                     {/* Share Button */}
                     <motion.button
                         whileHover={{ scale: 1.05 }}

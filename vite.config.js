@@ -10,6 +10,9 @@ export default defineConfig({
   ],
   server: {
     host: true, // Exposes the server to the local network
+    allowedHosts: [
+      'c3fc330b78e5.ngrok-free.app'
+    ],
     headers: {
       'Cross-Origin-Opener-Policy': 'unsafe-none',
       'Cross-Origin-Embedder-Policy': 'unsafe-none',

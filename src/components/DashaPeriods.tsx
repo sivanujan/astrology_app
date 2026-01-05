@@ -11,6 +11,7 @@ import { calculateDasaScore, DasaQuality } from '../utils/dashaScoring';
 import DashaStatsCard from './DashaStatsCard';
 import DashaProgressBar from './DashaProgressBar';
 import PlanetInfoTooltip from './PlanetInfoTooltip';
+import ShareChartButton from './ShareChartButton';
 
 
 interface DashaPeriodsProps {
@@ -120,6 +121,9 @@ const DashaPeriods: React.FC<DashaPeriodsProps> = ({ data }) => {
                     {t.dasha.title}
                 </h2>
                 <p className="text-slate-400">{t.dasha.timeline}</p>
+                <div className="mt-4 flex justify-center">
+                    <ShareChartButton />
+                </div>
             </motion.div>
 
             {/* Stats Dashboard */}
