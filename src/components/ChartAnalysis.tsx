@@ -12,6 +12,7 @@ const SpecialPredictionsAnalysis = React.lazy(() => import('./analysis/SpecialPr
 const ShadowPlanetAnalysis = React.lazy(() => import('./analysis/ShadowPlanetAnalysis'));
 import { ChevronDown, ChevronUp, Star, AlertTriangle, Crown, Activity, Eye, ArrowRight, Share2 } from 'lucide-react';
 import ShareChartButton from './ShareChartButton';
+import SubathuvamIntroModal from './SubathuvamIntroModal';
 import { NAKSHATRAS, ZODIAC_SIGNS, TAMIL_RASI_NAMES, PLANET_SYMBOLS } from '../utils/constants';
 import {
     getNakshatra,
@@ -88,6 +89,22 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
             }
         }
     }, [activeChart]);
+
+    // Subathuvam Intro Modal Logic
+    const [showSubathuvamModal, setShowSubathuvamModal] = useState(false);
+    React.useEffect(() => {
+        const hasSeenIntro = localStorage.getItem('hasSeenSubathuvamIntro');
+        if (!hasSeenIntro && activeChart) {
+            // Short delay for smooth entrance
+            const timer = setTimeout(() => setShowSubathuvamModal(true), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [activeChart]);
+
+    const handleCloseSubathuvamModal = () => {
+        setShowSubathuvamModal(false);
+        localStorage.setItem('hasSeenSubathuvamIntro', 'true');
+    };
 
     if (loading) return <div className="p-12 text-center text-slate-400">Loading Chart...</div>;
     if (!activeChart) return null;
@@ -203,6 +220,11 @@ const ChartAnalysis: React.FC<ChartAnalysisProps> = ({ data }) => {
             </React.Suspense>
 
             {/* Guruji's Predictions (FAQ) - Moved to separate page */}
+
+            <SubathuvamIntroModal
+                isOpen={showSubathuvamModal}
+                onClose={handleCloseSubathuvamModal}
+            />
         </div>
     );
 };
