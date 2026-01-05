@@ -30,6 +30,7 @@ app.use('/api/auth', authRoutes);
 // Routes
 // app.use('/api/whatsapp', require('./routes/whatsapp')); // Deprecated
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/contact', require('./routes/contact'));
 // const userRoutes = require('./routes/user');
 // const ruleRoutes = require('./routes/rules');
 // app.use('/api/users', userRoutes);

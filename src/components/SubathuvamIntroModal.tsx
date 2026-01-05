@@ -35,10 +35,10 @@ const SubathuvamIntroModal: React.FC<SubathuvamIntroModalProps> = ({ isOpen, onC
                         <div className="bg-slate-900 border border-purple-500/30 w-full max-w-lg rounded-2xl shadow-2xl pointer-events-auto overflow-hidden">
                             {/* Header */}
                             <div className="relative h-32 bg-gradient-to-r from-violet-600 to-indigo-600 p-6 flex flex-col justify-center overflow-hidden">
-                                <div className="absolute top-0 right-0 p-4">
+                                <div className="absolute top-0 right-0 p-4 z-50 pointer-events-auto">
                                     <button
                                         onClick={onClose}
-                                        className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                                        className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>

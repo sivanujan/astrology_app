@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart, ChevronDown, FileText, Activity } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart, ChevronDown, FileText, Activity, Phone } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -52,7 +52,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             ]
         },
         { type: 'link', path: '/predictions', label: t.nav.predictions, icon: Sparkles, color: 'text-teal-400', protected: true },
-        { type: 'link', path: '/marriage-tools', label: language === 'ta' ? 'திருமண கருவிகள்' : 'Marriage Tools', icon: Heart, color: 'text-red-400' }
+        { type: 'link', path: '/marriage-tools', label: language === 'ta' ? 'திருமண கருவிகள்' : 'Marriage Tools', icon: Heart, color: 'text-red-400' },
+        { type: 'link', path: '/contact', label: language === 'ta' ? 'தொடர்புக்கு' : 'Contact Us', icon: Phone, color: 'text-indigo-400' }
     ];
 
 

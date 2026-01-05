@@ -31,6 +31,7 @@ import InstallPWA from './components/InstallPWA';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import NotFound from './pages/NotFound';
+import Contact from './pages/Contact';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
@@ -56,6 +57,12 @@ const AppRoutes = () => {
         <>
           <SEO title="Free Horoscope & Astrology Predictions" description="Generate your complete Vedic Astrology chart and get instant predictions about career, marriage, and health." />
           <InputForm />
+        </>
+      } />
+      <Route path="/contact" element={
+        <>
+          <SEO title="Contact Us - AstroZen" />
+          <Contact />
         </>
       } />
       <Route path="/login" element={
