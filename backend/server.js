@@ -55,6 +55,7 @@ app.use((err, req, res, next) => {
 });
 
 const { initJob } = require('./jobs/dailyForecast');
+const { checkDasaChanges } = require('./jobs/dasaMonitor');
 
 // Start Server
 const PORT = process.env.PORT || 5000;
@@ -64,4 +65,9 @@ app.listen(PORT, () => {
 
     // Initialize Jobs
     initJob();
+
+    // Run Dasa Monitor every 24 hours (86400000 ms)
+    // Also run once on startup for demonstration/checks
+    checkDasaChanges();
+    setInterval(checkDasaChanges, 86400000);
 });

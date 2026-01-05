@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #4a3b2a;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #ffffff;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        .period-card {
+            background-color: #fff8e1;
+            border-left: 5px solid #ffb300;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #7f8c8d;
+            letter-spacing: 1px;
+        }
+
+        .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏳ Significant Time Change Detected</h1>
+        </div>
+        <div class="content">
+            <h2>Hello {{name}},</h2>
+            <p>We noticed a major shift in the planetary periods for <strong>{{chartName}}</strong>.</p>
+
+            <div class="period-card">
+                <div class="label">New {{changeType}} Started</div>
+                <div class="value">{{newPeriod}}</div>
+                <div class="label" style="margin-top: 8px;">Date of Change</div>
+                <div>{{changeDate}}</div>
+            </div>
+
+            <p><strong>What does this mean for you?</strong></p>
+            <p>This change signifies a shift in energy. To understand the full predictions, career impacts, and
+                relationship advice associated with this new period, please visit your full report.</p>
+
+            <a href="{{chart_url}}" class="btn">View Full Prediction & Remedies</a>
+        </div>
+        <div class="footer">
+            <p>You are receiving this because you subscribed to Dasa Alerts for this chart.</p>
+            <p><a href="{{dashboard_url}}" style="color: #999;">Unsubscribe</a></p>
+            <p>&copy; 2026 AstroZen. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+
+</html>

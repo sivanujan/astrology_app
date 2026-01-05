@@ -16,7 +16,7 @@ import { db } from '../lib/firebase';
 
 const InputForm: React.FC = () => {
     const navigate = useNavigate();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { setChartData } = useChartData();
     const { user } = useAuth();
     const [formData, setFormData] = useState({
@@ -44,6 +44,10 @@ const InputForm: React.FC = () => {
         date: { isValid: false, error: '' },
         time: { isValid: false, error: '' },
         city: { isValid: false, error: '' }
+    });
+
+    const [bookingWarnings, setBookingWarnings] = useState<{ timeAccuracy: boolean | null }>({
+        timeAccuracy: null
     });
 
     // Lagna identification state - DISABLED FOR NOW
@@ -451,6 +455,51 @@ const InputForm: React.FC = () => {
                                     )}
                                 </div>
 
+                                {formData.time && (
+                                    <div className="mt-3 bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                                        <p className="text-sm text-slate-300 mb-2">
+                                            {language === 'ta' ? 'பிறந்த நேரம் துல்லியமானதா?' : 'Is this birth time accurate?'}
+                                        </p>
+                                        <div className="flex gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setBookingWarnings({ ...bookingWarnings, timeAccuracy: true })}
+                                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${bookingWarnings.timeAccuracy === true
+                                                    ? 'bg-green-500/20 text-green-300 border border-green-500/50'
+                                                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                                    }`}
+                                            >
+                                                {language === 'ta' ? 'ஆம், துல்லியம்' : 'Yes, Exact'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBookingWarnings({ ...bookingWarnings, timeAccuracy: false })}
+                                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${bookingWarnings.timeAccuracy === false
+                                                    ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/50'
+                                                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                                    }`}
+                                            >
+                                                {language === 'ta' ? 'இல்லை / சந்தேகம்' : 'No / Not Sure'}
+                                            </button>
+                                        </div>
+
+                                        {bookingWarnings.timeAccuracy === false && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                className="mt-3 flex items-start gap-2 text-yellow-200/90 text-xs bg-yellow-500/10 p-2 rounded border border-yellow-500/20"
+                                            >
+                                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                <span>
+                                                    {language === 'ta'
+                                                        ? 'எச்சரிக்கை: தவறான நேரம் தசா/புக்தி கணிப்புகளில் பல மாத மாறுபாடுகளை ஏற்படுத்தலாம். துல்லியமான பலன்களுக்கு சரியான நேரத்தை உள்ளிடவும்.'
+                                                        : 'Warning: Inaccurate time may cause Dasa/Bhukti prediction mismatches of several months. Please ensure accuracy for best results.'}
+                                                </span>
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* DISABLED: I don't know my birth time checkbox */}
                                 {/* <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-slate-300 transition-colors mt-2">
                                 <input
@@ -505,7 +554,7 @@ const InputForm: React.FC = () => {
                                             }));
                                         }
                                     }}
-                                    className="w-full min-w-0 appearance-none bg-slate-800/60 border border-slate-600 rounded-lg px-3 md:px-4 py-3 pl-10 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
+                                    className="w-full min-w-0 appearance-none bg-slate-800/60 border border-slate-600 rounded-lg py-3 pl-12 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-400 focus:shadow-lg focus:shadow-purple-500/20 outline-none transition-all text-white placeholder-slate-400"
                                     placeholder="Search city..."
                                 />
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
