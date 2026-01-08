@@ -48,7 +48,7 @@ router.post('/subscribe', async (req, res) => {
         const payload = JSON.stringify({
             title: 'Welcome to Astrozen!',
             body: 'You successfully subscribed to daily predictions.',
-            url: '/forecast'
+            url: '/dashboard'
         });
 
         await webPush.sendNotification(subscription, payload);
