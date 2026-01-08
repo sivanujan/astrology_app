@@ -334,6 +334,8 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
                     yoga={todayForecast.extended?.yoga || "Yoga Unavailable"}
                     goodTime={todayForecast.extended?.luckyTime || "-"}
                     badTime={todayForecast.extended?.unluckyTime || "-"}
+                    rahuKalam={todayForecast.extended?.rahuKalam || "-"}
+                    yemagandam={todayForecast.extended?.yemagandam || "-"}
                 />
             )}
 
@@ -410,6 +412,7 @@ const DailySnapshot: React.FC<DailySnapshotProps> = ({ data }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
+                    snapshot.moon,
                     snapshot.sun,
                     snapshot.mars,
                     snapshot.mercury,

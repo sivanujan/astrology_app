@@ -187,8 +187,8 @@ const GurujiPersonaModal: React.FC<GurujiPersonaModalProps> = ({ isOpen, onClose
                                     })}
                                 </div>
 
-                                {/* Dark Mode Trigger Button */}
-                                {!isDarkSideActivated && !loading && result && (
+                                {/* Dark Mode Trigger Button - TEMPORARILY HIDDEN */}
+                                {/* {!isDarkSideActivated && !loading && result && (
                                     <div className="mt-12 pt-8 border-t border-white/10 text-center">
                                         <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
                                             <h4 className="text-lg font-semibold text-slate-300 mb-2">
@@ -217,6 +217,18 @@ const GurujiPersonaModal: React.FC<GurujiPersonaModalProps> = ({ isOpen, onClose
                                                 </button>
                                             </div>
                                         )}
+                                    </div>
+                                )} */}
+
+                                {/* Close Button (Always show when not loading) */}
+                                {!loading && result && (
+                                    <div className="pt-8 pb-4 flex justify-center">
+                                        <button
+                                            onClick={onClose}
+                                            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full text-sm font-medium transition-colors border border-slate-700"
+                                        >
+                                            {language === 'ta' ? 'மூடுக' : 'Close'}
+                                        </button>
                                     </div>
                                 )}
                             </div>

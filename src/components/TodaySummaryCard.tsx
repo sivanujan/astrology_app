@@ -11,6 +11,8 @@ interface TodaySummaryCardProps {
     yoga?: string;
     goodTime?: string;
     badTime?: string;
+    rahuKalam?: string;
+    yemagandam?: string;
 }
 
 const TodaySummaryCard: React.FC<TodaySummaryCardProps> = ({
@@ -20,7 +22,9 @@ const TodaySummaryCard: React.FC<TodaySummaryCardProps> = ({
     tithi,
     yoga,
     goodTime,
-    badTime
+    badTime,
+    rahuKalam,
+    yemagandam
 }) => {
     const { language } = useLanguage();
 
@@ -134,6 +138,34 @@ const TodaySummaryCard: React.FC<TodaySummaryCardProps> = ({
                                     </div>
                                 </div>
                                 <div className="text-sm font-semibold text-red-300">{badTime}</div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Rahu Kalam and Yemagandam */}
+                {(rahuKalam || yemagandam) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        {rahuKalam && (
+                            <div className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Clock className="w-4 h-4 text-orange-400" />
+                                    <div className="text-xs text-orange-400 font-medium">
+                                        {language === 'ta' ? 'ராகு காலம்' : 'Rahu Kalam'}
+                                    </div>
+                                </div>
+                                <div className="text-sm font-semibold text-orange-300">{rahuKalam}</div>
+                            </div>
+                        )}
+                        {yemagandam && (
+                            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Clock className="w-4 h-4 text-red-400" />
+                                    <div className="text-xs text-red-400 font-medium">
+                                        {language === 'ta' ? 'எமகண்டம்' : 'Yemagandam'}
+                                    </div>
+                                </div>
+                                <div className="text-sm font-semibold text-red-300">{yemagandam}</div>
                             </div>
                         )}
                     </div>
