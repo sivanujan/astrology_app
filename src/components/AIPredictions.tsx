@@ -118,24 +118,16 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         setError('');
 
         try {
-            // Calculate Dasa if missing (similar to GurujiPredictions)
+            // Use Dasha data directly from database (no calculation)
             let enrichedData = { ...data };
-            // FORCE RE-CALCULATION of Dasa (Consistency with DashaPeriods component)
-            if (data.birthDate && data.planets) {
-                const moon = data.planets.find((p: any) => p.name === 'Moon');
-                if (moon) {
-                    const { calculateDashaPeriods, getCurrentDasha } = await import('../utils/astrology');
-                    const dashaPeriods = calculateDashaPeriods(new Date(data.birthDate), moon.longitude);
-                    const currentDasha = getCurrentDasha(dashaPeriods);
 
-                    // Overwrite with fresh calculation
-                    enrichedData = {
-                        ...enrichedData,
-                        currentDasa: currentDasha,
-                        dashaPeriods: dashaPeriods
-                    };
-                }
-            }
+            console.log("[AI Predictions] Using Dasha from database:", {
+                hasCurrentDasa: !!data.currentDasa,
+                hasDashaPeriods: !!data.dashaPeriods,
+                maha: data.currentDasa?.maha?.planet,
+                bhukti: data.currentDasa?.bhukti?.planet,
+                antaram: data.currentDasa?.antaram?.planet
+            });
 
             // --- PROACTIVE ENRICHMENT: Calculate Yogas & Subathuvam if missing ---
             // The AI needs these pre-calculated values to follow rules accurately.
@@ -174,19 +166,19 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 enrichedData = { ...enrichedData, yogas, doshas };
             }
 
-            // CRITICAL VALIDATION: Ensure Dasha calculation succeeded
+            // VALIDATION: Log Dasha status but don't block (AI can still answer without perfect Dasha data)
             if (!enrichedData.currentDasa || !enrichedData.dashaPeriods || enrichedData.dashaPeriods.length === 0) {
-                console.error('[AI Chat] Dasha calculation failed or incomplete:', {
+                console.warn('[AI Chat] Dasha calculation incomplete (will proceed anyway):', {
                     hasDasa: !!enrichedData.currentDasa,
                     hasSchedule: !!enrichedData.dashaPeriods,
-                    scheduleLength: enrichedData.dashaPeriods?.length || 0
+                    scheduleLength: enrichedData.dashaPeriods?.length || 0,
+                    birthDate: data.birthDate,
+                    hasMoon: !!data.planets?.find((p: any) => p.name === 'Moon')
                 });
 
-                setError(isTamil ?
-                    'தசா கணக்கீடு முடிவடையவில்லை. பக்கத்தை புதுப்பித்து மீண்டும் முயற்சிக்கவும்.' :
-                    'Dasha calculation incomplete. Please refresh the page and try again.');
-                setIsLoading(false);
-                return;
+                // Don't block - AI can still provide useful answers without Dasha
+                // Just add a note to the enriched data
+                enrichedData.dashaWarning = "Dasha calculation incomplete - predictions may be limited";
             }
 
             // Debug: Log what we're sending to AI
@@ -484,8 +476,17 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     )}
 
                     {error && (
-                        <div className="text-red-400 text-center p-4 bg-red-900/20 rounded-lg">
-                            <AlertCircle className="w-5 h-5 inline mr-2" /> {error}
+                        <div className="text-red-400 text-center p-4 bg-red-900/20 rounded-lg whitespace-pre-wrap">
+                            <AlertCircle className="w-5 h-5 inline mr-2" />
+                            {error.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+                                /(https?:\/\/[^\s]+)/g.test(part) ? (
+                                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline font-bold text-red-300 hover:text-white break-all">
+                                        {part}
+                                    </a>
+                                ) : (
+                                    <span key={i}>{part}</span>
+                                )
+                            )}
                         </div>
                     )}
 

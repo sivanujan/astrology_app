@@ -23,6 +23,8 @@ interface SavedChart {
     longitude: number;
     createdAt: Date;
     dasaAlerts?: boolean;
+    currentDasa?: any;      // Add Dasha data
+    dashaPeriods?: any[];   // Add Dasha periods
 }
 
 const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewChart, onSubscribe, language, isSubscribed }: any) => {
@@ -199,12 +201,17 @@ const Dashboard: React.FC = () => {
     const loadUserCharts = async () => {
         if (!user) return;
         try {
+            console.log('[Dashboard] Loading charts for user:', user.uid);
             const chartsRef = collection(db, 'charts');
             const q = query(chartsRef, where('userId', '==', user.uid));
             const querySnapshot = await getDocs(q);
+            console.log('[Dashboard] Query returned', querySnapshot.size, 'documents');
+
             const loadedCharts: SavedChart[] = [];
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
+                console.log('[Dashboard] Processing document:', doc.id, data);
+
                 loadedCharts.push({
                     id: doc.id,
                     name: data.name || 'Unnamed Chart',
@@ -213,14 +220,18 @@ const Dashboard: React.FC = () => {
                     latitude: data.birth_details?.latitude || 0,
                     longitude: data.birth_details?.longitude || 0,
                     createdAt: data.createdAt?.toDate() || new Date(),
-                    dasaAlerts: data.dasaAlerts || false
+                    dasaAlerts: data.dasaAlerts || false,
+                    currentDasa: data.currentDasa || null,        // Load Dasha from Firebase
+                    dashaPeriods: data.dashaPeriods || []         // Load Dasha periods
                 });
             });
+
+            console.log('[Dashboard] Loaded charts:', loadedCharts);
             // Sort by Created At Descending
             loadedCharts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
             setCharts(loadedCharts);
         } catch (error) {
-            console.error('Failed to load charts:', error);
+            console.error('[Dashboard] Failed to load charts:', error);
         } finally {
             setLoading(false);
         }
@@ -317,6 +328,7 @@ const Dashboard: React.FC = () => {
 
     const handleViewChart = (chart: SavedChart) => {
         try {
+            // Use saved data from Firebase - no recalculation needed!
             const calculatedData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
             setChartData({
                 ...calculatedData,
@@ -327,8 +339,11 @@ const Dashboard: React.FC = () => {
                     place: chart.place,
                     lat: chart.latitude,
                     lng: chart.longitude,
-                    city: chart.place // Add city for consistency
-                }
+                    city: chart.place
+                },
+                currentDasa: chart.currentDasa,
+                dashaPeriods: chart.dashaPeriods,
+                birthDate: chart.dob
             });
             navigate('/chart');
         } catch (e) {
@@ -348,7 +363,9 @@ const Dashboard: React.FC = () => {
                 lat: chart.latitude,
                 lng: chart.longitude
             },
-            birthDate: chart.dob
+            birthDate: chart.dob,
+            currentDasa: chart.currentDasa,      // Include Dasha from Firebase
+            dashaPeriods: chart.dashaPeriods     // Include Dasha periods
         });
         setShowPredictionModal(true);
     };

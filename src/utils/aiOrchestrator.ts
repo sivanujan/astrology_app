@@ -64,13 +64,22 @@ const OPENROUTER_API_KEY = "sk-or-v1-d108477085d807f3304e5dc2c864a5425f7c03d3022
 const GOOGLE_API_KEY = "AIzaSyBJTVK7y4U7Sb9V1oslE2uG_2t2ERq4Tdo";
 
 const FREE_MODELS = [
-    "tngtech/deepseek-r1t2-chimera:free",
-    "openai/gpt-oss-20b:free",
-    "qwen/qwen3-235b-a22b:free",
+    "google/gemini-2.0-flash-exp:free", // User Preference: Top Priority
+    // "google/gemini-2.0-flash-thinking-exp:free", // 400 Error
+    // "deepseek/deepseek-r1-distill-llama-70b:free", // 404 Error
+    "tngtech/deepseek-r1t2-chimera:free", // Good but rate limited
+    // "openai/gpt-oss-20b:free", // 404 Error
+    // "qwen/qwen3-235b-a22b:free", // 404 Error
     "google/gemma-3-12b-it:free",
-    "kwaipilot/kat-coder-pro:free",
-    "google/gemini-2.0-flash-exp:free",
+    "kwaipilot/kat-coder-pro:free", // Works!
     "mistralai/mistral-7b-instruct:free",
+];
+
+// Paid models as fallback (Cheap options only - ~$0.001 per run)
+const PAID_MODELS = [
+    "openai/gpt-4o-mini",          // Highly reliable, very cheap ($0.15/M tokens)
+    "google/gemini-2.0-flash-exp",        // Very cheap (paid version)
+    "deepseek/deepseek-r1-distill-llama-70b", // Very cheap (paid version)
 ];
 
 const HOUSE_KARAKAS = {
@@ -1033,6 +1042,8 @@ ${JSON.stringify(context, null, 2)}
 
         // --- NEW: Rule-Based Context Injection ---
         let ruleBasedInsight = "";
+        let calculatedDasa: any = null;
+        let calculatedPeriods: any[] = [];
 
         try {
             // 1. Prepare Data for Rules
@@ -1056,43 +1067,102 @@ ${JSON.stringify(context, null, 2)}
 
             const planets = chartData.planets;
             const ascendantSign = chartData.ascendant.signIndex;
+            // Get Dasha data directly from database (no calculation)
             const moon = planets.find((p: any) => p.name === 'Moon');
 
-            if (moon) {
-                // Safely get birth date (try birthDetails.dob first, then root birthDate)
-                const rawDob = chartData.birthDetails?.date || chartData.birthDetails?.dob || chartData.birthDate || chartData.userParams?.dob;
-                if (!rawDob) throw new Error("Missing Date of Birth in chartData");
-                const birthDateObj = new Date(rawDob);
+            console.log("[Orchestrator] Using Dasha from database:", {
+                hasCurrentDasa: !!chartData.currentDasa,
+                hasDashaPeriods: !!chartData.dashaPeriods,
+                maha: chartData.currentDasa?.maha?.planet,
+                bhukti: chartData.currentDasa?.bhukti?.planet,
+                antaram: chartData.currentDasa?.antaram?.planet
+            });
 
-                const periods = calculateDashaPeriods(birthDateObj, moon.longitude);
-                // NOTE: chartData.userParams.dob might need parsing if it's string. Assuming Date or convertible.
-                const currentDasa = getCurrentDasha(periods, now);
+            if (moon) {
                 const subathuvamScores = calculateAdityaGurujiSubathuvam(planets);
 
-                if (currentDasa && currentDasa.maha) {
-                    let prediction: PredictionResult | null = null;
+                // Use Dasha from database directly
+                calculatedDasa = chartData.currentDasa || null;
+                calculatedPeriods = chartData.dashaPeriods || [];
 
-                    // Match Intent to Rules
-                    const lowerIntent = intent.toLowerCase();
-                    if (lowerIntent.includes('job') || lowerIntent.includes('career') || lowerIntent.includes('profession')) {
-                        // Run Job Timing AND Career Path
-                        const jobTiming = predictJobTiming({ maha: currentDasa.maha, bhukti: currentDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, language);
-                        const careerPath = predictCareerPath(planets, ascendantSign, subathuvamScores, { maha: currentDasa.maha, bhukti: currentDasa.bhukti }, language);
-                        ruleBasedInsight = `\n ** Algorithmic Calculation Results(Ground Truth):**\n1.Job Timing: ${jobTiming.answer} \n   Reason: ${jobTiming.reason} \n2.Suitable Career Path: ${careerPath.answer} \n   Reason: ${careerPath.reason} `;
-                    }
-                    else if (lowerIntent.includes('marriage') || lowerIntent.includes('wedding') || lowerIntent.includes('spouse')) {
-                        prediction = predictDetailedMarriageTiming({ maha: currentDasa.maha, bhukti: currentDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, birthDateObj, chartData.userDetails?.gender || 'male', periods, language);
-                        ruleBasedInsight = `\n ** Algorithmic Calculation Results(Ground Truth):**\nMarriage Prediction: ${prediction.answer} \nReason: ${prediction.reason} `;
-                    }
-                    else if (lowerIntent.includes('abroad') || lowerIntent.includes('foreign') || lowerIntent.includes('travel')) {
-                        prediction = predictForeignTravel(planets, ascendantSign, moon.signIndex, subathuvamScores, { maha: currentDasa.maha, bhukti: currentDasa.bhukti }, language);
-                        ruleBasedInsight = `\n ** Algorithmic Calculation Results(Ground Truth):**\nForeign Settlement: ${prediction.answer} \nReason: ${prediction.reason} `;
-                    }
-                }
+                console.log('[AI Orchestrator] Using Dasha from database:', {
+                    maha: calculatedDasa?.maha?.planet,
+                    bhukti: calculatedDasa?.bhukti?.planet,
+                    antaram: calculatedDasa?.antaram?.planet
+                });
+
+                // logic moved below to support fallback data
+            } else {
+                console.error("[Orchestrator DEBUG] MOON NOT FOUND in planets array!");
             }
         } catch (err) {
-            console.error("Error calculating rule-based insight for AI:", err);
-            // Fallback - continue without rule context
+            console.error("Error calculating local dasha/transits:", err);
+            // Fallback continues below
+        }
+
+        // FALLBACK: Use pre-calculated Dasha from chartData if our calculation failed
+        if (!calculatedDasa && chartData.currentDasa) {
+            console.log('[AI Orchestrator] Using pre-calculated Dasha from chartData');
+            calculatedDasa = chartData.currentDasa;
+        }
+        if (!calculatedPeriods || calculatedPeriods.length === 0) {
+            if (chartData.dashaPeriods && chartData.dashaPeriods.length > 0) {
+                console.log('[AI Orchestrator] Using pre-calculated Dasha periods from chartData');
+                calculatedPeriods = chartData.dashaPeriods;
+            }
+        }
+
+        // --- GENERATE INSIGHTS (Now that we have Dasha data, either local or fallback) ---
+        try {
+            // Re-calculate basic data needed for insights if not already done
+            const now = new Date();
+            // TODO: Use actual user lat/lng if available
+            const lat = 13.0827;
+            const lng = 80.2707;
+
+            // We need planets and transits for the rules
+            const planets = chartData.planets;
+            const transitData = calculatePlanetaryPositions(now, lat, lng);
+            const transits: TransitPositions = {
+                jupiterSignIndex: transitData.planets.find(p => p.name === 'Jupiter')?.signIndex || 0,
+                saturnSignIndex: transitData.planets.find(p => p.name === 'Saturn')?.signIndex || 0,
+                rahuSignIndex: transitData.planets.find(p => p.name === 'Rahu')?.signIndex || 0,
+                ketuSignIndex: transitData.planets.find(p => p.name === 'Ketu')?.signIndex || 0,
+                sunSignIndex: transitData.planets.find(p => p.name === 'Sun')?.signIndex || 0,
+                moonSignIndex: transitData.planets.find(p => p.name === 'Moon')?.signIndex || 0,
+                marsSignIndex: transitData.planets.find(p => p.name === 'Mars')?.signIndex || 0,
+                mercurySignIndex: transitData.planets.find(p => p.name === 'Mercury')?.signIndex || 0,
+                venusSignIndex: transitData.planets.find(p => p.name === 'Venus')?.signIndex || 0,
+            };
+            const ascendantSign = chartData.ascendant.signIndex;
+            const moon = planets.find((p: any) => p.name === 'Moon');
+            const subathuvamScores = calculateAdityaGurujiSubathuvam(planets);
+
+            // Safely get birth date
+            const rawDob = chartData.birthDetails?.date || chartData.birthDetails?.dob || chartData.birthDate || chartData.userParams?.dob;
+            const birthDateObj = rawDob ? new Date(rawDob) : new Date(); // Fallback to now if missing (shouldn't happen)
+
+            if (calculatedDasa && calculatedDasa.maha && moon) {
+                let prediction: PredictionResult | null = null;
+                const lowerIntent = intent.toLowerCase();
+
+                if (lowerIntent.includes('job') || lowerIntent.includes('career') || lowerIntent.includes('profession')) {
+                    // Run Job Timing AND Career Path
+                    const jobTiming = predictJobTiming({ maha: calculatedDasa.maha, bhukti: calculatedDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, language);
+                    const careerPath = predictCareerPath(planets, ascendantSign, subathuvamScores, { maha: calculatedDasa.maha, bhukti: calculatedDasa.bhukti }, language);
+                    ruleBasedInsight = `\n ** Algorithmic Calculation Results(Ground Truth):**\n1.Job Timing: ${jobTiming.answer} \n   Reason: ${jobTiming.reason} \n2.Suitable Career Path: ${careerPath.answer} \n   Reason: ${careerPath.reason} `;
+                }
+                else if (lowerIntent.includes('marriage') || lowerIntent.includes('wedding') || lowerIntent.includes('spouse')) {
+                    prediction = predictDetailedMarriageTiming({ maha: calculatedDasa.maha, bhukti: calculatedDasa.bhukti }, transits, ascendantSign, moon.signIndex, planets, birthDateObj, chartData.userDetails?.gender || 'male', calculatedPeriods, language);
+                    ruleBasedInsight = `\n ** Algorithmic Calculation Results(Ground Truth):**\nMarriage Prediction: ${prediction.answer} \nReason: ${prediction.reason} `;
+                }
+                else if (lowerIntent.includes('abroad') || lowerIntent.includes('foreign') || lowerIntent.includes('travel')) {
+                    prediction = predictForeignTravel(planets, ascendantSign, moon.signIndex, subathuvamScores, { maha: calculatedDasa.maha, bhukti: calculatedDasa.bhukti }, language);
+                    ruleBasedInsight = `\n ** Algorithmic Calculation Results(Ground Truth):**\nForeign Settlement: ${prediction.answer} \nReason: ${prediction.reason} `;
+                }
+            }
+        } catch (e) {
+            console.error("Error generating rule-based insight:", e);
         }
 
         // Check for specific Lagna Rule
@@ -1130,10 +1200,250 @@ ${JSON.stringify(context, null, 2)}
             }
         }
 
+        // --- ROBUST DATE PARSING HELPER ---
+        const parseDateSafe = (val: any): string => {
+            if (!val) return "Unknown";
+            try {
+                if (val instanceof Date) return val.toLocaleDateString('en-IN');
+                if (typeof val === 'string') return new Date(val).toLocaleDateString('en-IN');
+                if (val && typeof val === 'object' && val.seconds) { // Firestore Timestamp check
+                    return new Date(val.seconds * 1000).toLocaleDateString('en-IN');
+                }
+                return "Unknown";
+            } catch { return "Unknown"; }
+        };
+
+        // --- PREPARE FORCED TEXT BLOCK ---
+        const mahaP = calculatedDasa?.maha?.planet || chartData.currentDasa?.maha?.planet || "Unknown";
+        const bhuktiP = calculatedDasa?.bhukti?.planet || chartData.currentDasa?.bhukti?.planet || "Unknown";
+        const antaraP = calculatedDasa?.antaram?.planet || chartData.currentDasa?.antaram?.planet || "Unknown";
+
+        const mahaStart = parseDateSafe(calculatedDasa?.maha?.start || chartData.currentDasa?.maha?.start);
+        const mahaEnd = parseDateSafe(calculatedDasa?.maha?.end || chartData.currentDasa?.maha?.end);
+        const bhuktiEnd = parseDateSafe(calculatedDasa?.bhukti?.end || chartData.currentDasa?.bhukti?.end);
+
+        // Get current date for predictions
+        const now = new Date();
+
+        const forcedDashaString = `
+!!! CRITICAL DATA - READ THIS FIRST !!!
+
+**CURRENT DATE: ${now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}**
+**CURRENT YEAR: ${now.getFullYear()}**
+⚠️ NEVER PREDICT DATES IN THE PAST! All predictions must be for ${now.getFullYear()} or later!
+
+CURRENT DASHA STATUS:
+- MAHA DASA: ${mahaP} (Ends: ${mahaEnd})
+- BHUKTI: ${bhuktiP} (Ends: ${bhuktiEnd})
+- ANTARA: ${antaraP}
+- DATE RANGE: ${mahaStart} to ${mahaEnd}
+
+🔴 VEDIC ASTROLOGY PROTOCOLS (MANDATORY - DO NOT MENTION THESE RULE NAMES IN YOUR RESPONSE):
+1. **LAGNA IS SUPREME**: ALL predictions must be from Lagna (Ascendant), NOT Rasi (Moon Sign)
+   - Marriage timing = 7th from Lagna
+   - Career = 10th from Lagna  
+   - Never say "because you are in [Nakshatra]" - that's just an address!
+
+2. **STAR IS JUST AN ADDRESS**: 
+   - ❌ WRONG: "You will get married because you are in Bharani star"
+   - ✅ CORRECT: "You will get married because 7th lord is in Bharani (address) with Jupiter aspect (Subathuvam)"
+
+3. **DASHA DETERMINISM**:
+   - A planet CANNOT give results if its Dasha/Bhukti is NOT running
+   - Always check: Is the relevant planet (7th lord for marriage, 10th lord for job) in CURRENT Dasha?
+   - If NO → Predict when that planet's Dasha will come (give EXACT dates from DashaSchedule)
+
+4. **TIMING MUST BE SPECIFIC**:
+   - ❌ WRONG: "திருமணம் 2024 ஆம் ஆண்டில் நடக்கும்" (2024 is PAST!)
+   - ❌ WRONG: "வீனஸ் தசை வரும் வரை காத்திருக்கவும்" (When does Venus Dasa come? Give date!)
+   - ✅ CORRECT: "திருமணம் 2027 ஜனவரி முதல் 2028 மார்ச் வரை நடக்கும் (Venus Bhukti காலத்தில்)"
+
+**IMPORTANT: In your response, DO NOT say "Based on Aditya Guruji system" or mention any astrologer names. Just provide the analysis directly.**
+
+!!! END CRITICAL DATA !!!
+`;
+
+        // CREATE COMPREHENSIVE CONTEXT OBJECT FOR AI
+        // Calculate House Lordship (Adhipathya)
+        const houseLords: Record<number, string> = {};
+        if (chartData.ascendant?.signIndex !== undefined) {
+            for (let i = 1; i <= 12; i++) {
+                const houseSignIndex = (chartData.ascendant.signIndex + i - 1) % 12;
+                houseLords[i] = SIGN_LORDS[houseSignIndex];
+            }
+        }
+
+        // Calculate 6-8-12 Connections
+        const hiddenHouseConnections = {
+            house6: {
+                sign: chartData.ascendant?.signIndex !== undefined ? ZODIAC_SIGNS[(chartData.ascendant.signIndex + 5) % 12] : "Unknown",
+                lord: houseLords[6] || "Unknown",
+                planetsIn: chartData.planets?.filter((p: any) => p.house === 6).map((p: any) => p.name) || []
+            },
+            house8: {
+                sign: chartData.ascendant?.signIndex !== undefined ? ZODIAC_SIGNS[(chartData.ascendant.signIndex + 7) % 12] : "Unknown",
+                lord: houseLords[8] || "Unknown",
+                planetsIn: chartData.planets?.filter((p: any) => p.house === 8).map((p: any) => p.name) || []
+            },
+            house12: {
+                sign: chartData.ascendant?.signIndex !== undefined ? ZODIAC_SIGNS[(chartData.ascendant.signIndex + 11) % 12] : "Unknown",
+                lord: houseLords[12] || "Unknown",
+                planetsIn: chartData.planets?.filter((p: any) => p.house === 12).map((p: any) => p.name) || []
+            }
+        };
+
+        const comprehensiveContext = {
+            UserDetails: {
+                name: chartData.userDetails?.name || "User",
+                birthDate: parseDateSafe(chartData.birthDate || chartData.timestamp),
+                birthPlace: chartData.userDetails?.place || "Unknown",
+                gender: chartData.userDetails?.gender || "Unknown"
+            },
+            Lagna: {
+                sign: chartData.ascendant?.sign_en || "Unknown",
+                signIndex: chartData.ascendant?.signIndex,
+                degree: chartData.ascendant?.degree,
+                lord: chartData.ascendant?.signIndex !== undefined ? SIGN_LORDS[chartData.ascendant.signIndex] : "Unknown",
+                lordPosition: chartData.planets?.find((p: any) => p.name === (chartData.ascendant?.signIndex !== undefined ? SIGN_LORDS[chartData.ascendant.signIndex] : null))
+            },
+            current_time_cycle: calculatedDasa ? {
+                dasha: {
+                    lord: calculatedDasa.maha?.planet || "Unknown",
+                    end_date: parseDateSafe(calculatedDasa.maha?.end),
+                    start_date: parseDateSafe(calculatedDasa.maha?.start),
+                    years_remaining: calculatedDasa.maha?.end ? Math.round((new Date(calculatedDasa.maha.end).getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000) * 10) / 10 : null,
+                    lord_status_in_chart: (() => {
+                        const planet = chartData.planets?.find((p: any) => p.name === calculatedDasa.maha?.planet);
+                        if (!planet) return "Unknown";
+                        if (planet.isExalted) return "Strong (Exalted)";
+                        if (planet.isOwnSign) return "Strong (Own Sign)";
+                        if (planet.isDebilitated) return planet.neechaBhangaRaja ? "Weak but Neecha Bhanga" : "Weak (Debilitated)";
+                        return "Moderate";
+                    })(),
+                    is_favourable_for_lagna: (() => {
+                        const planet = calculatedDasa.maha?.planet;
+                        const lagnaIndex = chartData.ascendant?.signIndex;
+                        if (lagnaIndex === undefined) return false;
+                        const housesRuled = Object.entries(houseLords).filter(([_, lord]) => lord === planet).map(([house]) => parseInt(house));
+                        // Favorable if ruling 1,4,5,7,9,10
+                        return housesRuled.some(h => [1, 4, 5, 7, 9, 10].includes(h));
+                    })()
+                },
+                bhukti: {
+                    lord: calculatedDasa.bhukti?.planet || "Unknown",
+                    end_date: parseDateSafe(calculatedDasa.bhukti?.end),
+                    start_date: parseDateSafe(calculatedDasa.bhukti?.start),
+                    lord_status_in_chart: (() => {
+                        const planet = chartData.planets?.find((p: any) => p.name === calculatedDasa.bhukti?.planet);
+                        if (!planet) return "Unknown";
+                        if (planet.isExalted) return "Strong (Exalted)";
+                        if (planet.isOwnSign) return "Strong (Own Sign)";
+                        if (planet.isDebilitated) return planet.neechaBhangaRaja ? "Weak but Neecha Bhanga" : "Weak (Debilitated)";
+                        return "Moderate";
+                    })(),
+                    relationship_with_dasha_lord: "Friendly" // TODO: Calculate actual relationship
+                },
+                antharam: {
+                    lord: calculatedDasa.antaram?.planet || "Unknown",
+                    end_date: parseDateSafe(calculatedDasa.antaram?.end),
+                    lord_status_in_chart: (() => {
+                        const planet = chartData.planets?.find((p: any) => p.name === calculatedDasa.antaram?.planet);
+                        if (!planet) return "Unknown";
+                        if (planet.isExalted) return "Strong (Exalted)";
+                        if (planet.isOwnSign) return "Strong (Own Sign)";
+                        if (planet.isDebilitated) return planet.neechaBhangaRaja ? "Weak but Neecha Bhanga" : "Weak (Debilitated)";
+                        return "Moderate";
+                    })()
+                }
+            } : (chartData.currentDasa ? {
+                dasha: {
+                    lord: chartData.currentDasa.maha?.planet || "Unknown",
+                    end_date: chartData.currentDasa.maha?.end || "Unknown",
+                    start_date: chartData.currentDasa.maha?.start || "Unknown",
+                    lord_status_in_chart: "From chartData (not recalculated)",
+                    is_favourable_for_lagna: false
+                },
+                bhukti: {
+                    lord: chartData.currentDasa.bhukti?.planet || "Unknown",
+                    end_date: chartData.currentDasa.bhukti?.end || "Unknown",
+                    lord_status_in_chart: "From chartData (not recalculated)"
+                },
+                antharam: {
+                    lord: chartData.currentDasa.antaram?.planet || "Unknown",
+                    lord_status_in_chart: "From chartData (not recalculated)"
+                }
+            } : {
+                dasha: { lord: "NOT CALCULATED", end_date: "Unknown" },
+                bhukti: { lord: "NOT CALCULATED", end_date: "Unknown" },
+                antharam: { lord: "NOT CALCULATED" }
+            }),
+            HouseLordship: houseLords,
+            HiddenHouses_6_8_12: hiddenHouseConnections,
+            Planets: chartData.planets?.map((p: any) => ({
+                name: p.name,
+                sign: p.sign || ZODIAC_SIGNS[p.signIndex] || "Unknown",
+                signIndex: p.signIndex,
+                house: p.house,
+                longitude: p.longitude,
+                degree: Math.round((p.longitude % 30) * 100) / 100,
+                isRetrograde: p.isRetrograde,
+                nakshatra: p.nakshatra,
+                isExalted: p.isExalted,
+                isDebilitated: p.isDebilitated,
+                isOwnSign: p.isOwnSign,
+                subathuvamScore: chartData.subathuvam_calculations?.planetary_scores?.[p.name]?.totalScore || 0,
+                isSubathuva: chartData.subathuvam_calculations?.planetary_scores?.[p.name]?.isSubathuva || false,
+                rulesHouses: Object.entries(houseLords).filter(([_, lord]) => lord === p.name).map(([house]) => parseInt(house))
+            })) || [],
+            SubathuvamPavathuvam: {
+                planetaryScores: chartData.subathuvam_calculations?.planetary_scores || {},
+                houseScores: chartData.subathuvam_calculations?.house_scores || {},
+                summary: "Subathuvam > 0 = Beneficial, < 0 = Malefic influence"
+            },
+            Yogas: chartData.yogas || [],
+            Doshas: chartData.doshas || [],
+            NeechaBhangaYogas: chartData.planets?.filter((p: any) => p.isDebilitated && p.neechaBhangaRaja).map((p: any) => ({
+                planet: p.name,
+                cancellationType: "Neecha Bhanga Raja Yoga",
+                strength: "Converts debilitation to strength"
+            })) || [],
+            CriticalInstruction: "ALL DASHA-BHUKTI-ANTARA DATA IS COMPLETE ABOVE. Use this for TIMING predictions. Check House Lordship to understand which planet controls which life area. Use Subathuvam scores to determine quality of results."
+        };
+
         systemPrompt = `
+${forcedDashaString}
+
         Role & Persona:
-You are an expert Vedic Astrologer following the "Aditya Guruji" system.You provide deep, rule - based predictions, not generic advice.
-You MUST process the chart in this specific 6 - step logical order for every analysis:
+You are an expert Vedic Astrologer using advanced predictive techniques based on Subathuvam (Light) vs. Papathuvam (Darkness) theory.
+
+**CRITICAL: DO NOT mention "Aditya Guruji" or any astrologer names in your responses. This is a proprietary system.**
+
+**CRITICAL FORMATTING REQUIREMENT:**
+Your response MUST be visually formatted. DO NOT give plain text paragraphs!
+ALWAYS use:
+- Emojis for categories (💼 🏛️ 🏗️ ⭐ ✓ ⚠️ 💡)
+- Section dividers (use dashes: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━)
+- Bullet points with checkmarks (✓)
+- Star ratings (⭐⭐⭐⭐⭐)
+- Progress bars for percentages (████████████████░░░░ 85%)
+
+Example format:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💼 Main Topic
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Rating: ⭐⭐⭐⭐⭐
+
+Key Points:
+  ✓ Point 1
+  ✓ Point 2
+
+Success Rate: ████████████████░░░░ 85%
+
+You provide deep, rule-based predictions, not generic advice. You analyze charts strictly based on planetary strength, aspects, and timing.
+
+Your goal is to determine if a planet has received the 'Light' of Jupiter or Venus to override its natural maleficence.
+
+You MUST process the chart in this specific 6-step logical order for every analysis:
 
 *** THE 6 PILLARS OF PREDICTION(GURUJI RULES) ***
 
@@ -1165,9 +1475,12 @@ You MUST process the chart in this specific 6 - step logical order for every ana
 5. RULE 5: FUNCTIONAL STRENGTH(Dasha / Bhukti) - Timing
             - "A strong planet is useless if its time never comes."
             - * Action *: ONLY predict results for the planets currently active in Dasha or Bhukti.
-   - ** User's Current Dasa**: ${(context as any).CurrentDasa?.lord || "Unknown"}
-            - ** User's Current Bhukti**: ${(context as any).CurrentDasa?.bhukti || "Unknown"}
-                - * Instruction *: Structure your answer around how * this specific * Dasa / Bhukti impacts the question.
+   - ** User's Current Maha Dasa**: Check 'current_time_cycle.dasha.lord' in the input data
+            - ** User's Current Bhukti (Sub-period)**: Check 'current_time_cycle.bhukti.lord' in the input data
+            - ** User's Current Antara (Sub-sub-period)**: Check 'current_time_cycle.antharam.lord' in the input data
+            - ** Dasha End Date**: Check 'current_time_cycle.dasha.end_date'
+            - ** Bhukti End Date**: Check 'current_time_cycle.bhukti.end_date'
+                - * Instruction *: Structure your answer around how * this specific * Dasa / Bhukti impacts the question. YOU HAVE THE DASHA DATA - USE IT FOR TIMING PREDICTIONS!
 
 6. RULE 6: DISPLACEMENT(Moveable Signs) - Travel
             - Check Lords of 8, 12.
@@ -1176,7 +1489,7 @@ You MUST process the chart in this specific 6 - step logical order for every ana
 ---
 
 ** Input Data(Context):**
-            ${JSON.stringify(context, null, 2)}
+            ${JSON.stringify(comprehensiveContext, null, 2)}
 
 ** Admin Overrides(Dynamic Rules):**
             ${dynamicRulesMap
@@ -1188,6 +1501,143 @@ You MUST process the chart in this specific 6 - step logical order for every ana
             }
 
 ${intentPrompt}
+
+** CRITICAL INSTRUCTIONS FOR MARRIAGE TIMING QUESTIONS **:
+If the user asks about marriage timing, you MUST follow this exact analysis process:
+
+1. **CURRENT DASHA ANALYSIS** (MANDATORY):
+   - State the current Maha Dasa planet and period (from CurrentDasaPeriods.MahaDasa)
+   - State the current Bhukti planet and period (from CurrentDasaPeriods.Bhukti)
+   - State the current Antara planet (from CurrentDasaPeriods.Antara)
+   - Explain: "You are currently in [Planet] Maha Dasa, [Planet] Bhukti from [start] to [end]"
+
+2. **7TH HOUSE ANALYSIS** (MANDATORY):
+   - Identify the 7th house lord (calculate from Lagna.signIndex + 6)
+   - Check 7th lord's Subathuvam score (from SubathuvamScores)
+   - Check if 7th lord is in current Dasha or Bhukti
+   - Explain: "Your 7th house (marriage) is ruled by [Planet]. This planet has [X]% Subathuvam, meaning [interpretation]"
+
+3. **VENUS ANALYSIS** (MANDATORY for marriage):
+   - Find Venus in Planets array
+   - Check Venus Subathuvam score
+   - Check Venus house position
+   - Check if Venus is in current Dasha/Bhukti
+   - Explain: "Venus (காதல்/சுக்கிரன்) is in [house] with [X]% Subathuvam"
+
+4. **3RD & 11TH HOUSE CHECK** (MANDATORY):
+   - 3rd house = Courage to marry (Lagna + 2)
+   - 11th house = Fulfillment of desires (Lagna + 10)
+   - Check if their lords are in current Dasha/Bhukti
+   - Explain their role
+
+5. **TIMING PREDICTION** (MANDATORY - BE SPECIFIC):
+   - If 7th lord or Venus is in CURRENT Dasha/Bhukti: "Marriage can happen in current period [dates]"
+   - If NOT in current period: Look at upcoming Dasha periods and say "Marriage likely in [Planet] Dasa/Bhukti which starts on [date]"
+   - If Subathuvam is low: "There may be delays due to [reason], but marriage will happen when [specific Dasha] comes"
+   - NEVER say "வீனஸ் தசை வரும் வரை காத்திருக்கவும்" without giving WHEN Venus Dasa starts!
+
+6. **EXPLAIN IN SIMPLE TERMS** (MANDATORY):
+   - Assume the user doesn't know astrology
+   - Explain what Dasha means: "தசா என்பது கிரகங்களின் காலம் - ஒவ்வொரு கிரகத்திற்கும் ஒரு குறிப்பிட்ட காலம் உண்டு"
+   - Explain what Subathuvam means: "சுபத்துவம் என்பது கிரகத்தின் நல்ல தன்மை - 75% க்கு மேல் இருந்தால் நல்லது"
+   - Explain what 7th house means: "7-ம் வீடு திருமணத்தை குறிக்கும்"
+
+7. **PROVIDE COMPLETE REASONING** (MANDATORY):
+   - Don't just say "Venus Dasa will bring marriage"
+   - Explain WHY: "Venus is your 7th lord with high Subathuvam, positioned in 11th house (fulfillment), so when Venus Dasa comes, marriage will happen easily"
+   - Show your analysis: "I checked your current Dasa ([Planet]), 7th lord ([Planet]), Venus position ([house]), and Subathuvam scores"
+
+
+
+**========================================================================**
+**RESPONSE FORMATTING RULES (MANDATORY - MAKE IT VISUALLY BEAUTIFUL!):**
+**========================================================================**
+
+NEVER DO THIS:
+- Plain text paragraph walls
+- No structure or sections
+- No emojis or visual elements
+- Everything in one block
+
+ALWAYS DO THIS:
+
+**1. START WITH SUMMARY BOX (use dashes):**
+Example:
+----------------------------------
+⚡ சுருக்கம்:
+சிறந்த தொழில்: வணிகம் 💼
+வெற்றி வாய்ப்பு: 85% 📈
+சிறந்த காலம்: 6 மாதங்களில் ⏰
+----------------------------------
+
+**2. USE SECTION DIVIDERS (use dashes):**
+Example:
+----------------------------------
+💼 1. வணிகம் & நிதி
+----------------------------------
+
+**3. USE EMOJIS FOR CATEGORIES:**
+- 💼 Business/வணிகம்
+- 🏛️ Government/அரசு
+- 🏗️ Construction/கட்டுமானம்
+- ⚙️ Manufacturing/உற்பத்தி
+- 🎓 Education/கல்வி
+- 💻 Technology/தொழில்நுட்பம்
+- 🏥 Healthcare/மருத்துவம்
+- 🎨 Creative/கலை
+- 💑 Marriage/திருமணம்
+- 👶 Children/குழந்தை
+- 🏠 Property/சொத்து
+- ✈️ Travel/பயணம்
+- ⭐ Stars for ratings
+- ✓ Checkmarks for lists
+- ⚠️ Warnings
+- 💡 Tips/குறிப்புகள்
+
+**4. USE BULLET POINTS:**
+Example:
+சிறந்த துறைகள்:
+  ✓ நிதி மேலாண்மை (Finance)
+  ✓ கணக்கியல் (Accounting)
+  ✓ வணிக ஆலோசனை (Consulting)
+
+**5. USE VISUAL PROGRESS BARS:**
+Example:
+வணிக வெற்றி: ████████████████░░░░ 85%
+அரசு வேலை:   ████████████░░░░░░░░ 65%
+
+**6. USE STAR RATINGS:**
+Example:
+சிறப்பு மதிப்பீடு: ⭐⭐⭐⭐⭐ (Excellent)
+                  ⭐⭐⭐⭐ (Good)
+                  ⭐⭐⭐ (Average)
+
+**7. STRUCTURE EACH SECTION:**
+Example:
+----------------------------------
+💼 வணிகம் & நிதி
+----------------------------------
+சிறப்பு மதிப்பீடு: ⭐⭐⭐⭐⭐
+
+சிறந்த துறைகள்:
+  ✓ Item 1
+  ✓ Item 2
+
+ஏன் பொருத்தம்:
+- Reason 1
+- Reason 2
+
+வெற்றி வாய்ப்பு: ████████████████░░░░ 85%
+
+**8. END WITH ACTION ITEMS:**
+Example:
+----------------------------------
+💡 முக்கிய குறிப்புகள்:
+
+⚠️ தற்போதைய நிலை: [Current status]
+✨ சிறந்த காலம்: [Best timing]
+🎯 பரிந்துரை: [Recommendation]
+----------------------------------
 
 MANDATORY OUTPUT FORMAT:
         - If Tamil is requested, answer COMPLETELY in Tamil.
@@ -1214,14 +1664,75 @@ Output Format(JSON):
 
     // 4. Try Models with Fallback
     let lastError = null;
+    let openRouterAuthError = null;
     const effectiveKey = (apiKey || OPENROUTER_API_KEY).trim();
+
+    // Debug Log for Key Verification
+    if (effectiveKey.length > 10) {
+        console.log(`[Orchestrator] Using OpenRouter Key: ...${effectiveKey.slice(-4)}`);
+    } else {
+        console.warn("[Orchestrator] NO VALID OPENROUTER KEY FOUND. Defaults may fail.");
+    }
 
     /* 
     // TEMPORARILY DISABLED: OPENROUTER CONNECTION - RE-ENABLING
     // User requested to switch strictly to Google Gemini Direct for testing.
     */
 
-    for (const model of FREE_MODELS) {
+    // ========================================
+    // 🔍 DEBUG: SHOW EXACTLY WHAT DATA IS BEING SENT TO AI
+    // ========================================
+    console.log("\n" + "=".repeat(80));
+    console.log("🤖 AI ORCHESTRATOR - DATA BEING SENT TO AI MODEL");
+    console.log("=".repeat(80));
+
+    console.log("\n❓ USER QUERY:", userQuery);
+    console.log("📋 INTENT:", intent);
+
+    // Safe access to Dasha data (these variables only exist in specific intent blocks)
+    console.log("\n📊 DASHA DATA BEING SENT:");
+    const mahaP = chartData.currentDasa?.maha?.planet || "NOT FOUND IN chartData";
+    const bhuktiP = chartData.currentDasa?.bhukti?.planet || "NOT FOUND IN chartData";
+    const antaraP = chartData.currentDasa?.antaram?.planet || "NOT FOUND IN chartData";
+
+    console.log("  From chartData.currentDasa:");
+    console.log("    Maha Dasa:", mahaP);
+    console.log("    Bhukti:", bhuktiP);
+    console.log("    Antara:", antaraP);
+
+    // Check if comprehensiveContext exists (only in specific intent blocks)
+    if (typeof comprehensiveContext !== 'undefined' && comprehensiveContext.current_time_cycle) {
+        console.log("\n  ✅ From comprehensiveContext.current_time_cycle (SENT TO AI):");
+        console.log(JSON.stringify(comprehensiveContext.current_time_cycle, null, 2));
+    } else {
+        console.log("\n  ⚠️ comprehensiveContext.current_time_cycle not available (intent:", intent, ")");
+    }
+
+    if (chartData.currentDasa?.maha?.start) {
+        console.log("\n  📅 DATES (from chartData):");
+        console.log("    Maha Start:", chartData.currentDasa.maha.start);
+        console.log("    Maha End:", chartData.currentDasa.maha.end);
+        console.log("    Bhukti End:", chartData.currentDasa.bhukti?.end);
+    }
+
+    console.log("\n📋 SYSTEM PROMPT (First 1000 chars):");
+    console.log(systemPrompt.substring(0, 1000) + "...");
+
+    // Check if forced Dasha text is in the prompt
+    if (systemPrompt.includes("CURRENT DASHA STATUS")) {
+        console.log("\n✅ FORCED DASHA TEXT BLOCK IS INCLUDED IN PROMPT");
+    } else {
+        console.log("\n❌ WARNING: FORCED DASHA TEXT BLOCK NOT FOUND IN PROMPT");
+    }
+
+    console.log("\n" + "=".repeat(80));
+    console.log("END DEBUG - Now sending to AI...");
+    console.log("=".repeat(80) + "\n");
+
+    // Combine Free + Paid models for robust fallback
+    const ALL_MODELS = [...FREE_MODELS, ...PAID_MODELS];
+
+    for (const model of ALL_MODELS) {
         try {
             console.log(`Attempting with model: ${model} `);
             const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -1256,13 +1767,13 @@ Output Format(JSON):
 
                 // Handle Invalid Key specifically
                 if (response.status === 401) {
-                    // console.error("Invalid API Key (401).");
-                    // lastError = new Error("Invalid API Key (401). Please check your key.");
-                    // If key is invalid, no point trying other models with same key
-                    // break;
+                    console.warn("Invalid API Key (401) on OpenRouter. Skipping.");
+                    openRouterAuthError = new Error("OpenRouter Key Invalid or No Credits (401/402)");
+                    continue;
+                }
 
-                    // For now, treat 401 as a skip to try other models or fallback to Gemini
-                    console.warn("Invalid API Key (401) for this provider. Skipping to next/fallback.");
+                if (response.status === 402) {
+                    openRouterAuthError = new Error("OpenRouter Insufficient Credits (402)");
                     continue;
                 }
 
@@ -1279,8 +1790,11 @@ Output Format(JSON):
 
             let content = data.choices[0].message.content;
 
-            // FIX: Clean markdown code blocks if present (Models often return markdown)
-            if (content.includes('```')) {
+            // FIX: Robust JSON Extraction (Find first { ... } block)
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                content = jsonMatch[0];
+            } else if (content.includes('```json')) {
                 content = content.replace(/```json/g, "").replace(/```/g, "").trim();
             }
 
@@ -1330,6 +1844,20 @@ Output Format(JSON):
                 }
             } else {
                 const errText = await response.text();
+
+                // Specific Check for "API Not Enabled" (403)
+                if (response.status === 403 && errText.includes("Generative Language API")) {
+                    const match = errText.match(/https:\/\/console\.developers\.google\.com[^\s"]+/);
+                    const url = match ? match[0] : "https://console.developers.google.com/apis/api/generativelanguage.googleapis.com";
+
+                    let msg = `Google API Not Enabled. Please enable it here: ${url}`;
+                    if (openRouterAuthError) {
+                        msg += ` \n(NOTE: OpenRouter also failed: ${openRouterAuthError.message})`;
+                    }
+                    // Throw immediately to stop retrying - this is a configuration error
+                    throw new Error(msg);
+                }
+
                 // If 429 or 404, try next google model
                 if (response.status === 429 || response.status === 404) {
                     console.warn(`Google Model ${gModel} failed (${response.status}). Trying next...`);
@@ -1339,7 +1867,15 @@ Output Format(JSON):
                 console.error("Direct Google Gemini failed:", errText);
                 lastError = new Error(`Google Direct API Error: ${response.status} - ${errText}`);
             }
-        } catch (e) {
+        } catch (e: any) {
+            // Re-throw the configuration error immediately
+            if (e.message && e.message.includes("Google API Not Enabled")) {
+                throw e;
+            }
+            // If we have an OpenRouter Auth error and everything else failed, prioritize showing that too
+            if (openRouterAuthError) {
+                console.error("OpenRouter Auth Error Persisted:", openRouterAuthError);
+            }
             console.error(`Direct Google Gemini Network Error (${gModel}):`, e);
             lastError = e;
             continue;

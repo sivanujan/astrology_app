@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Clock, MapPin, Search, Loader2, ChevronRight, User, CheckCircle, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { calculatePlanetaryPositions } from '../utils/astrology';
+import { calculatePlanetaryPositions, calculateDashaPeriods, getCurrentDasha } from '../utils/astrology';
 // import LagnaIdentificationWizard from './LagnaIdentificationWizard';
 // import { IdentificationResult } from '../utils/lagnaIdentification';
 
@@ -228,14 +228,56 @@ const InputForm: React.FC = () => {
             return;
         }
 
+
         console.log('[InputForm] Valid birthDate created:', birthDate);
         const chartData = calculatePlanetaryPositions(birthDate, formData.lat, formData.lng);
+
+        // Calculate Dasha periods
+        const moon = chartData.planets.find((p: any) => p.name === 'Moon');
+        let dashaPeriods: any[] = [];
+        let currentDasa: any = null;
+
+        if (moon) {
+            console.log('[InputForm] Calculating Dasha periods...');
+            dashaPeriods = calculateDashaPeriods(birthDate, moon.longitude);
+            currentDasa = getCurrentDasha(dashaPeriods, new Date());
+            console.log('[InputForm] Dasha calculated:', {
+                maha: currentDasa?.maha?.planet,
+                bhukti: currentDasa?.bhukti?.planet,
+                antaram: currentDasa?.antaram?.planet
+            });
+        } else {
+            console.warn('[InputForm] Moon not found in chart - cannot calculate Dasha');
+        }
+
+        // Calculate Subathuvam & Pavathuvam
+        console.log('[InputForm] Calculating Subathuvam & Pavathuvam...');
+        const { calculateSubathuvamPavathuvam, calculateHouseSubathuvamPavathuvam } = await import('../utils/subathuvam');
+        const subathuvam_calculations = {
+            planetary_scores: calculateSubathuvamPavathuvam(chartData.planets),
+            house_scores: calculateHouseSubathuvamPavathuvam(chartData.planets, chartData.ascendant.signIndex)
+        };
+
+        // Calculate Yogas
+        console.log('[InputForm] Calculating Yogas...');
+        const { calculateYogas } = await import('../utils/astrology');
+        const yogas = calculateYogas(chartData.planets, chartData.ascendant.signIndex);
+
+        // Doshas (placeholder - can be calculated later if needed)
+        const doshas: any[] = [];
 
         const fullChartData = {
             ...chartData,
             userDetails: formData,
-            birthDate
+            birthDate,
+            dashaPeriods,              // Dasha schedule
+            currentDasa,               // Current Dasha/Bhukti/Antara
+            subathuvam_calculations,   // Subathuvam scores
+            yogas,                     // Yogas
+            doshas                     // Doshas
         };
+
+        console.log('[InputForm] All calculations complete!');
 
         // Save guest data if not logged in
         if (!user) {
@@ -247,23 +289,35 @@ const InputForm: React.FC = () => {
                 longitude: formData.lng!
             });
         } else {
-            // Auto-save to Dashboard for logged-in users
+            // Auto-save to Dashboard for logged-in users WITH ALL DATA
             try {
                 await addDoc(collection(db, 'charts'), {
                     userId: user.uid,
                     name: formData.name,
+                    gender: formData.gender,
                     birth_details: {
                         dob: birthDate,
                         place: formData.city,
                         latitude: formData.lat,
                         longitude: formData.lng
                     },
+                    // Save ALL calculated data to Firebase
+                    planets: chartData.planets,
+                    ascendant: chartData.ascendant,
+                    ayanamsa: chartData.ayanamsa,
+                    dashaPeriods: dashaPeriods,
+                    currentDasa: currentDasa,
+                    subathuvam_calculations: subathuvam_calculations,
+                    yogas: yogas,
+                    doshas: doshas,
                     createdAt: new Date()
                 });
+                console.log('[InputForm] Chart saved to Firebase with ALL calculated data');
             } catch (error) {
                 console.error("Error auto-saving chart:", error);
             }
         }
+
 
         setChartData(fullChartData);
         setIsGenerating(false);
