@@ -50,13 +50,30 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 id: doc.id,
                 ...doc.data()
             }));
-            setChatHistory(msgs);
+
+            // Add welcome message if chat is empty
+            if (msgs.length === 0) {
+                const userName = data.userDetails.name || 'there';
+                const welcomeMsg = {
+                    id: 'welcome',
+                    role: 'assistant',
+                    content: language === 'ta'
+                        ? `வணக்கம் ${userName}! 🙏✨\n\nநான் உங்கள் ஜோதிட ஆலோசகர். உங்கள் ஜாதகம் பற்றி எந்த கேள்வியும் கேளுங்கள்.\n\n💼 தொழில்\n💑 திருமணம்\n🏠 சொத்து\n✈️ வெளிநாடு\n👶 குழந்தை\n\nஎன்ன தெரிந்து கொள்ள விரும்புகிறீர்கள்?`
+                        : `Hello ${userName}! 🙏✨\n\nI'm your Vedic Astrology advisor. Ask me anything about your birth chart.\n\n💼 Career\n💑 Marriage\n🏠 Property\n✈️ Foreign Travel\n👶 Children\n\nWhat would you like to know?`,
+                    timestamp: new Date(),
+                    isWelcome: true
+                };
+                setChatHistory([welcomeMsg]);
+            } else {
+                setChatHistory(msgs);
+            }
+
             // Scroll to bottom on load
             setTimeout(scrollToBottom, 100);
         });
 
         return () => unsubscribe();
-    }, [user, data]);
+    }, [user, data, language]);
 
     // Internal save function
     const saveMessageToFirestore = async (msg: any) => {
@@ -492,21 +509,6 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
                     <div ref={chatEndRef} />
                 </div>
-
-                {/* System Context Info (Debug/Transparency) */}
-                {data.currentDasa && (
-                    <div className="px-4 py-2 bg-slate-900 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center">
-                        <span>
-                            System Calculation:
-                            <span className="text-purple-400 font-semibold ml-1">
-                                {data.currentDasa.maha?.planet || '?'} Dasa - {data.currentDasa.bhukti?.planet || '?'} Bhukti
-                            </span>
-                        </span>
-                        <span className="opacity-50 text-[10px]">
-                            (If wrong, tell the AI: "I am in [Planet] Dasa")
-                        </span>
-                    </div>
-                )}
 
                 <div className="p-4 border-t border-slate-800 bg-slate-900/50 space-y-3">
                     {/* Language Toggle */}
