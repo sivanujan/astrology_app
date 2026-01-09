@@ -1643,7 +1643,11 @@ MANDATORY OUTPUT FORMAT:
         - If Tamil is requested, answer COMPLETELY in Tamil.
 - Structure your answer using the 6 Rules logic implicitly.
 - Don't list the rules, APPLY them.
-            - Start with a friendly greeting.
+            - GREETING RULE (STRICT):
+              - For English: Start with "Hello".
+              - For Tamil: Start with "வணக்கம்" (Vanakkam).
+              - DO NOT use "Namaskaram" or "Namaste" under any circumstances.
+              - DO NOT say "Hello User" or "Greetings". Just use "Hello" or "வணக்கம்".
 
 Output Format(JSON):
 
@@ -1701,12 +1705,13 @@ Output Format(JSON):
     console.log("    Antara:", antaraP);
 
     // Check if comprehensiveContext exists (only in specific intent blocks)
-    if (typeof comprehensiveContext !== 'undefined' && comprehensiveContext.current_time_cycle) {
-        console.log("\n  ✅ From comprehensiveContext.current_time_cycle (SENT TO AI):");
-        console.log(JSON.stringify(comprehensiveContext.current_time_cycle, null, 2));
-    } else {
-        console.log("\n  ⚠️ comprehensiveContext.current_time_cycle not available (intent:", intent, ")");
-    }
+    // Check if comprehensiveContext exists (only in specific intent blocks)
+    // if (typeof comprehensiveContext !== 'undefined' && comprehensiveContext.current_time_cycle) {
+    //     console.log("\n  ✅ From comprehensiveContext.current_time_cycle (SENT TO AI):");
+    //     console.log(JSON.stringify(comprehensiveContext.current_time_cycle, null, 2));
+    // } else {
+    //     console.log("\n  ⚠️ comprehensiveContext.current_time_cycle not available (intent:", intent, ")");
+    // }
 
     if (chartData.currentDasa?.maha?.start) {
         console.log("\n  📅 DATES (from chartData):");
@@ -1729,7 +1734,7 @@ Output Format(JSON):
     console.log("END DEBUG - Now sending to AI...");
     console.log("=".repeat(80) + "\n");
 
-    // Combine Free + Paid models for robust fallback
+    // Try FREE models first to save credits, then PAID models as fallback
     const ALL_MODELS = [...FREE_MODELS, ...PAID_MODELS];
 
     for (const model of ALL_MODELS) {
@@ -1794,16 +1799,84 @@ Output Format(JSON):
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 content = jsonMatch[0];
+                console.log(`📦 Extracted JSON block from ${model}`);
             } else if (content.includes('```json')) {
                 content = content.replace(/```json/g, "").replace(/```/g, "").trim();
+                console.log(`📦 Cleaned markdown JSON from ${model}`);
+            } else {
+                console.log(`⚠️ No JSON structure found in response from ${model}, will try parsing anyway`);
             }
 
+            console.log(`🔍 Attempting to parse response from ${model} (length: ${content.length})`);
+
+            // Clean up common JSON issues before parsing
+            // 1. Replace backticks with double quotes (common AI error)
+            let cleanedContent = content.replace(/`/g, '"');
+            // 2. Fix potential trailing commas (simple case)
+            cleanedContent = cleanedContent.replace(/,(\s*[\}\]])/g, '$1');
+
             try {
-                return JSON.parse(content);
+                const parsed = JSON.parse(cleanedContent);
+                console.log(`✅ Successfully parsed JSON from ${model}`);
+                return parsed;
             } catch (e) {
-                console.error(`Failed to parse JSON from ${model}`, content);
-                continue;
+                // Try original content if cleanup failed
+                try {
+                    const parsed = JSON.parse(content);
+                    console.log(`✅ Successfully parsed JSON (original) from ${model}`);
+                    return parsed;
+                } catch (e2) {
+                    console.warn(`⚠️ JSON parse failed for ${model}, using text fallback`);
+                }
             }
+
+            // If we are here, JSON parsing failed.
+            // Check if the content looks like JSON. If so, don't use it as raw text fallback directly
+            // because that shows code to the user.
+            if (content.trim().startsWith('{') && content.includes('"intent"')) {
+                console.warn(`⚠️ Content looks like broken JSON, trying to extract fields manually`);
+
+                // Try manual extraction of final_answer_tamil using regex
+                const tamilMatch = content.match(/"final_answer_tamil"\s*:\s*[`"](.*?)[`"]\s*(?:,|\})/s);
+                if (tamilMatch && tamilMatch[1]) {
+                    return {
+                        intent: "Recovery Mode",
+                        final_answer_tamil: tamilMatch[1],
+                        final_answer_english: tamilMatch[1], // Use same for english fallback
+                        primary_analysis: { key_planet: "Analysis", status: "Completed", dasa_verdict: "Unknown" },
+                        model_consensus: "Recovered from partial JSON",
+                        reasoning: "JSON parsing failed but content was extracted."
+                    };
+                }
+            }
+
+            // Fallback: Create a basic response object from the text
+            // If the content looks like it has Tamil/English answers, use it
+            if (content.length > 100) {
+                // FORCE replace "Namaskaram" if it appears in the text fallback
+                content = content.replace(/Namaskaram/gi, "Vanakkam").replace(/Namaste/gi, "Vanakkam");
+
+                console.log(`✅ Using text response as fallback (${content.length} chars)`);
+                const fallbackResponse = {
+                    intent: "General Prediction",
+                    final_answer_tamil: content.includes('━') || content.includes('💍') || content.includes('✓')
+                        ? content
+                        : `பதில்:\n\n${content}`,
+                    final_answer_english: content,
+                    primary_analysis: {
+                        key_planet: "Multiple factors",
+                        status: "Analysis complete",
+                        dasa_verdict: "See detailed answer"
+                    },
+                    model_consensus: `Response from ${model}`,
+                    reasoning: "AI model provided direct text response"
+                };
+                console.log(`📤 Returning fallback response:`, fallbackResponse);
+                return fallbackResponse;
+            }
+
+            console.error(`❌ Response too short or invalid from ${model} (${content.length} chars)`);
+            continue;
 
         } catch (error) {
             console.error(`Network error with ${model}:`, error);

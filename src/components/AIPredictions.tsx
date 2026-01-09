@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Send, Bot, User, AlertCircle, BrainCircuit, Clock, Heart, Briefcase, Shield, Star, Users, BarChart2, Zap, FileText } from 'lucide-react';
+import { Sparkles, Send, MessageCircle, Gift, Bot, User, AlertCircle, BrainCircuit, Clock, Heart, Briefcase, Shield, Star, Users, BarChart2, Zap, FileText } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom'; // Import useLocation, useNavigate
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../lib/firebase';
@@ -8,6 +8,10 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 
 import { useAuth } from '../contexts/AuthContext';
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 import FeedbackWidget from './FeedbackWidget';
+import PromoCodeModal from './PromoCodeModal';
+import ChatLimitWarning from './ChatLimitWarning';
+import PromoStatusBadge from './PromoStatusBadge';
+import { initDeviceTracking, generateFingerprint, getIPAddress } from '../utils/deviceFingerprint';
 
 interface AIPredictionsProps {
     data: any;
@@ -20,12 +24,19 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const location = useLocation(); // Hook to get navigation state
     const [prediction, setPrediction] = useState<OrchestratorResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingStatus, setLoadingStatus] = useState('');
     const [error, setError] = useState('');
     const [chatHistory, setChatHistory] = useState<any[]>([]);
     const [question, setQuestion] = useState('');
     const [responseLanguage, setResponseLanguage] = useState<'en' | 'ta'>('en');
     const chatEndRef = useRef<HTMLDivElement>(null);
     const { user } = useAuth(); // Auth context
+
+    // Chat Limit State
+    const [chatLimit, setChatLimit] = useState({ canChat: true, remaining: 5, limit: 5, hasPromo: false });
+    const [promoStatus, setPromoStatus] = useState<{ hasActivePromo: boolean; promoCode?: string; expiresAt?: Date; duration?: string } | null>(null);
+    const [showPromoModal, setShowPromoModal] = useState(false);
+    const [deviceInfo, setDeviceInfo] = useState<{ fingerprint: string; ipAddress: string } | null>(null);
 
     // Check for initial message from navigation (e.g., from "Wrong Prediction" button)
     useEffect(() => {
@@ -41,18 +52,41 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         if (!user || !data) return;
 
         // Generate a simplified chart ID or use Name+DOB key
-        const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_');
-        const messagesRef = collection(db, `users/${user.uid}/charts/${chartId}/messages`);
+        const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()} `.replace(/[^a-zA-Z0-9]/g, '_');
+        const messagesRef = collection(db, `users / ${user.uid} /charts/${chartId}/messages`);
         const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const msgs = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+        const unsubscribe = onSnapshot(q,
+            (snapshot) => {
+                const msgs = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
 
-            // Add welcome message if chat is empty
-            if (msgs.length === 0) {
+                // Add welcome message if chat is empty
+                if (msgs.length === 0) {
+                    const userName = data.userDetails.name || 'there';
+                    const welcomeMsg = {
+                        id: 'welcome',
+                        role: 'assistant',
+                        content: language === 'ta'
+                            ? `வணக்கம் ${userName}! 🙏✨\n\nநான் உங்கள் ஜோதிட ஆலோசகர். உங்கள் ஜாதகம் பற்றி எந்த கேள்வியும் கேளுங்கள்.\n\n💼 தொழில்\n💑 திருமணம்\n🏠 சொத்து\n✈️ வெளிநாடு\n👶 குழந்தை\n\nஎன்ன தெரிந்து கொள்ள விரும்புகிறீர்கள்?`
+                            : `Hello ${userName}! 🙏✨\n\nI'm your Vedic Astrology advisor. Ask me anything about your birth chart.\n\n💼 Career\n💑 Marriage\n🏠 Property\n✈️ Foreign Travel\n👶 Children\n\nWhat would you like to know?`,
+                        timestamp: new Date(),
+                        isWelcome: true
+                    };
+                    setChatHistory([welcomeMsg]);
+                } else {
+                    setChatHistory(msgs);
+                }
+
+                // Scroll to bottom on load
+                setTimeout(scrollToBottom, 100);
+            },
+            (error) => {
+                // Handle permission errors gracefully - use local-only chat
+                console.warn('⚠️ Chat history unavailable (Firestore permissions):', error.message);
+                // Initialize with welcome message for local-only mode
                 const userName = data.userDetails.name || 'there';
                 const welcomeMsg = {
                     id: 'welcome',
@@ -64,13 +98,8 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     isWelcome: true
                 };
                 setChatHistory([welcomeMsg]);
-            } else {
-                setChatHistory(msgs);
             }
-
-            // Scroll to bottom on load
-            setTimeout(scrollToBottom, 100);
-        });
+        );
 
         return () => unsubscribe();
     }, [user, data, language]);
@@ -112,6 +141,72 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         loadDasa();
     }, [data]);
 
+    // Initialize Device Tracking
+    useEffect(() => {
+        const initTracking = async () => {
+            if (!user) return;
+            try {
+                const tracking = await initDeviceTracking(user.uid);
+                setDeviceInfo({
+                    fingerprint: tracking.fingerprint,
+                    ipAddress: tracking.ipAddress
+                });
+            } catch (error) {
+                console.error('Device tracking error:', error);
+            }
+        };
+        initTracking();
+    }, [user]);
+
+    // Check Chat Limit and Promo Status
+    useEffect(() => {
+        const checkLimits = async () => {
+            if (!user || !deviceInfo) return;
+
+            try {
+                // Check promo status
+                const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+                const promoResponse = await fetch(`${apiUrl}/api/promo/status/${user.uid}`);
+                const promoData = await promoResponse.json();
+
+                if (promoData.success && promoData.hasActivePromo) {
+                    setPromoStatus({
+                        hasActivePromo: true,
+                        promoCode: promoData.promoCode,
+                        expiresAt: new Date(promoData.expiresAt),
+                        duration: promoData.duration
+                    });
+                    setChatLimit({ canChat: true, remaining: -1, limit: 5, hasPromo: true });
+                    return;
+                }
+
+                // Check chat limit
+                const limitResponse = await fetch(`${apiUrl}/api/chat/check-limit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        uid: user.uid,
+                        deviceFingerprint: deviceInfo.fingerprint
+                    })
+                });
+
+                const limitData = await limitResponse.json();
+                if (limitData.success) {
+                    setChatLimit({
+                        canChat: limitData.canChat,
+                        remaining: limitData.remaining,
+                        limit: limitData.limit || 5,
+                        hasPromo: limitData.hasPromo
+                    });
+                }
+            } catch (error) {
+                console.error('Error checking limits:', error);
+            }
+        };
+
+        checkLimits();
+    }, [user, deviceInfo]);
+
     const scrollToBottom = () => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -122,16 +217,30 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         e.preventDefault();
         if (!question.trim()) return;
 
-        // Optimistic Update (will apply only if not logged in, otherwise Firestore syncs)
+        // Check chat limit before sending
+        if (!chatLimit.canChat && !chatLimit.hasPromo) {
+            setError(language === 'ta'
+                ? 'இன்றைய அரட்டை வரம்பு எட்டப்பட்டது. நாளைக்கு மீண்டும் முயற்சிக்கவும் அல்லது ப்ரோமோ குறியீட்டைப் பயன்படுத்தவும்.'
+                : 'Daily chat limit reached. Try again tomorrow or use a promo code.'
+            );
+            setShowPromoModal(true);
+            return;
+        }
+
+        // Always add message to local chat history immediately for instant feedback
         const userMsg = { role: 'user', content: question, timestamp: new Date() };
-        if (!user) {
-            setChatHistory(prev => [...prev, userMsg]);
-        } else {
-            saveMessageToFirestore(userMsg);
+        setChatHistory(prev => [...prev, userMsg]);
+
+        // Also save to Firestore in background if user is logged in (non-blocking)
+        if (user) {
+            saveMessageToFirestore(userMsg).catch(err => {
+                console.warn('Failed to save user message to Firestore:', err.message);
+            });
         }
 
         setQuestion('');
         setIsLoading(true);
+        setLoadingStatus(isTamil ? 'உங்கள் தரவை சேகரிக்கிறோம்...' : 'Collecting your data...');
         setError('');
 
         try {
@@ -212,25 +321,166 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 responseLanguage: responseLanguage
             });
 
-            // Call the Orchestrator with enriched data
-            const response = await queryAstrologyOrchestrator(question, enrichedData, responseLanguage);
+            // Update status before calling AI
+            setLoadingStatus(isTamil ? 'உங்கள் ஜாதகத்தை பகுப்பாய்வு செய்கிறோம்...' : 'Analyzing your chart...');
+
+            // Call the Orchestrator with enriched data (with 120s timeout for free models)
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('AI response timeout - please try again')), 120000)
+            );
+
+            const response = await Promise.race([
+                queryAstrologyOrchestrator(question, enrichedData, responseLanguage),
+                timeoutPromise
+            ]) as any;
+
+            console.log('✅ Got AI response:', response);
+            console.log('Response structure:', {
+                hasTamil: !!response.final_answer_tamil,
+                hasEnglish: !!response.final_answer_english,
+                responseLanguage: responseLanguage
+            });
 
             setPrediction(response);
 
-            // Add AI response to history
-            const aiContent = responseLanguage === 'ta' ? response.final_answer_tamil : response.final_answer_english;
+            // Add AI response to history - always add to local chat for instant display
+            // Extract content with fallbacks
+            // Extract content with robust fallbacks
+            let aiContent = '';
+            let parsedResponse = response;
+
+            // 1. Handle if response is a string (might be JSON string or plain text)
+            if (typeof response === 'string') {
+                try {
+                    // Try to parse it as JSON
+                    parsedResponse = JSON.parse(response);
+                } catch (e) {
+                    // If parsing fails, usage the string as-is (fallback)
+                    console.log('Response is a string but not valid JSON, using as raw text');
+                    aiContent = response;
+                }
+            }
+
+            // 2. If we have an object (either originally or successfully parsed)
+            if (typeof parsedResponse === 'object' && parsedResponse !== null) {
+                if (responseLanguage === 'ta') {
+                    aiContent = parsedResponse.final_answer_tamil || parsedResponse.final_answer_english || parsedResponse.answer;
+                } else {
+                    aiContent = parsedResponse.final_answer_english || parsedResponse.final_answer_tamil || parsedResponse.answer;
+                }
+
+                // If still empty, check if it's the raw JSON string itself (last resort)
+                if (!aiContent) {
+                    aiContent = JSON.stringify(parsedResponse, null, 2);
+                }
+            }
+
+            // 3. Clean up content (remove quotes if it looks like a stringified string)
+            if (typeof aiContent === 'string') {
+                // If the content is wrapped in quotes or backticks, strip them
+                aiContent = aiContent.replace(/^["'`]|["'`]$/g, '');
+                // Replace escaped newlines
+                aiContent = aiContent.replace(/\\n/g, '\n');
+            }
+
+            console.log('Extracted AI content (first 200 chars):', aiContent.substring(0, 200));
             const aiMsg = { role: 'ai', content: aiContent, details: response, timestamp: new Date() };
 
-            if (!user) {
-                setChatHistory(prev => [...prev, aiMsg]);
-            } else {
-                saveMessageToFirestore(aiMsg);
+            setChatHistory(prev => [...prev, aiMsg]);
+
+            // Also save to Firestore in background if user is logged in (non-blocking)
+            if (user) {
+                saveMessageToFirestore(aiMsg).catch(err => {
+                    console.warn('Failed to save AI message to Firestore:', err.message);
+                });
+            }
+
+            // Increment chat count if not using promo
+            if (!chatLimit.hasPromo && user && deviceInfo) {
+                try {
+                    const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+                    await fetch(`${apiUrl}/api/chat/increment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            uid: user.uid,
+                            deviceFingerprint: deviceInfo.fingerprint,
+                            ipAddress: deviceInfo.ipAddress
+                        })
+                    });
+
+                    // Update local state
+                    setChatLimit(prev => ({
+                        ...prev,
+                        remaining: Math.max(0, prev.remaining - 1),
+                        canChat: prev.remaining > 1
+                    }));
+                } catch (error) {
+                    console.error('Error incrementing chat count:', error);
+                }
             }
 
         } catch (err: any) {
+            console.error('❌ AI Chat Error:', err);
+            console.error('Error details:', {
+                message: err.message,
+                stack: err.stack,
+                name: err.name
+            });
             setError(err.message || "Failed to get prediction");
         } finally {
             setIsLoading(false);
+            setLoadingStatus('');
+        }
+    };
+
+    // Handle Promo Code Activation
+    const handlePromoActivation = async (code: string) => {
+        if (!user) {
+            return { success: false, message: 'Please log in to activate promo code' };
+        }
+
+        try {
+            const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${apiUrl}/api/promo/activate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    uid: user.uid,
+                    promoCode: code
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update promo status
+                setPromoStatus({
+                    hasActivePromo: true,
+                    promoCode: code,
+                    expiresAt: new Date(data.expiresAt),
+                    duration: data.duration
+                });
+
+                // Update chat limit
+                setChatLimit({
+                    canChat: true,
+                    remaining: -1,
+                    limit: 5,
+                    hasPromo: true
+                });
+
+                return {
+                    success: true,
+                    message: data.message,
+                    expiresAt: new Date(data.expiresAt),
+                    duration: data.duration
+                };
+            } else {
+                return { success: false, message: data.message };
+            }
+        } catch (error: any) {
+            return { success: false, message: error.message || 'Failed to activate promo code' };
         }
     };
 
@@ -251,6 +501,17 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             {/* Chat Interface */}
             <div className="flex-1 glass-panel flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {/* Promo Status Badge */}
+                    {promoStatus?.hasActivePromo && promoStatus.promoCode && promoStatus.expiresAt && (
+                        <PromoStatusBadge
+                            promoCode={promoStatus.promoCode}
+                            expiresAt={promoStatus.expiresAt}
+                            duration={promoStatus.duration || 'week'}
+                        />
+                    )}
+
+                    {/* Removed large chat limit warning - now using compact button */}
+
                     {chatHistory.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto px-4 py-8">
 
@@ -481,7 +742,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                             </div>
                             <div className="bg-indigo-900/30 border border-indigo-500/20 rounded-2xl p-5 shadow-lg shadow-indigo-500/10">
                                 <div className="flex items-center gap-3 text-indigo-300">
-                                    <span className="text-sm">{isTamil ? 'AI ஜோதிடர் உங்கள் ஜாதகத்தை பார்க்கிறார்...' : 'AI Astrologer is analyzing your chart...'}</span>
+                                    <span className="text-sm">{loadingStatus || (isTamil ? 'AI ஜோதிடர் உங்கள் ஜாதகத்தை பார்க்கிறார்...' : 'AI Astrologer is analyzing your chart...')}</span>
                                     <div className="flex gap-1">
                                         <span className="animate-bounce">●</span>
                                         <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>●</span>
@@ -510,24 +771,69 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     <div ref={chatEndRef} />
                 </div>
 
-                <div className="p-4 border-t border-slate-800 bg-slate-900/50 space-y-3">
-                    {/* Language Toggle */}
-                    <div className="flex justify-end gap-2 text-xs">
-                        <span className="text-slate-400 self-center">Answer in:</span>
-                        <button
-                            onClick={() => setResponseLanguage('en')}
-                            className={`px-3 py-1 rounded-full border transition-colors ${responseLanguage === 'en' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
-                        >
-                            English
-                        </button>
-                        <button
-                            onClick={() => setResponseLanguage('ta')}
-                            className={`px-3 py-1 rounded-full border transition-colors ${responseLanguage === 'ta' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
-                        >
-                            தமிழ்
-                        </button>
+                {/* Input Area */}
+                <div className="p-4 border-t border-white/10">
+                    {/* Top bar with language selector, chat count, and promo button */}
+                    <div className="flex items-center justify-between mb-3">
+                        {/* Language Selector */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-400 text-sm">Answer in:</span>
+                            <button
+                                onClick={() => setResponseLanguage('en')}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${responseLanguage === 'en'
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                                    }`}
+                            >
+                                English
+                            </button>
+                            <button
+                                onClick={() => setResponseLanguage('ta')}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${responseLanguage === 'ta'
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                                    }`}
+                            >
+                                தமிழ்
+                            </button>
+                        </div>
+
+                        {/* Chat Count and Promo Button */}
+                        <div className="flex items-center gap-2">
+                            {/* Chat Count Display */}
+                            {!chatLimit.hasPromo && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                    <MessageCircle className="w-4 h-4 text-blue-400" />
+                                    <span className="text-sm font-medium text-blue-300">
+                                        {chatLimit.remaining}/{chatLimit.limit}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Promo Status or Button */}
+                            {promoStatus?.hasActivePromo ? (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                                    <Gift className="w-4 h-4 text-purple-400" />
+                                    <span className="text-sm font-medium text-purple-300">
+                                        {isTamil ? 'வரம்பற்றது' : 'Unlimited'}
+                                    </span>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowPromoModal(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 hover:border-purple-500/50 rounded-lg transition-all group"
+                                    title={isTamil ? 'ப்ரோமோ குறியீடு' : 'Promo Code'}
+                                >
+                                    <Gift className="w-4 h-4 text-purple-400 group-hover:text-purple-300" />
+                                    <span className="text-sm font-medium text-purple-300 group-hover:text-purple-200">
+                                        {isTamil ? 'குறியீடு' : 'Code'}
+                                    </span>
+                                </button>
+                            )}
+                        </div>
                     </div>
 
+                    {/* Question Input Form */}
                     <form onSubmit={handleAskQuestion} className="flex gap-2">
                         <input
                             type="text"
@@ -546,8 +852,16 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     </form>
                 </div>
             </div>
+
+            {/* Promo Code Modal */}
+            <PromoCodeModal
+                isOpen={showPromoModal}
+                onClose={() => setShowPromoModal(false)}
+                onActivate={handlePromoActivation}
+            />
         </div>
     );
 };
 
 export default AIPredictions;
+

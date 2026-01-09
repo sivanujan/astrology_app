@@ -25,6 +25,7 @@ import EmailVerification from './pages/EmailVerification';
 import Dashboard from './pages/Dashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminPromoCodes from './pages/AdminPromoCodes';
 import DashaPredictionsPage from './pages/DashaPredictionsPage';
 import SEO from './components/SEO';
 import InstallPWA from './components/InstallPWA';
@@ -115,6 +116,12 @@ const AppRoutes = () => {
         <>
           <SEO title="Admin Dashboard" />
           <AdminDashboard />
+        </>
+      } />
+      <Route path="/admin/promo-codes" element={
+        <>
+          <SEO title="Promo Code Management" />
+          <AdminPromoCodes />
         </>
       } />
 

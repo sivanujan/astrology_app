@@ -1119,71 +1119,84 @@ export const predictDetailedMarriageTiming = (
     // --- Sequence Logic (Waterfall with Smart Gap Fill) ---
     // User Requirement: "Saturn (P1) near... if gap (e.g. 2026 to 2041) find intermediate valid periods"
 
-    // Sort all by date first
-    p1Periods.sort((a, b) => a.start.getTime() - b.start.getTime());
-    p2Periods.sort((a, b) => a.start.getTime() - b.start.getTime());
-    validPeriods.sort((a, b) => a.start.getTime() - b.start.getTime());
+    // Helper function to safely get time from date (handles Date, string, and Firestore Timestamp)
+    const getTime = (date: Date | string | any): number => {
+        if (!date) {
+            // console.warn('getTime called with null/undefined date'); // Optional: uncomment if needed
+            return 0;
+        }
+        if (typeof date === 'string') {
+            return new Date(date).getTime();
+        }
+        if (date instanceof Date) {
+            return date.getTime();
+        }
+        // Handle Firestore Timestamp (has toDate)
+        if (typeof date.toDate === 'function') {
+            return date.toDate().getTime();
+        }
+        // Handle serialized Firestore Timestamp (has seconds)
+        if (typeof date === 'object' && 'seconds' in date) {
+            return date.seconds * 1000;
+        }
+        // Handle generic object with getTime
+        if (typeof date === 'object' && typeof date.getTime === 'function') {
+            return date.getTime();
+        }
+
+        console.warn('getTime called with invalid date type:', typeof date, date);
+        return 0;
+    };
+
+    // Sort all by date first (with safe date conversion)
+    p1Periods.sort((a, b) => getTime(a.start) - getTime(b.start));
+    p2Periods.sort((a, b) => getTime(a.start) - getTime(b.start));
+    validPeriods.sort((a, b) => getTime(a.start) - getTime(b.start));
 
     // 1. Start with P1 periods as the baseline.
     let selectedPeriods = [...p1Periods];
 
     // 2. Gap Analysis & Fill
-    // If P1 is empty, or has large gaps, fill with P2 or General Valid.
-    const GAP_THRESHOLD_YEARS = 3.5;
+    const GAP_THRESHOLD_YEARS = 3; // If next period is >3 years away, fill with intermediate
+    const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
+    const nowTime = Date.now();
 
-    const nowTime = now.getTime();
-    const msPerYear = 1000 * 60 * 60 * 24 * 365.25;
-
-    // A. Initial Gap Check (Now to First P1)
-    if (selectedPeriods.length === 0 || (selectedPeriods[0].start.getTime() - nowTime) / msPerYear > GAP_THRESHOLD_YEARS) {
-        // Find fillers before the first P1
-        const endLimit = selectedPeriods.length > 0 ? selectedPeriods[0].start : new Date(now.getFullYear() + 10, 0, 1);
-
-        // Prefer P2 fillers first
-        const p2Fillers = p2Periods.filter(p => !p.isPriority1 && p.start >= now && p.start < endLimit);
-        // If no P2, us generic valid fillers
-        const genericFillers = validPeriods.filter(p => !p.isPriority1 && p.start >= now && p.start < endLimit);
-
-        const fillers = p2Fillers.length > 0 ? p2Fillers : genericFillers;
-
-        fillers.forEach(f => {
-            // Add unique
-            if (!selectedPeriods.some(sp => sp.dasa === f.dasa && sp.bhukti === f.bhukti && sp.antaram === f.antaram)) {
-                selectedPeriods.push(f);
-            }
+    // If no P1 periods or first P1 is too far, look for intermediate periods
+    if (selectedPeriods.length === 0 || (getTime(selectedPeriods[0].start) - nowTime) / msPerYear > GAP_THRESHOLD_YEARS) {
+        // Find valid periods that start sooner
+        const intermediate = validPeriods.filter(vp => {
+            const vpTime = getTime(vp.start);
+            return vpTime < (selectedPeriods.length > 0 ? getTime(selectedPeriods[0].start) : Infinity) &&
+                vpTime > nowTime;
         });
+        selectedPeriods = [...intermediate, ...selectedPeriods];
     }
 
-    // B. Inter-Period Gap Check (Between P1s)
-    // We iterate through valid periods and check if they fall into any "empty" space between P1s
-    // Simple heuristic: If a valid period is > 2 years away from ANY P1 period, include it.
-    const otherHighQuality = validPeriods.filter(p => !p.isPriority1);
-
-    otherHighQuality.forEach(other => {
-        // Is this 'other' period useful? 
-        // useful if it occupies a time slot where NO P1 period exists within +/- 2 years.
-        const isCoveredByP1 = p1Periods.some(p1 => {
-            const diffYears = Math.abs(p1.start.getTime() - other.start.getTime()) / msPerYear;
-            return diffYears < 2.5; // If within 2.5 years of a P1, assume P1 covers it.
+    // 3. Merge P2 if needed
+    // If we still have gaps between selected periods, insert P2 periods
+    for (const p2 of p2Periods) {
+        const p2Time = getTime(p2.start);
+        // Check if there's a gap before/after this P2 period
+        const hasNearby = selectedPeriods.some(p1 => {
+            const diffYears = Math.abs(getTime(p1.start) - p2Time) / msPerYear;
+            return diffYears < GAP_THRESHOLD_YEARS;
         });
 
-        if (!isCoveredByP1) {
-            // Add only if not already added
-            if (!selectedPeriods.some(sp => sp.dasa === other.dasa && sp.bhukti === other.bhukti && sp.antaram === other.antaram)) {
-                selectedPeriods.push(other);
-            }
+        if (!hasNearby) {
+            selectedPeriods.push(p2);
         }
+    }
+
+    // 4. Remove duplicates and sort
+    const seen = new Set<string>();
+    finalPeriods = selectedPeriods.filter(p => {
+        const key = `${p.dasa}_${p.bhukti}_${getTime(p.start)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
     });
 
-    finalPeriods = selectedPeriods;
-
-    // Fallback: If absolutely nothing selected (rare), revert to validPeriods
-    if (finalPeriods.length === 0) {
-        finalPeriods = validPeriods;
-    }
-
-    // Final Sort by Date
-    finalPeriods.sort((a, b) => a.start.getTime() - b.start.getTime());
+    finalPeriods.sort((a, b) => getTime(a.start) - getTime(b.start));
 
     // --- Step 4: Final Prediction Output ---
     let answer = "";
@@ -1212,8 +1225,10 @@ export const predictDetailedMarriageTiming = (
         const topPeriods = finalPeriods.slice(0, 3);
 
         const periodTexts = topPeriods.map(p => {
-            const startStr = p.start.toLocaleDateString(language, { month: 'short', year: 'numeric' });
-            const endStr = p.end.toLocaleDateString(language, { month: 'short', year: 'numeric' });
+            const startDate = typeof p.start === 'string' ? new Date(p.start) : p.start;
+            const endDate = typeof p.end === 'string' ? new Date(p.end) : p.end;
+            const startStr = startDate.toLocaleDateString(language, { month: 'short', year: 'numeric' });
+            const endStr = endDate.toLocaleDateString(language, { month: 'short', year: 'numeric' });
             const scoreLabel = isTamil ? "மதிப்பெண்" : "Score";
             const priorityLabel = p.isPriority1 ? (isTamil ? "(முக்கிய காலம்)" : "(Primary Period)") : "";
             return `**${startStr} - ${endStr}**: ${p.dasa}/${p.bhukti}/${p.antaram} ${priorityLabel}`;
