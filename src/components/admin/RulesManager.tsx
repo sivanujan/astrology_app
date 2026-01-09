@@ -15,8 +15,20 @@ const RulesManager = () => {
 
     const fetchRules = async () => {
         setIsLoading(true);
-        const data = await adminService.getAllRules();
-        setRules(data);
+        try {
+            const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${apiUrl}/api/admin/rules`);
+            const data = await response.json();
+
+            if (data.success) {
+                setRules(data.rules);
+            } else {
+                setRules([]);
+            }
+        } catch (error) {
+            console.error('Error fetching rules:', error);
+            setRules([]);
+        }
         setIsLoading(false);
     };
 
@@ -178,8 +190,8 @@ const RulesManager = () => {
                         <div className="flex-1">
                             <div className="flex items-center gap-3 mb-1">
                                 <span className={`text-xs px-2 py-0.5 rounded border ${rule.category === 'Lagna' ? 'bg-indigo-900/30 text-indigo-300 border-indigo-800' :
-                                        rule.category === 'Planet' ? 'bg-pink-900/30 text-pink-300 border-pink-800' :
-                                            'bg-slate-800 text-slate-400 border-slate-700'
+                                    rule.category === 'Planet' ? 'bg-pink-900/30 text-pink-300 border-pink-800' :
+                                        'bg-slate-800 text-slate-400 border-slate-700'
                                     }`}>
                                     {rule.category}
                                 </span>

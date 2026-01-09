@@ -1410,7 +1410,14 @@ CURRENT DASHA STATUS:
             CriticalInstruction: "ALL DASHA-BHUKTI-ANTARA DATA IS COMPLETE ABOVE. Use this for TIMING predictions. Check House Lordship to understand which planet controls which life area. Use Subathuvam scores to determine quality of results."
         };
 
+        // DYNAMIC LANGUAGE INSTRUCTION
+        const languageInstruction = language === 'ta'
+            ? `\n**CRITICAL LANGUAGE RULE**: \nThe user has requested the response in TAMIL (தமிழ்). \nYOU MUST OUTPUT THE 'final_answer_tamil' AND 'reasoning' COMPLETELY IN TAMIL SCRIPT. \nDO NOT USE ENGLISH FOR THE MAIN EXPLANATION. \nUse English only for specific technical terms if needed in brackets.`
+            : `\n**CRITICAL LANGUAGE RULE**: \nThe user has requested the response in ENGLISH.`;
+
         systemPrompt = `
+${languageInstruction}
+
 ${forcedDashaString}
 
         Role & Persona:

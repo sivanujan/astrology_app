@@ -28,12 +28,12 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const [error, setError] = useState('');
     const [chatHistory, setChatHistory] = useState<any[]>([]);
     const [question, setQuestion] = useState('');
-    const [responseLanguage, setResponseLanguage] = useState<'en' | 'ta'>('en');
+    const [responseLanguage, setResponseLanguage] = useState<'en' | 'ta'>('en'); // LOCAL chat language, independent from app language
     const chatEndRef = useRef<HTMLDivElement>(null);
     const { user } = useAuth(); // Auth context
 
-    // Chat Limit State
-    const [chatLimit, setChatLimit] = useState({ canChat: true, remaining: 5, limit: 5, hasPromo: false });
+    // Chat Limit State - START BLOCKED, then enable after API confirms
+    const [chatLimit, setChatLimit] = useState({ canChat: false, remaining: 0, limit: 2, hasPromo: false });
     const [promoStatus, setPromoStatus] = useState<{ hasActivePromo: boolean; promoCode?: string; expiresAt?: Date; duration?: string } | null>(null);
     const [showPromoModal, setShowPromoModal] = useState(false);
     const [deviceInfo, setDeviceInfo] = useState<{ fingerprint: string; ipAddress: string } | null>(null);
@@ -52,8 +52,8 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         if (!user || !data) return;
 
         // Generate a simplified chart ID or use Name+DOB key
-        const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()} `.replace(/[^a-zA-Z0-9]/g, '_');
-        const messagesRef = collection(db, `users / ${user.uid} /charts/${chartId}/messages`);
+        const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_');
+        const messagesRef = collection(db, `users/${user.uid}/charts/${chartId}/messages`);
         const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
         const unsubscribe = onSnapshot(q,
@@ -108,20 +108,28 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const saveMessageToFirestore = async (msg: any) => {
         if (!user || !data) return;
         try {
-            const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_');
-            await addDoc(collection(db, `users/${user.uid}/charts/${chartId}/messages`), {
-                ...msg,
-                timestamp: serverTimestamp()
+            // Get device fingerprint and IP
+            const deviceId = await generateFingerprint();
+            const ipAddress = await getIPAddress();
+
+            // Save to ai_chat_messages collection for admin tracking
+            await addDoc(collection(db, `users/${user.uid}/ai_chat_messages`), {
+                userQuestion: msg.sender === 'user' ? msg.text : '',
+                aiResponse: msg.sender === 'ai' ? msg.text : '',
+                question: msg.sender === 'user' ? msg.text : '',
+                response: msg.sender === 'ai' ? msg.text : '',
+                timestamp: serverTimestamp(),
+                language: language,
+                userId: user.uid,
+                deviceFingerprint: deviceId,
+                ipAddress: ipAddress || 'Unknown'
             });
         } catch (e) {
             console.error("Error saving message:", e);
         }
     };
 
-    // Sync initial response language with app language
-    useEffect(() => {
-        setResponseLanguage(language);
-    }, [language]);
+    // Language is now directly from context - no separate state needed
 
     // Calculate Dasa locally for display (Consistency Check)
     const [systemDasa, setSystemDasa] = useState<any>(null);
@@ -158,29 +166,45 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         initTracking();
     }, [user]);
 
-    // Check Chat Limit and Promo Status
+    // Check Chat Limit and Promo Status - DATABASE ONLY
     useEffect(() => {
         const checkLimits = async () => {
-            if (!user || !deviceInfo) return;
+            if (!user) {
+                console.log('⏸️ No user logged in - skipping limit check');
+                setChatLimit({ canChat: true, remaining: 2, limit: 2, hasPromo: false });
+                return;
+            }
+
+            if (!deviceInfo) {
+                console.log('⏸️ Device tracking loading...');
+                return;
+            }
+
+            console.log('🔍 Checking chat limits from DATABASE for user:', user.uid);
 
             try {
-                // Check promo status
                 const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+
+                // Check promo status first
+                console.log('📡 Fetching promo status...');
                 const promoResponse = await fetch(`${apiUrl}/api/promo/status/${user.uid}`);
                 const promoData = await promoResponse.json();
+                console.log('📨 Promo response:', promoData);
 
                 if (promoData.success && promoData.hasActivePromo) {
+                    console.log('✅ User has active promo - unlimited chats!');
                     setPromoStatus({
                         hasActivePromo: true,
                         promoCode: promoData.promoCode,
                         expiresAt: new Date(promoData.expiresAt),
                         duration: promoData.duration
                     });
-                    setChatLimit({ canChat: true, remaining: -1, limit: 5, hasPromo: true });
+                    setChatLimit({ canChat: true, remaining: -1, limit: 2, hasPromo: true });
                     return;
                 }
 
-                // Check chat limit
+                // Check chat limit from database
+                console.log('📡 Fetching chat limit from database...');
                 const limitResponse = await fetch(`${apiUrl}/api/chat/check-limit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -190,17 +214,38 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     })
                 });
 
+                if (!limitResponse.ok) {
+                    throw new Error(`HTTP ${limitResponse.status}: ${limitResponse.statusText}`);
+                }
+
                 const limitData = await limitResponse.json();
+                console.log('📨 Chat limit response:', limitData);
+
                 if (limitData.success) {
-                    setChatLimit({
+                    const newLimit = {
                         canChat: limitData.canChat,
                         remaining: limitData.remaining,
-                        limit: limitData.limit || 5,
-                        hasPromo: limitData.hasPromo
-                    });
+                        limit: limitData.limit || 2,
+                        hasPromo: limitData.hasPromo || false
+                    };
+                    console.log('✅ Chat limit loaded from DATABASE:', newLimit);
+                    console.log('⚡ SETTING STATE NOW:', newLimit);
+                    setChatLimit(newLimit);
+                    console.log('✔️ State has been set (might not update instantly due to React batching)');
+                } else {
+                    console.error('❌ Backend returned success=false:', limitData);
+                    // Conservative fallback - allow 5 chats
+                    setChatLimit({ canChat: true, remaining: 2, limit: 2, hasPromo: false });
                 }
-            } catch (error) {
-                console.error('Error checking limits:', error);
+            } catch (error: any) {
+                console.error('❌ CRITICAL ERROR checking limits:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack
+                });
+                // On error, allow chats but warn
+                setChatLimit({ canChat: true, remaining: 2, limit: 2, hasPromo: false });
+                alert('Warning: Could not verify chat limit. Please check your connection.');
             }
         };
 
@@ -217,15 +262,10 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         e.preventDefault();
         if (!question.trim()) return;
 
-        // Check chat limit before sending
-        if (!chatLimit.canChat && !chatLimit.hasPromo) {
-            setError(language === 'ta'
-                ? 'இன்றைய அரட்டை வரம்பு எட்டப்பட்டது. நாளைக்கு மீண்டும் முயற்சிக்கவும் அல்லது ப்ரோமோ குறியீட்டைப் பயன்படுத்தவும்.'
-                : 'Daily chat limit reached. Try again tomorrow or use a promo code.'
-            );
-            setShowPromoModal(true);
-            return;
-        }
+        // Removed frontend blocking - better UX to let user send message first
+        // Backend will handle limits and we'll show friendly error after attempt
+
+        console.log('✅ Allowing chat message to proceed. Backend will enforce limits if needed.');
 
         // Always add message to local chat history immediately for instant feedback
         const userMsg = { role: 'user', content: question, timestamp: new Date() };
@@ -318,7 +358,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 hasSchedule: !!enrichedData.dashaPeriods,
                 scheduleLength: enrichedData.dashaPeriods?.length || 0,
                 hasSubathuvam: !!enrichedData.subathuvam_calculations,
-                responseLanguage: responseLanguage
+                language: language
             });
 
             // Update status before calling AI
@@ -338,7 +378,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             console.log('Response structure:', {
                 hasTamil: !!response.final_answer_tamil,
                 hasEnglish: !!response.final_answer_english,
-                responseLanguage: responseLanguage
+                language: language
             });
 
             setPrediction(response);
@@ -395,11 +435,12 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 });
             }
 
-            // Increment chat count if not using promo
+            // Increment chat count if not using promo - DATABASE ONLY
             if (!chatLimit.hasPromo && user && deviceInfo) {
                 try {
+                    console.log('📤 Incrementing chat count in database...');
                     const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
-                    await fetch(`${apiUrl}/api/chat/increment`, {
+                    const response = await fetch(`${apiUrl}/api/chat/increment`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -409,14 +450,72 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                         })
                     });
 
-                    // Update local state
-                    setChatLimit(prev => ({
-                        ...prev,
-                        remaining: Math.max(0, prev.remaining - 1),
-                        canChat: prev.remaining > 1
-                    }));
-                } catch (error) {
-                    console.error('Error incrementing chat count:', error);
+                    if (!response.ok) {
+                        throw new Error(`Failed to increment: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    console.log('📨 Increment response:', result);
+
+                    // Update local state immediately for responsive UI
+                    setChatLimit(prev => {
+                        const updated = {
+                            ...prev,
+                            remaining: Math.max(0, prev.remaining - 1),
+                            canChat: prev.remaining > 1
+                        };
+                        console.log('💬 Chat count updated:', updated);
+                        return updated;
+                    });
+
+                    // Re-fetch the actual count from database after a short delay
+                    setTimeout(async () => {
+                        try {
+                            const limitResponse = await fetch(`${apiUrl}/api/chat/check-limit`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    uid: user.uid,
+                                    deviceFingerprint: deviceInfo.fingerprint
+                                })
+                            });
+                            const limitData = await limitResponse.json();
+                            if (limitData.success) {
+                                console.log('🔄 Refreshed count from database:', limitData);
+                                setChatLimit({
+                                    canChat: limitData.canChat,
+                                    remaining: limitData.remaining,
+                                    limit: limitData.limit || 2,
+                                    hasPromo: limitData.hasPromo || false
+                                });
+                            }
+                        } catch (err: any) {
+                            console.warn('Failed to refresh count:', err);
+                        }
+                    }, 1000);
+
+                } catch (error: any) {
+                    // Handle 429 (Too Many Requests) specifically - this is the limit being enforced
+                    if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+                        console.log('🚫 Chat limit enforced by backend (this is normal protection)');
+                        // Update UI to show limit reached
+                        setChatLimit({
+                            canChat: false,
+                            remaining: 0,
+                            limit: 2,
+                            hasPromo: false
+                        });
+                        // Show friendly message
+                        setTimeout(() => {
+                            setError(language === 'ta'
+                                ? 'இன்றைய அரட்டை வரம்பு எட்டப்பட்டது. நாளைக்கு மீண்டும் முயற்சிக்கவும்!'
+                                : 'Daily chat limit reached! Try again tomorrow or use a promo code.'
+                            );
+                            setShowPromoModal(true);
+                        }, 500);
+                    } else {
+                        console.error('❌ Error incrementing chat count:', error);
+                    }
                 }
             }
 
@@ -805,8 +904,9 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                                     <MessageCircle className="w-4 h-4 text-blue-400" />
                                     <span className="text-sm font-medium text-blue-300">
-                                        {chatLimit.remaining}/{chatLimit.limit}
+                                        {chatLimit.limit - chatLimit.remaining}/{chatLimit.limit}
                                     </span>
+                                    <span className="text-xs text-blue-400/60">used</span>
                                 </div>
                             )}
 
@@ -833,19 +933,55 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                         </div>
                     </div>
 
+                    {/* LIMIT REACHED WARNING - Now shown AFTER user tries to send (handled in handleAskQuestion) */}
+                    {/* Commented out pre-emptive blocking - better UX to let user try first */}
+                    {/*{!chatLimit.hasPromo && chatLimit.remaining <= 0 && (
+                        <div className="mb-3 p-4 bg-red-900/20 border border-red-500/50 rounded-lg">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <h4 className="font-semibold text-red-300 mb-1">
+                                        {language === 'ta' ? 'அரட்டை வரம்பு எட்டப்பட்டது' : 'Daily Chat Limit Reached'}
+                                    </h4>
+                                    <p className="text-sm text-red-200/80">
+                                        {language === 'ta'
+                                            ? 'நீங்கள் இன்றைய 2 இலவச அரட்டைகளையும் பயன்படுத்தியுள்ளீர்கள். நாளை மீண்டும் முயற்சிக்கவும் அல்லது வரம்பற்ற அணுகலுக்கு ப்ரோமோ குறியீட்டைப் பயன்படுத்தவும்!'
+                                            : 'You have used your 2 free chats for today. Try again tomorrow or use a promo code for unlimited access!'
+                                        }
+                                    </p>
+                                    <button
+                                        onClick={() => setShowPromoModal(true)}
+                                        className="mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                    >
+                                        <Gift className="w-4 h-4" />
+                                        {language === 'ta' ? 'ப்ரோமோ குறியீட்டைப் பயன்படுத்தவும்' : 'Use Promo Code'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}*/}
+
+
                     {/* Question Input Form */}
                     <form onSubmit={handleAskQuestion} className="flex gap-2">
                         <input
                             type="text"
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
-                            placeholder={t.predictions.askPlaceholder}
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-full px-6 py-3 focus:ring-2 focus:ring-purple-500 outline-none"
+                            placeholder={!chatLimit.hasPromo && chatLimit.remaining <= 0
+                                ? (language === 'ta' ? 'இன்றைய வரம்பு எட்டப்பட்டது...' : 'Daily limit reached...')
+                                : t.predictions.askPlaceholder
+                            }
+                            disabled={!chatLimit.hasPromo && chatLimit.remaining <= 0}
+                            className={`flex-1 bg-slate-950 border rounded-full px-6 py-3 outline-none transition-all ${!chatLimit.hasPromo && chatLimit.remaining <= 0
+                                ? 'border-red-500/50 text-slate-600 cursor-not-allowed'
+                                : 'border-slate-700 focus:ring-2 focus:ring-purple-500'
+                                }`}
                         />
                         <button
                             type="submit"
-                            disabled={isLoading || !question.trim()}
-                            className="w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center transition-colors disabled:opacity-50"
+                            disabled={isLoading || !question.trim() || (!chatLimit.hasPromo && chatLimit.remaining <= 0)}
+                            className="w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? <Sparkles className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                         </button>

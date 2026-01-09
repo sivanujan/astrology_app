@@ -33,6 +33,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/contact', require('./routes/contact'));
 app.use('/api/chat', require('./routes/chatLimit'));
 app.use('/api/promo', require('./routes/promoCodes'));
+app.use('/api/admin', require('./routes/admin'));
 // const userRoutes = require('./routes/user');
 // const ruleRoutes = require('./routes/rules');
 // app.use('/api/users', userRoutes);

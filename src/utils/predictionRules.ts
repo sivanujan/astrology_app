@@ -1225,10 +1225,26 @@ export const predictDetailedMarriageTiming = (
         const topPeriods = finalPeriods.slice(0, 3);
 
         const periodTexts = topPeriods.map(p => {
-            const startDate = typeof p.start === 'string' ? new Date(p.start) : p.start;
-            const endDate = typeof p.end === 'string' ? new Date(p.end) : p.end;
-            const startStr = startDate.toLocaleDateString(language, { month: 'short', year: 'numeric' });
-            const endStr = endDate.toLocaleDateString(language, { month: 'short', year: 'numeric' });
+            // Safe Date Conversion
+            const toDate = (d: any): Date => {
+                if (!d) return new Date();
+                if (d instanceof Date) return d;
+                if (typeof d === 'string') return new Date(d);
+                if (typeof d.toDate === 'function') return d.toDate(); // Firestore Timestamp
+                if (d.seconds) return new Date(d.seconds * 1000); // Serialized Timestamp
+                return new Date(d); // Fallback
+            };
+
+            const startDate = toDate(p.start);
+            const endDate = toDate(p.end);
+
+            // Allow for potential invalid dates to avoid crash
+            const startStr = !isNaN(startDate.getTime())
+                ? startDate.toLocaleDateString(language, { month: 'short', year: 'numeric' })
+                : 'Unknown';
+            const endStr = !isNaN(endDate.getTime())
+                ? endDate.toLocaleDateString(language, { month: 'short', year: 'numeric' })
+                : 'Unknown';
             const scoreLabel = isTamil ? "மதிப்பெண்" : "Score";
             const priorityLabel = p.isPriority1 ? (isTamil ? "(முக்கிய காலம்)" : "(Primary Period)") : "";
             return `**${startStr} - ${endStr}**: ${p.dasa}/${p.bhukti}/${p.antaram} ${priorityLabel}`;

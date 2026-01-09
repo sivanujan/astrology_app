@@ -16,33 +16,28 @@ const ChatInspector = () => {
         setErrorMsg(null);
         setIndexLink(null);
         try {
-            // Fetch both Modern logs (chat_logs) and Legacy logs (messages subcollection)
-            const [newLogs, legacyLogs] = await Promise.all([
-                adminService.getChatLogs(50),      // The new system
-                adminService.getLegacyChatLogs(50) // The old system (history)
-            ]);
+            const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${apiUrl}/api/admin/chat-logs`);
+            const data = await response.json();
 
-            // Combine and Sort by Timestamp Descending
-            const combined = [...newLogs, ...legacyLogs].sort((a, b) => {
-                const timeA = a.timestamp?.seconds || 0;
-                const timeB = b.timestamp?.seconds || 0;
-                return timeB - timeA;
-            });
+            if (data.success) {
+                // Convert backend data to ChatLog format
+                const formattedLogs = data.logs.map((log: any) => ({
+                    id: log.id,
+                    question: log.userQuestion,
+                    answer: log.aiResponse,
+                    timestamp: log.timestamp ? { seconds: new Date(log.timestamp).getTime() / 1000 } : null,
+                    userName: log.userId,
+                    language: log.language,
+                    intent: 'General'
+                }));
 
-            // Remove duplicates if any (though IDs should be different)
-            const uniqueLogs = Array.from(new Map(combined.map(item => [item.id, item])).values());
-
-            setLogs(uniqueLogs);
+                setLogs(formattedLogs);
+            } else {
+                setErrorMsg('Failed to load logs');
+            }
         } catch (e: any) {
             console.error("Error fetching logs", e);
-            if (e.message && e.message.includes('https://console.firebase.google.com')) {
-                const urlMatch = e.message.match(/(https:\/\/console\.firebase\.google\.com[^\s]+)/);
-                if (urlMatch) {
-                    setIndexLink(urlMatch[0]);
-                    setErrorMsg("Missing Database Index. Click the link below to fix.");
-                    return;
-                }
-            }
             setErrorMsg(e.message || "Failed to load logs");
         } finally {
             setIsLoading(false);

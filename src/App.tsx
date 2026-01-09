@@ -40,7 +40,25 @@ const AppRoutes = () => {
   // ... (existing hydration logic)
   // Check if we have data in state, storage, or URL params (for sharing)
   // Check if we have data in state, storage, or URL params (for sharing)
-  // Use useMemo to check synchronously on first render
+  // Check URL query parameters for 'promo' and store it
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const promoCode = params.get('promo');
+      if (promoCode) {
+        localStorage.setItem('active_promo_code', promoCode);
+        console.log('🎟️ Promo Code Applied from URL:', promoCode);
+
+        // Optional: clear params from URL without reload to be clean
+        const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+
+        // Optional: show a toast/alert - keeping it simple for now
+        // alert(`Promo code ${promoCode} applied!`);
+      }
+    }
+  }, []);
+
   const urlParamsValid = React.useMemo(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);

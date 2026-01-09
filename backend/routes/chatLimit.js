@@ -8,25 +8,37 @@ const admin = require('firebase-admin');
  * POST /api/chat/check-limit
  */
 router.post('/check-limit', async (req, res) => {
+    console.log('📥 /api/chat/check-limit called');
+    console.log('Request body:', req.body);
+
     try {
         const { uid, deviceFingerprint } = req.body;
 
         if (!uid) {
+            console.log('❌ No UID provided');
             return res.status(400).json({ success: false, message: 'User ID required' });
         }
 
+        console.log(`🔍 Checking limit for user: ${uid}`);
+        console.log('Database connection:', db ? 'Connected' : 'Not Connected');
+
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        console.log('Today date:', today);
 
         // 1. Check for active promo code
+        // 1. Check for active promo code (Safe In-Memory Check)
         const promoSnapshot = await db.collection('users').doc(uid)
             .collection('promo_activations')
             .where('isActive', '==', true)
-            .where('expiresAt', '>', new Date())
-            .limit(1)
             .get();
 
-        if (!promoSnapshot.empty) {
-            const promo = promoSnapshot.docs[0].data();
+        const now = new Date();
+        const validPromos = promoSnapshot.docs
+            .map(doc => doc.data())
+            .filter(data => data.expiresAt.toDate() > now);
+
+        if (validPromos.length > 0) {
+            const promo = validPromos[0];
             return res.json({
                 success: true,
                 canChat: true,
@@ -44,13 +56,13 @@ router.post('/check-limit', async (req, res) => {
             .get();
 
         const currentCount = usageDoc.exists ? usageDoc.data().count : 0;
-        const limit = 5;
+        const limit = 2;
         const remaining = Math.max(0, limit - currentCount);
 
         res.json({
             success: true,
             canChat: currentCount < limit,
-            hasPromo: false,
+            hasPromo: false, // Explicitly false if no valid promo found
             remaining,
             limit,
             currentCount
@@ -69,8 +81,8 @@ router.post('/check-limit', async (req, res) => {
             success: true,
             canChat: true, // Allow chat by default if check fails
             hasPromo: false,
-            remaining: 5,
-            limit: 5,
+            remaining: 2,
+            limit: 2,
             currentCount: 0,
             warning: 'Using default limits due to system error'
         });
@@ -89,6 +101,18 @@ router.post('/increment', async (req, res) => {
             return res.status(400).json({ success: false, message: 'User ID required' });
         }
 
+        // Check for active promo FIRST (Safe In-Memory Check)
+        const promoSnapshot = await db.collection('users').doc(uid)
+            .collection('promo_activations')
+            .where('isActive', '==', true)
+            .get();
+
+        const now = new Date();
+        const hasActivePromo = promoSnapshot.docs.some(doc => {
+            const data = doc.data();
+            return data.expiresAt.toDate() > now;
+        });
+
         const today = new Date().toISOString().split('T')[0];
         const usageRef = db.collection('users').doc(uid)
             .collection('chat_usage')
@@ -99,7 +123,8 @@ router.post('/increment', async (req, res) => {
             const doc = await transaction.get(usageRef);
             const currentCount = doc.exists ? doc.data().count : 0;
 
-            if (currentCount >= 5) {
+            // Only check limit if user does NOT have active promo
+            if (!hasActivePromo && currentCount >= 2) {
                 throw new Error('Chat limit exceeded');
             }
 
@@ -108,11 +133,12 @@ router.post('/increment', async (req, res) => {
                 count: currentCount + 1,
                 lastChatAt: admin.firestore.FieldValue.serverTimestamp(),
                 deviceFingerprint: deviceFingerprint || 'unknown',
-                ipAddress: ipAddress || 'unknown'
+                ipAddress: ipAddress || 'unknown',
+                hasPromo: hasActivePromo
             }, { merge: true });
         });
 
-        res.json({ success: true, message: 'Chat count incremented' });
+        res.json({ success: true, message: 'Chat count incremented', hasPromo: hasActivePromo });
 
     } catch (error) {
         console.error('Increment error:', error);
@@ -144,8 +170,8 @@ router.get('/usage/:uid', async (req, res) => {
             usage: {
                 date: data.date,
                 count: data.count || 0,
-                limit: 5,
-                remaining: Math.max(0, 5 - (data.count || 0)),
+                limit: 2,
+                remaining: Math.max(0, 2 - (data.count || 0)),
                 lastChatAt: data.lastChatAt?.toDate() || null
             }
         });
