@@ -25,7 +25,9 @@ app.get('/api/health', (req, res) => {
 
 // Import Routes
 const authRoutes = require('./routes/auth');
+const deviceRegistrationRoutes = require('./routes/deviceRegistration');
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', deviceRegistrationRoutes); // Device anti-abuse
 
 // Routes
 // app.use('/api/whatsapp', require('./routes/whatsapp')); // Deprecated
