@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Search, Eye, Calendar, MessageSquare, Loader2 } from 'lucide-react';
+import { Users, Search, Eye, Calendar, MessageSquare, Loader2, Trash2 } from 'lucide-react';
 import UserDetails from './UserDetails';
 
 interface User {
@@ -15,6 +15,7 @@ interface User {
 const UserList = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [cleaningUp, setCleaningUp] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
@@ -35,6 +36,35 @@ const UserList = () => {
             console.error('Error fetching users:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCleanup = async () => {
+        if (!confirm('This will remove all duplicate and orphaned users from Firestore.\n\nOnly users in Firebase Authentication will be kept.\n\nContinue?')) {
+            return;
+        }
+
+        setCleaningUp(true);
+        try {
+            const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${apiUrl}/api/admin/cleanup-users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                alert(`✅ Cleanup complete!\n\nDeleted: ${data.report.deleted.length} duplicate users\nKept: ${data.report.kept.length} valid users`);
+                // Refresh user list
+                await fetchUsers();
+            } else {
+                alert('❌ Cleanup failed: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Cleanup error:', error);
+            alert('❌ Error during cleanup');
+        } finally {
+            setCleaningUp(false);
         }
     };
 
@@ -74,16 +104,32 @@ const UserList = () => {
                     </div>
                 </div>
 
-                {/* Search */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search users..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 bg-slate-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white w-64"
-                    />
+                <div className="flex items-center gap-3">
+                    {/* Cleanup Button */}
+                    <button
+                        onClick={handleCleanup}
+                        disabled={cleaningUp}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 transition-colors disabled:opacity-50"
+                    >
+                        {cleaningUp ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Trash2 className="w-4 h-4" />
+                        )}
+                        {cleaningUp ? 'Cleaning...' : 'Clean Up Duplicates'}
+                    </button>
+
+                    {/* Search */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search users..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 pr-4 py-2 bg-slate-800 border border-white/10 rounded-lg focus:outline-none focus:border-purple-500 text-white w-64"
+                        />
+                    </div>
                 </div>
             </div>
 

@@ -92,14 +92,28 @@ router.get('/user/:uid', async (req, res) => {
             console.log('❌ Error counting new chats:', e.message);
         }
 
+        // Initialize Sets for IP and device tracking
+        const ipAddresses = new Set();
+        const deviceFingerprints = new Set();
+
         // 2. Count Legacy Chats (charts/{chartId}/messages)
         try {
             const chartsSnapshot = await db.collection('users').doc(uid).collection('charts').get();
             for (const chartDoc of chartsSnapshot.docs) {
                 const msgsSnapshot = await chartDoc.ref.collection('messages').get();
                 totalChats += msgsSnapshot.size;
+
+                // Extract IP and device data from messages
+                msgsSnapshot.forEach(msgDoc => {
+                    const msgData = msgDoc.data();
+                    if (msgData.ipAddress) ipAddresses.add(msgData.ipAddress);
+                    if (msgData.deviceFingerprint) deviceFingerprints.add(msgData.deviceFingerprint);
+                });
             }
             console.log(`✅ Total chats (new + legacy): ${totalChats}`);
+            console.log(`📊 IPs found: ${ipAddresses.size}, Devices found: ${deviceFingerprints.size}`);
+            console.log(`📍 IP Addresses:`, Array.from(ipAddresses));
+            console.log(`📱 Device Fingerprints:`, Array.from(deviceFingerprints));
         } catch (e) {
             console.log('❌ Error counting legacy chats:', e.message);
         }
@@ -116,8 +130,7 @@ router.get('/user/:uid', async (req, res) => {
         const promoData = hasActivePromo ? promoSnapshot.docs[0].data() : null;
 
         // Get IP addresses from BOTH old and new chat paths
-        const ipAddresses = new Set();
-        const deviceFingerprints = new Set();
+        // (Sets already initialized above)
 
         // Check new path: ai_chat_messages
         try {
@@ -173,6 +186,16 @@ router.get('/user/:uid', async (req, res) => {
                     count: d.count,
                     lastChatAt: d.lastChatAt ? d.lastChatAt.toDate() : null
                 };
+
+                // Extract IP/device from usage record
+                if (d.ipAddress) ipAddresses.add(d.ipAddress);
+                if (d.deviceFingerprint) deviceFingerprints.add(d.deviceFingerprint);
+
+                // Update the arrays in payload
+                userPayload.ipAddresses = Array.from(ipAddresses);
+                userPayload.deviceFingerprints = Array.from(deviceFingerprints);
+
+                console.log(`📊 FINAL - IPs: ${ipAddresses.size}, Devices: ${deviceFingerprints.size}`);
             }
         } catch (e) {
             console.log('Error fetching latest usage:', e);
@@ -536,6 +559,92 @@ router.get('/debug/:uid', async (req, res) => {
     } catch (error) {
         console.error('Debug error:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * CLEANUP: Remove duplicate/orphaned users
+ * POST /api/admin/cleanup-users
+ * Syncs Firestore with Firebase Authentication
+ */
+router.post('/cleanup-users', async (req, res) => {
+    try {
+        console.log('🧹 Starting user cleanup...');
+
+        const report = {
+            authUsers: 0,
+            firestoreUsers: 0,
+            deleted: [],
+            kept: [],
+            errors: []
+        };
+
+        // Step 1: Get ALL users from Firebase Authentication (authoritative source)
+        const authUsers = [];
+        let nextPageToken;
+        do {
+            const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
+            authUsers.push(...listUsersResult.users);
+            nextPageToken = listUsersResult.pageToken;
+        } while (nextPageToken);
+
+        report.authUsers = authUsers.length;
+        console.log(`✅ Found ${authUsers.length} users in Firebase Auth`);
+
+        // Create Set of valid UIDs
+        const validUIDs = new Set(authUsers.map(u => u.uid));
+
+        // Step 2: Get all Firestore users
+        const firestoreSnapshot = await db.collection('users').get();
+        report.firestoreUsers = firestoreSnapshot.size;
+        console.log(`📊 Found ${firestoreSnapshot.size} users in Firestore`);
+
+        // Step 3: Delete orphaned Firestore documents (no matching Firebase Auth)
+        const batch = db.batch();
+        let batchCount = 0;
+
+        for (const doc of firestoreSnapshot.docs) {
+            const uid = doc.id;
+            const userData = doc.data();
+            const email = userData.profile?.email || userData.email || 'No email';
+
+            if (!validUIDs.has(uid)) {
+                // Orphaned document - delete it
+                batch.delete(doc.ref);
+                batchCount++;
+                report.deleted.push({ uid, email });
+                console.log(`❌ Deleting orphaned user: ${email} (${uid})`);
+
+                // Firestore batch limit is 500
+                if (batchCount >= 500) {
+                    await batch.commit();
+                    batchCount = 0;
+                }
+            } else {
+                report.kept.push({ uid, email });
+            }
+        }
+
+        // Commit remaining deletes
+        if (batchCount > 0) {
+            await batch.commit();
+        }
+
+        console.log(`✅ Cleanup complete! Deleted ${report.deleted.length} orphaned users`);
+
+        res.json({
+            success: true,
+            report: report,
+            message: `Deleted ${report.deleted.length} duplicate/orphaned users. Kept ${report.kept.length} valid users.`
+        });
+
+    } catch (error) {
+        console.error('❌ Cleanup error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Cleanup failed',
+            error: error.message
+        });
     }
 });
 

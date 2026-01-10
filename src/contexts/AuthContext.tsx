@@ -74,6 +74,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 if (result.success) {
                     console.log('✅ Custom verification email sent successfully!');
+
+                    // If in dev mode, use client-side method
+                    if (result.devMode) {
+                        console.log('🔧 DEV MODE: Using client-side email verification');
+                        const { sendEmailVerification } = await import('firebase/auth');
+                        await sendEmailVerification(userCredential.user);
+                        console.log('✅ Client-side verification email sent');
+                    }
                 } else {
                     console.error('Failed to send verification email:', result.message);
                 }

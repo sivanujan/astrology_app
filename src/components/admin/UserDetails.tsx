@@ -191,20 +191,6 @@ const UserDetails: React.FC<UserDetailsProps> = ({ uid, onClose }) => {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-slate-800/30 p-4 rounded-lg">
                                 <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                                    <Phone className="w-4 h-4" />
-                                    Phone
-                                </div>
-                                <div className="text-white font-medium">{user.phone}</div>
-                            </div>
-                            <div className="bg-slate-800/30 p-4 rounded-lg">
-                                <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                                    <Calendar className="w-4 h-4" />
-                                    DOB
-                                </div>
-                                <div className="text-white font-medium">{user.dob}</div>
-                            </div>
-                            <div className="bg-slate-800/30 p-4 rounded-lg">
-                                <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
                                     <Calendar className="w-4 h-4" />
                                     Registered
                                 </div>
