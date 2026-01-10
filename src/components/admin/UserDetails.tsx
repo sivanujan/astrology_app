@@ -23,23 +23,37 @@ interface UserInfo {
     promoExpiresAt: Date | null;
     ipAddresses: string[];
     deviceFingerprints: string[];
+    latestUsage?: {
+        date: string;
+        count: number;
+        lastChatAt: string;
+    } | null;
 }
 
-interface Chat {
+interface Message {
     id: string;
-    question: string;
-    response: string;
+    role: string;
+    content: string;
     timestamp: Date;
     language: string;
     ipAddress: string;
     deviceFingerprint: string;
 }
 
+interface Chart {
+    chartId: string;
+    chartName: string;
+    createdAt: Date | null;
+    messageCount: number;
+    messages: Message[];
+}
+
 const UserDetails: React.FC<UserDetailsProps> = ({ uid, onClose }) => {
     const [user, setUser] = useState<UserInfo | null>(null);
-    const [chats, setChats] = useState<Chat[]>([]);
+    const [charts, setCharts] = useState<Chart[]>([]);
     const [loading, setLoading] = useState(true);
-    const [expandedChat, setExpandedChat] = useState<string | null>(null);
+    const [expandedChart, setExpandedChart] = useState<string | null>(null);
+    const [expandedMessage, setExpandedMessage] = useState<string | null>(null);
 
     useEffect(() => {
         fetchUserDetails();
@@ -69,10 +83,11 @@ const UserDetails: React.FC<UserDetailsProps> = ({ uid, onClose }) => {
             const data = await response.json();
 
             if (data.success) {
-                setChats(data.chats);
+                setCharts(data.charts || []);
             }
         } catch (error) {
             console.error('Error fetching chats:', error);
+            setCharts([]);
         }
     };
 
@@ -88,13 +103,48 @@ const UserDetails: React.FC<UserDetailsProps> = ({ uid, onClose }) => {
     };
 
     const exportChats = () => {
-        const data = JSON.stringify(chats, null, 2);
+        const allMessages = charts.flatMap(chart =>
+            chart.messages.map(msg => ({
+                chartId: chart.chartId,
+                chartName: chart.chartName,
+                ...msg
+            }))
+        );
+        const data = JSON.stringify(allMessages, null, 2);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `user_${uid}_chats.json`;
         a.click();
+    };
+
+    const handleResetLimit = async () => {
+        if (!user || !user.latestUsage) return;
+
+        if (!confirm(`Are you sure you want to reset the limit for ${user.displayName}? \nThis will clear the usage for ${user.latestUsage.date}.`)) {
+            return;
+        }
+
+        try {
+            const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${apiUrl}/api/admin/user/${uid}/reset-limit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: user.latestUsage.date })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                alert('Limit reset successfully!');
+                fetchUserDetails(); // Refresh data
+            } else {
+                alert('Failed to reset limit: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error resetting limit:', error);
+            alert('Error resetting limit');
+        }
     };
 
     if (loading) {
@@ -169,6 +219,43 @@ const UserDetails: React.FC<UserDetailsProps> = ({ uid, onClose }) => {
                             </div>
                         </div>
 
+                        {/* Daily Limit Status */}
+                        <div className="bg-slate-800/30 p-4 rounded-lg border border-purple-500/20">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="flex items-center gap-2 text-white font-semibold mb-2">
+                                        <MessageSquare className="w-5 h-5 text-purple-400" />
+                                        Daily Limit Status
+                                    </div>
+                                    {user.latestUsage ? (
+                                        <div className="flex items-center gap-4 text-sm">
+                                            <div className="text-slate-400">
+                                                Date: <span className="text-white font-mono">{user.latestUsage.date}</span>
+                                            </div>
+                                            <div className="text-slate-400">
+                                                Used: <span className={`font-bold ${user.latestUsage.count >= 2 ? 'text-red-400' : 'text-green-400'}`}>
+                                                    {user.latestUsage.count}/2
+                                                </span>
+                                            </div>
+                                            <div className="text-slate-400">
+                                                Last: <span className="text-white">{formatDate(user.latestUsage.lastChatAt)}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-slate-500 text-sm">No chats used today</div>
+                                    )}
+                                </div>
+                                {user.latestUsage && (
+                                    <button
+                                        onClick={handleResetLimit}
+                                        className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/50 text-red-500 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Reset Limit
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
                         {/* IP Addresses */}
                         <div className="bg-slate-800/30 p-4 rounded-lg">
                             <div className="flex items-center gap-2 text-white font-semibold mb-3">
@@ -199,14 +286,14 @@ const UserDetails: React.FC<UserDetailsProps> = ({ uid, onClose }) => {
                             </div>
                         </div>
 
-                        {/* Chat History */}
+                        {/* Charts & Messages */}
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                     <MessageSquare className="w-5 h-5 text-purple-400" />
-                                    Chat History ({chats.length})
+                                    Charts ({charts.length})
                                 </h3>
-                                {chats.length > 0 && (
+                                {charts.length > 0 && (
                                     <button
                                         onClick={exportChats}
                                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -218,54 +305,56 @@ const UserDetails: React.FC<UserDetailsProps> = ({ uid, onClose }) => {
                             </div>
 
                             <div className="space-y-3">
-                                {chats.map((chat) => (
-                                    <div key={chat.id} className="bg-slate-800/30 rounded-lg overflow-hidden border border-white/5">
+                                {charts.map((chart) => (
+                                    <div key={chart.chartId} className="bg-slate-800/30 rounded-lg overflow-hidden border border-white/5">
                                         <div
-                                            onClick={() => setExpandedChat(expandedChat === chat.id ? null : chat.id)}
+                                            onClick={() => setExpandedChart(expandedChart === chart.chartId ? null : chart.chartId)}
                                             className="p-4 cursor-pointer hover:bg-slate-700/30 transition-colors"
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div className="flex-1">
-                                                    <div className="text-white font-medium mb-1">{chat.question.substring(0, 100)}...</div>
+                                                    <div className="text-white font-medium mb-1">{chart.chartName}</div>
                                                     <div className="flex items-center gap-4 text-xs text-slate-400">
-                                                        <span>{formatDate(chat.timestamp)}</span>
-                                                        <span className="flex items-center gap-1">
-                                                            <Globe className="w-3 h-3" />
-                                                            {chat.ipAddress}
-                                                        </span>
+                                                        <span>{chart.messageCount} messages</span>
+                                                        <span>{formatDate(chart.createdAt)}</span>
                                                     </div>
                                                 </div>
-                                                {expandedChat === chat.id ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                                                {expandedChart === chart.chartId ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                                             </div>
                                         </div>
 
-                                        {expandedChat === chat.id && (
+                                        {expandedChart === chart.chartId && (
                                             <motion.div
                                                 initial={{ height: 0 }}
                                                 animate={{ height: 'auto' }}
                                                 exit={{ height: 0 }}
-                                                className="border-t border-white/5 p-4 bg-slate-900/50 space-y-3"
+                                                className="border-t border-white/5 p-4 bg-slate-900/50 space-y-2"
                                             >
-                                                <div>
-                                                    <div className="text-xs text-slate-500 mb-1">Question:</div>
-                                                    <div className="text-sm text-white">{chat.question}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-slate-500 mb-1">Response:</div>
-                                                    <div className="text-sm text-slate-300 whitespace-pre-wrap">{chat.response}</div>
-                                                </div>
-                                                <div className="flex items-center gap-4 text-xs text-slate-500">
-                                                    <span>Lang: {chat.language}</span>
-                                                    <span>Device: {chat.deviceFingerprint}</span>
-                                                </div>
+                                                {chart.messages.map((msg) => (
+                                                    <div key={msg.id} className="bg-slate-800/50 rounded p-3">
+                                                        <div className="flex items-start gap-2">
+                                                            <div className={`px-2 py-0.5 rounded text-xs font-medium ${msg.role === 'user' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}`}>
+                                                                {msg.role === 'user' ? 'USER' : 'AI'}
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <div className="text-sm text-white whitespace-pre-wrap">{msg.content}</div>
+                                                                <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
+                                                                    <span>{formatDate(msg.timestamp)}</span>
+                                                                    <span>{msg.ipAddress}</span>
+                                                                    <span>{msg.language}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </motion.div>
                                         )}
                                     </div>
                                 ))}
 
-                                {chats.length === 0 && (
+                                {charts.length === 0 && (
                                     <div className="text-center py-8 text-slate-500">
-                                        No chat history
+                                        No charts found
                                     </div>
                                 )}
                             </div>

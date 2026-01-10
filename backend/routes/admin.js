@@ -80,14 +80,29 @@ router.get('/user/:uid', async (req, res) => {
 
         const userData = userDoc.data();
 
-        // Get chat usage
-        const chatUsageSnapshot = await db.collection('chat_usage')
-            .where('uid', '==', uid)
-            .get();
+        // Calculate Total Chats (New + Legacy)
+        let totalChats = 0;
 
-        const totalChats = chatUsageSnapshot.docs.reduce((sum, doc) => {
-            return sum + (doc.data().count || 0);
-        }, 0);
+        // 1. Count New Chats (ai_chat_messages)
+        try {
+            const newChatsSnapshot = await db.collection('users').doc(uid).collection('ai_chat_messages').get();
+            totalChats += newChatsSnapshot.size;
+            console.log(`✅ Counted ${newChatsSnapshot.size} new chats for ${uid}`);
+        } catch (e) {
+            console.log('❌ Error counting new chats:', e.message);
+        }
+
+        // 2. Count Legacy Chats (charts/{chartId}/messages)
+        try {
+            const chartsSnapshot = await db.collection('users').doc(uid).collection('charts').get();
+            for (const chartDoc of chartsSnapshot.docs) {
+                const msgsSnapshot = await chartDoc.ref.collection('messages').get();
+                totalChats += msgsSnapshot.size;
+            }
+            console.log(`✅ Total chats (new + legacy): ${totalChats}`);
+        } catch (e) {
+            console.log('❌ Error counting legacy chats:', e.message);
+        }
 
         // Get active promo
         const promoSnapshot = await db.collection('users').doc(uid)
@@ -119,25 +134,57 @@ router.get('/user/:uid', async (req, res) => {
             console.log('No ai_chat_messages for user');
         }
 
-        res.json({
-            success: true,
-            user: {
-                uid: uid,
-                email: userData.profile?.email || userData.email || 'N/A',
-                displayName: userData.profile?.name || userData.displayName || userData.name || 'N/A',
-                phone: userData.profile?.phone || userData.phone || 'N/A',
-                dob: userData.dob || userData.profile?.dob || 'N/A',
-                birthTime: userData.birthTime || userData.profile?.birthTime || 'N/A',
-                location: userData.location || userData.profile?.location || 'N/A',
-                createdAt: userData.createdAt?.toDate() || null,
-                lastLogin: userData.last_login?.toDate() || userData.lastLogin?.toDate() || null,
-                totalChats: totalChats,
-                hasActivePromo: hasActivePromo,
-                promoCode: promoData?.promoCode || null,
-                promoExpiresAt: promoData?.expiresAt?.toDate() || null,
-                ipAddresses: Array.from(ipAddresses),
-                deviceFingerprints: Array.from(deviceFingerprints)
+
+
+        // HACK: We need to attach latestUsage but we already sent res.json above? 
+        // Wait, the previous code sent res.json directly. I need to modify it to BUILD the object first.
+
+        let userPayload = {
+            uid: uid,
+            email: userData.profile?.email || userData.email || 'N/A',
+            displayName: userData.profile?.name || userData.displayName || userData.name || 'N/A',
+            phone: userData.profile?.phone || userData.phone || 'N/A',
+            dob: userData.dob || userData.profile?.dob || 'N/A',
+            birthTime: userData.birthTime || userData.profile?.birthTime || 'N/A',
+            location: userData.location || userData.profile?.location || 'N/A',
+            createdAt: userData.createdAt?.toDate() || null,
+            lastLogin: userData.last_login?.toDate() || userData.lastLogin?.toDate() || null,
+            totalChats: totalChats,
+            hasActivePromo: hasActivePromo,
+            promoCode: promoData?.promoCode || null,
+            promoExpiresAt: promoData?.expiresAt?.toDate() || null,
+            ipAddresses: Array.from(ipAddresses),
+            deviceFingerprints: Array.from(deviceFingerprints),
+            latestUsage: null
+        };
+
+        try {
+            const usageSnapshot = await db.collection('users').doc(uid)
+                .collection('chat_usage')
+                .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
+                .limit(1)
+                .get();
+
+            if (!usageSnapshot.empty) {
+                const doc = usageSnapshot.docs[0];
+                const d = doc.data();
+                userPayload.latestUsage = {
+                    date: doc.id,
+                    count: d.count,
+                    lastChatAt: d.lastChatAt ? d.lastChatAt.toDate() : null
+                };
             }
+        } catch (e) {
+            console.log('Error fetching latest usage:', e);
+        }
+
+        // Send final response (overwriting the previous incorrect attempts if I had partial edits)
+        // Note: The previous res.json call in line 122 must be REMOVED or replaced by this block.
+        // Since I'm using replace_file_content on lines 122-141, I am effectively REPLACING the old res.json call.
+
+        return res.json({
+            success: true,
+            user: userPayload
         });
 
     } catch (error) {
@@ -151,105 +198,69 @@ router.get('/user/:uid', async (req, res) => {
 });
 
 /**
- * Get user's complete chat history - from BOTH old and new paths
+ * Get user's charts with their messages (hierarchical structure)
  * GET /api/admin/user/:uid/chats
  */
 router.get('/user/:uid/chats', async (req, res) => {
     try {
         const { uid } = req.params;
-        console.log('📥 Admin: Fetching chat history for', uid);
+        console.log('📥 Admin: Fetching charts and messages for', uid);
 
-        const chats = [];
+        const charts = [];
 
-        // 1. NEW path: ai_chat_messages
-        try {
-            const newChatsSnapshot = await db.collection('users').doc(uid)
-                .collection('ai_chat_messages')
-                .orderBy('timestamp', 'desc')
-                .get();
+        // Fetch all charts for this user
+        const chartsSnapshot = await db.collection('users').doc(uid)
+            .collection('charts')
+            .get();
 
-            newChatsSnapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.userQuestion || data.aiResponse) {
-                    chats.push({
-                        id: doc.id,
-                        question: data.userQuestion || data.question || '',
-                        response: data.aiResponse || data.response || '',
-                        timestamp: data.timestamp?.toDate(),
-                        language: data.language || 'en',
-                        ipAddress: data.ipAddress || 'Unknown',
-                        deviceFingerprint: data.deviceFingerprint || 'Unknown',
-                        source: 'new'
-                    });
-                }
-            });
-        } catch (err) {
-            console.log('No messages in ai_chat_messages');
-        }
+        console.log(`Found ${chartsSnapshot.size} charts for ${uid}`);
 
-        // 2. OLD path: charts/{chartId}/messages
-        try {
-            const chartsSnapshot = await db.collection('users').doc(uid)
+        for (const chartDoc of chartsSnapshot.docs) {
+            const chartId = chartDoc.id;
+            const chartData = chartDoc.data();
+
+            // Fetch messages for this chart
+            const messagesSnapshot = await db.collection('users').doc(uid)
                 .collection('charts')
+                .doc(chartId)
+                .collection('messages')
+                .orderBy('timestamp', 'asc')
                 .get();
 
-            for (const chartDoc of chartsSnapshot.docs) {
-                const messagesSnapshot = await db.collection('users').doc(uid)
-                    .collection('charts')
-                    .doc(chartDoc.id)
-                    .collection('messages')
-                    .get();
+            const messages = messagesSnapshot.docs.map(msgDoc => {
+                const data = msgDoc.data();
+                return {
+                    id: msgDoc.id,
+                    role: data.role || data.sender || 'unknown',
+                    content: data.content || data.text || '',
+                    timestamp: data.timestamp?.toDate(),
+                    language: data.language || 'en',
+                    ipAddress: data.ipAddress || 'Unknown',
+                    deviceFingerprint: data.deviceFingerprint || 'Unknown'
+                };
+            });
 
-                const pairMap = new Map();
-                messagesSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    const ts = data.timestamp?.toDate()?.getTime() || 0;
-
-                    if (data.sender === 'user') {
-                        if (!pairMap.has(ts)) {
-                            pairMap.set(ts, { question: data.text, response: '', timestamp: data.timestamp?.toDate(), lang: data.language || 'en' });
-                        } else {
-                            pairMap.get(ts).question = data.text;
-                        }
-                    } else if (data.sender === 'ai') {
-                        if (!pairMap.has(ts)) {
-                            pairMap.set(ts, { question: '', response: data.text, timestamp: data.timestamp?.toDate(), lang: data.language || 'en' });
-                        } else {
-                            pairMap.get(ts).response = data.text;
-                        }
-                    }
-                });
-
-                pairMap.forEach((pair, ts) => {
-                    if (pair.question || pair.response) {
-                        chats.push({
-                            id: `legacy_${ts}`,
-                            question: pair.question,
-                            response: pair.response,
-                            timestamp: pair.timestamp,
-                            language: pair.lang,
-                            ipAddress: 'Legacy (not captured)',
-                            deviceFingerprint: 'Legacy (not captured)',
-                            source: 'legacy'
-                        });
-                    }
-                });
-            }
-        } catch (err) {
-            console.log('No messages in charts/messages');
+            charts.push({
+                chartId: chartId,
+                chartName: chartData.name || 'Unknown Chart',
+                createdAt: chartData.createdAt?.toDate() || null,
+                messageCount: messages.length,
+                messages: messages
+            });
         }
 
-        // Sort all by timestamp descending
-        chats.sort((a, b) => {
-            if (!a.timestamp) return 1;
-            if (!b.timestamp) return -1;
-            return b.timestamp - a.timestamp;
+        // Sort charts by creation date (newest first)
+        charts.sort((a, b) => {
+            if (!a.createdAt) return 1;
+            if (!b.createdAt) return -1;
+            return b.createdAt - a.createdAt;
         });
 
         res.json({
             success: true,
-            chats: chats,
-            count: chats.length
+            charts: charts,
+            totalCharts: charts.length,
+            totalMessages: charts.reduce((sum, c) => sum + c.messageCount, 0)
         });
 
     } catch (error) {
@@ -263,7 +274,7 @@ router.get('/user/:uid/chats', async (req, res) => {
 });
 
 /**
- * Get chat logs for admin dashboard (recent 100)
+ * Get chat logs for admin dashboard (recent 100 messages from all users)
  * GET /api/admin/chat-logs
  */
 router.get('/chat-logs', async (req, res) => {
@@ -272,23 +283,52 @@ router.get('/chat-logs', async (req, res) => {
 
         const chatLogs = [];
 
-        const messagesSnapshot = await db.collectionGroup('ai_chat_messages')
+        // Use collectionGroup to query all messages across all charts
+        const messagesSnapshot = await db.collectionGroup('messages')
             .orderBy('timestamp', 'desc')
             .limit(100)
             .get();
 
-        messagesSnapshot.forEach(doc => {
+        // Fetch user details for each message
+        const userCache = new Map();
+
+        for (const doc of messagesSnapshot.docs) {
             const data = doc.data();
+            const userId = data.userId || 'unknown';
+
+            // Get user email if not cached
+            if (!userCache.has(userId) && userId !== 'unknown') {
+                try {
+                    const userDoc = await db.collection('users').doc(userId).get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        userCache.set(userId, {
+                            email: userData.profile?.email || userData.email || 'N/A',
+                            name: userData.profile?.name || userData.displayName || 'N/A'
+                        });
+                    } else {
+                        userCache.set(userId, { email: 'Unknown', name: 'Unknown' });
+                    }
+                } catch (e) {
+                    userCache.set(userId, { email: 'Error', name: 'Error' });
+                }
+            }
+
+            const userInfo = userCache.get(userId) || { email: 'Unknown', name: 'Unknown' };
+
             chatLogs.push({
                 id: doc.id,
-                userQuestion: data.userQuestion || data.question,
-                aiResponse: data.aiResponse || data.response,
+                role: data.role || data.sender || 'unknown',
+                content: data.content || data.text || '',
                 timestamp: data.timestamp?.toDate(),
-                userId: data.userId || 'unknown',
+                userId: userId,
+                userEmail: userInfo.email,
+                userName: userInfo.name,
                 language: data.language || 'en',
-                ipAddress: data.ipAddress || 'Unknown'
+                ipAddress: data.ipAddress || 'Unknown',
+                deviceFingerprint: data.deviceFingerprint || 'Unknown'
             });
-        });
+        }
 
         res.json({
             success: true,
@@ -382,6 +422,120 @@ router.get('/rules', async (req, res) => {
             message: 'Failed to fetch rules',
             error: error.message
         });
+    }
+});
+
+
+/**
+ * Reset user's chat limit (Delete specific day's usage)
+ * POST /api/admin/user/:uid/reset-limit
+ */
+router.post('/user/:uid/reset-limit', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { date } = req.body; // Optional: Specific date to reset
+
+        console.log(`🗑️ Resetting limit for ${uid}, date: ${date || 'LATEST'}`);
+
+        const usageCollection = db.collection('users').doc(uid).collection('chat_usage');
+
+        let docToDelete = date;
+
+        if (!date) {
+            // Find latest
+            const snapshot = await usageCollection
+                .orderBy(admin.firestore.FieldPath.documentId(), 'desc')
+                .limit(1)
+                .get();
+
+            if (!snapshot.empty) {
+                docToDelete = snapshot.docs[0].id;
+            }
+        }
+
+        if (docToDelete) {
+            await usageCollection.doc(docToDelete).delete();
+            console.log(`✅ Deleted chat usage for ${docToDelete}`);
+            res.json({ success: true, message: `Limit reset for ${docToDelete}` });
+        } else {
+            res.json({ success: false, message: 'No usage found to reset' });
+        }
+
+    } catch (error) {
+        console.error('Error resetting limit:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * DEBUG: Inspect user data structure
+ * GET /api/admin/debug/:uid
+ */
+router.get('/debug/:uid', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        console.log(`🔍 DEBUG: Inspecting data structure for ${uid}`);
+
+        const debug = {
+            uid,
+            collections: {},
+            errors: []
+        };
+
+        // Check user document
+        try {
+            const userDoc = await db.collection('users').doc(uid).get();
+            debug.collections.userDoc = {
+                exists: userDoc.exists,
+                fields: userDoc.exists ? Object.keys(userDoc.data()) : []
+            };
+        } catch (e) {
+            debug.errors.push(`User doc: ${e.message}`);
+        }
+
+        // Check ai_chat_messages
+        try {
+            const aiChats = await db.collection('users').doc(uid).collection('ai_chat_messages').get();
+            debug.collections.ai_chat_messages = {
+                count: aiChats.size,
+                sampleFields: aiChats.docs[0] ? Object.keys(aiChats.docs[0].data()) : []
+            };
+        } catch (e) {
+            debug.errors.push(`ai_chat_messages: ${e.message}`);
+        }
+
+        // Check charts
+        try {
+            const charts = await db.collection('users').doc(uid).collection('charts').get();
+            debug.collections.charts = {
+                count: charts.size,
+                chartIds: charts.docs.map(d => d.id).slice(0, 3)
+            };
+
+            if (charts.size > 0) {
+                const msgs = await charts.docs[0].ref.collection('messages').get();
+                debug.collections.charts.firstChartMessages = msgs.size;
+            }
+        } catch (e) {
+            debug.errors.push(`charts: ${e.message}`);
+        }
+
+        // Check chat_usage
+        try {
+            const usage = await db.collection('users').doc(uid).collection('chat_usage').get();
+            debug.collections.chat_usage = {
+                count: usage.size,
+                dates: usage.docs.map(d => d.id)
+            };
+        } catch (e) {
+            debug.errors.push(`chat_usage: ${e.message}`);
+        }
+
+        res.json({ success: true, debug });
+
+    } catch (error) {
+        console.error('Debug error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

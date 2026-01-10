@@ -4,7 +4,7 @@ import { Sparkles, Send, MessageCircle, Gift, Bot, User, AlertCircle, BrainCircu
 import { useLocation, useNavigate } from 'react-router-dom'; // Import useLocation, useNavigate
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../lib/firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { queryAstrologyOrchestrator, OrchestratorResponse } from '../utils/aiOrchestrator';
 import FeedbackWidget from './FeedbackWidget';
@@ -104,28 +104,92 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
         return () => unsubscribe();
     }, [user, data, language]);
 
-    // Internal save function
+    // Internal save function - saves to chart-specific path
     const saveMessageToFirestore = async (msg: any) => {
-        if (!user || !data) return;
-        try {
-            // Get device fingerprint and IP
-            const deviceId = await generateFingerprint();
-            const ipAddress = await getIPAddress();
+        console.log('📝 saveMessageToFirestore CALLED', { msg, userUid: user?.uid });
 
-            // Save to ai_chat_messages collection for admin tracking
-            await addDoc(collection(db, `users/${user.uid}/ai_chat_messages`), {
-                userQuestion: msg.sender === 'user' ? msg.text : '',
-                aiResponse: msg.sender === 'ai' ? msg.text : '',
-                question: msg.sender === 'user' ? msg.text : '',
-                response: msg.sender === 'ai' ? msg.text : '',
+        if (!user || !data) {
+            console.warn('❌ ABORTED: Missing user or data');
+            return;
+        }
+
+        try {
+            // Normalize message format immediately
+            const role = msg.role || msg.sender || 'unknown';
+            const text = msg.content || msg.text || '';
+
+            if (!text) {
+                console.warn('❌ ABORTED: Empty message text');
+                return;
+            }
+
+            // Generate chart ID (same as used in useEffect for loading)
+            const chartId = `${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_');
+
+            // Fetch metadata with timeout to prevent blocking
+            const getMetadata = async () => {
+                try {
+                    const ipPromise = getIPAddress().catch(() => 'Unknown');
+                    const fpPromise = generateFingerprint().catch(() => 'Unknown');
+
+                    // Race with 2s timeout
+                    const timeout = new Promise(resolve => setTimeout(resolve, 2000));
+
+                    const result = await Promise.race([
+                        Promise.all([ipPromise, fpPromise]),
+                        timeout
+                    ]);
+
+                    if (!result) return ['Unknown', 'Unknown']; // Timeout case
+                    return result as [string, string];
+                } catch {
+                    return ['Unknown', 'Unknown'];
+                }
+            };
+
+            const [ipAddress, deviceId] = await getMetadata();
+
+            // CRITICAL: Ensure the parent chart document exists
+            const chartRef = doc(db, `users/${user.uid}/charts/${chartId}`);
+            const chartSnapshot = await getDoc(chartRef);
+
+            if (!chartSnapshot.exists()) {
+                console.log('📄 Creating parent chart document:', chartId);
+                await setDoc(chartRef, {
+                    name: data.userDetails.name || 'Unknown',
+                    birthDate: data.birthDate,
+                    createdAt: serverTimestamp(),
+                    lastMessageAt: serverTimestamp()
+                });
+            } else {
+                // Update last message timestamp
+                await setDoc(chartRef, {
+                    lastMessageAt: serverTimestamp()
+                }, { merge: true });
+            }
+
+            console.log('💾 Saving doc to Firestore:', {
+                path: `users/${user.uid}/charts/${chartId}/messages`,
+                role,
+                textLength: text.length,
+                ip: ipAddress
+            });
+
+            // Save to chart-specific messages collection
+            await addDoc(collection(db, `users/${user.uid}/charts/${chartId}/messages`), {
+                role: role,
+                sender: role, // Legacy compatibility
+                content: text,
+                text: text, // Legacy compatibility
                 timestamp: serverTimestamp(),
-                language: language,
+                language: language || 'en',
                 userId: user.uid,
-                deviceFingerprint: deviceId,
+                deviceFingerprint: deviceId || 'Unknown',
                 ipAddress: ipAddress || 'Unknown'
             });
-        } catch (e) {
-            console.error("Error saving message:", e);
+            console.log('✅ Message saved successfully to chart path');
+        } catch (e: any) {
+            console.error("❌ CRITICAL Error saving message:", e);
         }
     };
 
@@ -205,12 +269,14 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
                 // Check chat limit from database
                 console.log('📡 Fetching chat limit from database...');
+                const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
                 const limitResponse = await fetch(`${apiUrl}/api/chat/check-limit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         uid: user.uid,
-                        deviceFingerprint: deviceInfo.fingerprint
+                        deviceFingerprint: deviceInfo.fingerprint,
+                        timeZone
                     })
                 });
 
@@ -440,13 +506,15 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 try {
                     console.log('📤 Incrementing chat count in database...');
                     const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+                    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
                     const response = await fetch(`${apiUrl}/api/chat/increment`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             uid: user.uid,
                             deviceFingerprint: deviceInfo.fingerprint,
-                            ipAddress: deviceInfo.ipAddress
+                            ipAddress: deviceInfo.ipAddress,
+                            timeZone
                         })
                     });
 

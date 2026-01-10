@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Tag, Clock, Save, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Tag, Clock, Save, AlertCircle, Loader2, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { collection, getDocs, setDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -22,6 +22,8 @@ const PromoCodeManager = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editingCode, setEditingCode] = useState<PromoCode | null>(null);
     const [error, setError] = useState('');
+    const [expandedPromo, setExpandedPromo] = useState<string | null>(null);
+    const [promoUsers, setPromoUsers] = useState<{ [key: string]: any[] }>({});
 
     // Form State
     const [newCode, setNewCode] = useState('');
@@ -177,6 +179,28 @@ const PromoCodeManager = () => {
             setError(err.message || 'Failed to update promo code');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Fetch users who activated a promo code
+    const fetchPromoUsers = async (code: string) => {
+        if (promoUsers[code]) {
+            // Already fetched, just toggle expand
+            setExpandedPromo(expandedPromo === code ? null : code);
+            return;
+        }
+
+        try {
+            const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+            const response = await fetch(`${apiUrl}/api/promo/admin/${code}/users`);
+            const data = await response.json();
+
+            if (data.success) {
+                setPromoUsers(prev => ({ ...prev, [code]: data.users }));
+                setExpandedPromo(code);
+            }
+        } catch (err) {
+            console.error('Error fetching promo users:', err);
         }
     };
 
@@ -448,6 +472,48 @@ const PromoCodeManager = () => {
                                     </span>
                                 </div>
                             )}
+
+                            {/* Activated Users Button */}
+                            <button
+                                onClick={() => fetchPromoUsers(promo.code)}
+                                className="mt-3 w-full flex items-center justify-between px-3 py-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-lg text-sm transition-colors"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-purple-400" />
+                                    {promoUsers[promo.code] ? `${promoUsers[promo.code].length} Active` : 'Active Users'}
+                                </span>
+                                {expandedPromo === promo.code ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
+
+                            {/* Expanded User List */}
+                            <AnimatePresence>
+                                {expandedPromo === promo.code && promoUsers[promo.code] && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="mt-2 overflow-hidden"
+                                    >
+                                        <div className="bg-slate-950/50 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+                                            {promoUsers[promo.code].length === 0 ? (
+                                                <div className="text-center py-2 text-slate-500 text-xs">
+                                                    No users yet
+                                                </div>
+                                            ) : (
+                                                promoUsers[promo.code].map((user: any, idx: number) => (
+                                                    <div key={idx} className="bg-slate-900/50 rounded p-2 space-y-1">
+                                                        <div className="text-xs font-medium text-white">{user.displayName}</div>
+                                                        <div className="text-xs text-slate-400">{user.email}</div>
+                                                        <div className="text-xs text-slate-500">
+                                                            {user.activatedAt ? new Date(user.activatedAt).toLocaleDateString() : 'Unknown date'}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </motion.div>
                 ))}

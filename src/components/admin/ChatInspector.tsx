@@ -7,6 +7,7 @@ const ChatInspector = () => {
     const [logs, setLogs] = useState<ChatLog[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [indexLink, setIndexLink] = useState<string | null>(null);
@@ -21,18 +22,37 @@ const ChatInspector = () => {
             const data = await response.json();
 
             if (data.success) {
-                // Convert backend data to ChatLog format
-                const formattedLogs = data.logs.map((log: any) => ({
-                    id: log.id,
-                    question: log.userQuestion,
-                    answer: log.aiResponse,
-                    timestamp: log.timestamp ? { seconds: new Date(log.timestamp).getTime() / 1000 } : null,
-                    userName: log.userId,
-                    language: log.language,
-                    intent: 'General'
-                }));
+                // Group messages by conversation pairs (user + AI)
+                const conversations: ChatLog[] = [];
+                let currentConversation: any = null;
 
-                setLogs(formattedLogs);
+                data.logs.forEach((log: any) => {
+                    if (log.role === 'user') {
+                        // Start new conversation
+                        currentConversation = {
+                            id: log.id,
+                            question: log.content || 'No question',
+                            answer: '',
+                            timestamp: log.timestamp ? { seconds: new Date(log.timestamp).getTime() / 1000 } : null,
+                            userName: log.userEmail || log.userName || log.userId || 'Unknown',
+                            language: log.language,
+                            intent: 'General'
+                        };
+                    } else if (log.role === 'ai' && currentConversation) {
+                        // Complete the conversation
+                        currentConversation.answer = log.content || 'No response';
+                        conversations.push(currentConversation);
+                        currentConversation = null;
+                    }
+                });
+
+                // Add any incomplete conversations
+                if (currentConversation) {
+                    currentConversation.answer = '(No AI response yet)';
+                    conversations.push(currentConversation);
+                }
+
+                setLogs(conversations);
             } else {
                 setErrorMsg('Failed to load logs');
             }
@@ -52,13 +72,43 @@ const ChatInspector = () => {
         setExpandedId(expandedId === id ? null : id);
     };
 
+    // Filter logs by search term
+    const filteredLogs = logs.filter(log => {
+        if (!searchTerm) return true;
+        const search = searchTerm.toLowerCase();
+        return (
+            log.userName?.toLowerCase().includes(search) ||
+            log.question?.toLowerCase().includes(search) ||
+            log.answer?.toLowerCase().includes(search)
+        );
+    });
+
     // Helper to format timestamp
     const formatTime = (ts: any) => {
         if (!ts) return "Unknown";
-        // Handle Firestore Timestamp
-        if (ts.toDate) return ts.toDate().toLocaleString();
-        // Handle JS Date
-        return new Date(ts).toLocaleString();
+
+        try {
+            // Handle object with seconds property (Firestore timestamp representation)
+            if (ts.seconds) {
+                return new Date(ts.seconds * 1000).toLocaleString();
+            }
+
+            // Handle Firestore Timestamp with toDate method
+            if (ts.toDate && typeof ts.toDate === 'function') {
+                return ts.toDate().toLocaleString();
+            }
+
+            // Handle ISO string or number
+            const date = new Date(ts);
+            if (!isNaN(date.getTime())) {
+                return date.toLocaleString();
+            }
+
+            return "Invalid Date";
+        } catch (e) {
+            console.error('Error formatting timestamp:', ts, e);
+            return "Error";
+        }
     };
 
     return (
@@ -67,7 +117,7 @@ const ChatInspector = () => {
                 <div className="flex items-center gap-3">
                     <h2 className="text-lg font-bold text-white">All User Interactions</h2>
                     <span className="bg-blue-900/30 text-blue-300 border border-blue-800 text-xs px-2 py-1 rounded">
-                        Live & History
+                        {filteredLogs.length} / {logs.length}
                     </span>
                 </div>
 
@@ -79,6 +129,17 @@ const ChatInspector = () => {
                     <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                     <span className="text-xs font-bold hidden sm:inline">Refresh</span>
                 </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                <input
+                    type="text"
+                    placeholder="Search by user email, question, or answer..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+                />
             </div>
 
             {errorMsg && (
@@ -107,7 +168,7 @@ const ChatInspector = () => {
             )}
 
             <div className="grid gap-3">
-                {logs.map((log) => (
+                {filteredLogs.map((log) => (
                     <div key={log.id} className={`border rounded-xl overflow-hidden transition ${log.intent === "History" ? "bg-slate-900/20 border-slate-800/50" : "bg-slate-900/40 border-slate-800 hover:bg-slate-900/60"}`}>
                         <div
                             onClick={() => toggleExpand(log.id)}

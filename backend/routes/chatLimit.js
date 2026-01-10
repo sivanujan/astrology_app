@@ -22,8 +22,10 @@ router.post('/check-limit', async (req, res) => {
         console.log(`🔍 Checking limit for user: ${uid}`);
         console.log('Database connection:', db ? 'Connected' : 'Not Connected');
 
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        console.log('Today date:', today);
+        // Use user's timezone if provided, otherwise default to UTC
+        const { timeZone } = req.body;
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: timeZone || 'UTC' });
+        console.log(`Today date (${timeZone || 'UTC'}):`, today);
 
         // 1. Check for active promo code
         // 1. Check for active promo code (Safe In-Memory Check)
@@ -113,7 +115,11 @@ router.post('/increment', async (req, res) => {
             return data.expiresAt.toDate() > now;
         });
 
-        const today = new Date().toISOString().split('T')[0];
+        // Use user's timezone for date calculation
+        const { timeZone } = req.body;
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: timeZone || 'UTC' });
+        console.log(`Incrementing for date (${timeZone || 'UTC'}):`, today);
+
         const usageRef = db.collection('users').doc(uid)
             .collection('chat_usage')
             .doc(today);

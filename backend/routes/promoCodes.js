@@ -173,6 +173,65 @@ router.get('/status/:uid', async (req, res) => {
 });
 
 /**
+ * ADMIN: Get users who activated a promo code
+ * GET /api/promo/admin/:code/users
+ */
+router.get('/admin/:code/users', async (req, res) => {
+    try {
+        const { code } = req.params;
+        const upperCode = code.toUpperCase();
+
+        console.log(`📥 Fetching users for promo code: ${upperCode}`);
+
+        // Query ALL users and check their promo_activations subcollection
+        const usersSnapshot = await db.collection('users').get();
+        const users = [];
+
+        for (const userDoc of usersSnapshot.docs) {
+            const userData = userDoc.data();
+
+            // Check promo_activations subcollection
+            const activationsSnapshot = await db.collection('users').doc(userDoc.id)
+                .collection('promo_activations')
+                .where('promoCode', '==', upperCode)
+                .where('isActive', '==', true)
+                .get();
+
+            if (!activationsSnapshot.empty) {
+                const activation = activationsSnapshot.docs[0].data();
+                const expiresAt = activation.expiresAt?.toDate();
+                const isStillActive = expiresAt && expiresAt > new Date();
+
+                if (isStillActive) {
+                    users.push({
+                        uid: userDoc.id,
+                        email: userData.profile?.email || userData.email || 'N/A',
+                        displayName: userData.profile?.name || userData.displayName || 'N/A',
+                        activatedAt: activation.activatedAt?.toDate() || null,
+                        expiresAt: expiresAt,
+                        duration: activation.duration || 'Unknown',
+                        isActive: true
+                    });
+                }
+            }
+        }
+
+        console.log(`✅ Found ${users.length} active users for promo ${upperCode}`);
+
+        res.json({
+            success: true,
+            promoCode: code,
+            users: users,
+            count: users.length
+        });
+
+    } catch (error) {
+        console.error('Get promo users error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch promo users' });
+    }
+});
+
+/**
  * ADMIN: Create new promo code
  * POST /api/promo/admin/create
  */
@@ -239,6 +298,93 @@ router.get('/admin/list', async (req, res) => {
     } catch (error) {
         console.error('List promos error:', error);
         res.status(500).json({ success: false, message: 'Failed to list promo codes' });
+    }
+});
+
+/**
+ * ADMIN: Get users who activated a promo code
+ * GET /api/promo/admin/:code/users
+ */
+router.get('/admin/:code/users', async (req, res) => {
+    try {
+        const { code } = req.params;
+        const upperCode = code.toUpperCase();
+        const lowerCode = code.toLowerCase();
+
+        console.log(`📥 Fetching users for promo code: ${code} (trying both cases)`);
+
+        // DEBUG: Get ALL users and check their activePromo field
+        console.log('🔍 DEBUG: Fetching ALL users to check activePromo field...');
+        const allUsersSnapshot = await db.collection('users').limit(50).get();
+
+        let usersWithPromo = 0;
+        allUsersSnapshot.forEach(userDoc => {
+            const userData = userDoc.data();
+            if (userData.activePromo) {
+                usersWithPromo++;
+                console.log(`👤 User ${userData.profile?.email || userDoc.id}: code="${userData.activePromo.code}" (type: ${typeof userData.activePromo.code})`);
+            }
+        });
+
+        console.log(`📊 Total users with activePromo: ${usersWithPromo} out of ${allUsersSnapshot.size}`);
+
+        // Try both uppercase and lowercase since we don't know how it's stored
+        const usersSnapshot1 = await db.collection('users')
+            .where('activePromo.code', '==', upperCode)
+            .get();
+
+        const usersSnapshot2 = await db.collection('users')
+            .where('activePromo.code', '==', lowerCode)
+            .get();
+
+        console.log(`🔍 Found ${usersSnapshot1.size} users with uppercase, ${usersSnapshot2.size} with lowercase`);
+
+        // Combine results (avoiding duplicates)
+        const userIds = new Set();
+        const users = [];
+
+        const processSnapshot = (snapshot) => {
+            snapshot.forEach(userDoc => {
+                if (!userIds.has(userDoc.id)) {
+                    userIds.add(userDoc.id);
+                    const userData = userDoc.data();
+                    const activePromo = userData.activePromo || {};
+
+                    console.log(`👤 User ${userDoc.id}:`, {
+                        email: userData.profile?.email || userData.email,
+                        promoCode: activePromo.code,
+                        activatedAt: activePromo.activatedAt,
+                        expiresAt: activePromo.expiresAt
+                    });
+
+                    users.push({
+                        uid: userDoc.id,
+                        email: userData.profile?.email || userData.email || 'N/A',
+                        displayName: userData.profile?.name || userData.displayName || 'N/A',
+                        activatedAt: activePromo.activatedAt?.toDate() || null,
+                        expiresAt: activePromo.expiresAt?.toDate() || null,
+                        duration: activePromo.duration || 'Unknown',
+                        isActive: activePromo.expiresAt && activePromo.expiresAt.toDate() > new Date()
+                    });
+                }
+            });
+        };
+
+        processSnapshot(usersSnapshot1);
+        processSnapshot(usersSnapshot2);
+
+        console.log(`✅ Total unique users found: ${users.length}`);
+
+        res.json({
+            success: true,
+            promoCode: code,
+            users: users,
+            count: users.length
+        });
+
+    } catch (error) {
+        console.error('Get promo users error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch promo users' });
     }
 });
 
