@@ -10,6 +10,13 @@ export const TAMIL_RASI_NAMES = [
     "Dhanusu", "Makaram", "Kumbam", "Meenam"
 ];
 
+// Tamil script versions
+export const TAMIL_RASI_NAMES_TAMIL = [
+    "மேஷம்", "ரிஷபம்", "மிதுனம்", "கடகம்",
+    "சிம்மம்", "கன்னி", "துலாம்", "விருச்சிகம்",
+    "தனுசு", "மகரம்", "கும்பம்", "மீனம்"
+];
+
 export const NAKSHATRAS = [
     "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
     "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni",

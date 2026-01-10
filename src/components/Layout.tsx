@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart, ChevronDown, FileText, Activity, Phone } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart, ChevronDown, FileText, Activity, Phone, LogOut } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +15,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { language, setLanguage, t } = useLanguage();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
     const [showFeaturePopup, setShowFeaturePopup] = React.useState(false);
     const [showWelcomeModal, setShowWelcomeModal] = React.useState(false);
@@ -193,13 +193,25 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             {/* Auth Buttons */}
                             <div className="flex items-center gap-3 mr-4">
                                 {user ? (
-                                    <button
-                                        onClick={() => navigate('/dashboard')}
-                                        className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap ml-6"
-                                    >
-                                        <LayoutDashboard className="w-4 h-4" />
-                                        <span className="hidden lg:inline">{t.nav.dashboard}</span>
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => navigate('/dashboard')}
+                                            className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap ml-6"
+                                        >
+                                            <LayoutDashboard className="w-4 h-4" />
+                                            <span className="hidden lg:inline">{t.nav.dashboard}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                logout();
+                                                navigate('/');
+                                            }}
+                                            className="flex items-center gap-2 px-3 py-2 bg-red-600/20 text-red-300 rounded-lg hover:bg-red-600/30 transition-colors border border-red-500/30 whitespace-nowrap"
+                                        >
+                                            <LogOut className="w-4 h-4" />
+                                            <span className="hidden lg:inline">{language === 'ta' ? 'வெளியேறு' : 'Logout'}</span>
+                                        </button>
+                                    </>
                                 ) : (
                                     <>
                                         <button
@@ -250,16 +262,29 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                     {/* Mobile Auth Buttons */}
                                     <div className="flex flex-col gap-2 pb-4 border-b border-white/10">
                                         {user ? (
-                                            <button
-                                                onClick={() => {
-                                                    navigate('/dashboard');
-                                                    setIsMenuOpen(false);
-                                                }}
-                                                className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 w-full"
-                                            >
-                                                <LayoutDashboard className="w-4 h-4" />
-                                                <span>{t.nav.dashboard}</span>
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        navigate('/dashboard');
+                                                        setIsMenuOpen(false);
+                                                    }}
+                                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 w-full"
+                                                >
+                                                    <LayoutDashboard className="w-4 h-4" />
+                                                    <span>{t.nav.dashboard}</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        logout();
+                                                        navigate('/');
+                                                        setIsMenuOpen(false);
+                                                    }}
+                                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-300 rounded-lg hover:bg-red-600/30 transition-colors border border-red-500/30 w-full"
+                                                >
+                                                    <LogOut className="w-4 h-4" />
+                                                    <span>{language === 'ta' ? 'வெளியேறு' : 'Logout'}</span>
+                                                </button>
+                                            </>
                                         ) : (
                                             <div className="flex gap-2 w-full">
                                                 <button

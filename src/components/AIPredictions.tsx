@@ -469,124 +469,128 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
             // 2. If we have an object (either originally or successfully parsed)
             if (typeof parsedResponse === 'object' && parsedResponse !== null) {
+                // STRICT: Only use the selected language, no fallbacks
                 if (responseLanguage === 'ta') {
-                    aiContent = parsedResponse.final_answer_tamil || parsedResponse.final_answer_english || parsedResponse.answer;
+                    aiContent = parsedResponse.final_answer_tamil || '';
                 } else {
-                    aiContent = parsedResponse.final_answer_english || parsedResponse.final_answer_tamil || parsedResponse.answer;
+                    aiContent = parsedResponse.final_answer_english || '';
                 }
 
-                // If still empty, check if it's the raw JSON string itself (last resort)
+                // If content is empty for selected language, show error message
+                // If content is empty for selected language, show error message
                 if (!aiContent) {
-                    aiContent = JSON.stringify(parsedResponse, null, 2);
+                    aiContent = responseLanguage === 'ta'
+                        ? 'மன்னிக்கவும், தமிழில் பதில் கிடைக்கவில்லை.'
+                        : 'Sorry, response not available in English.';
                 }
-            }
 
-            // 3. Clean up content (remove quotes if it looks like a stringified string)
-            if (typeof aiContent === 'string') {
-                // If the content is wrapped in quotes or backticks, strip them
-                aiContent = aiContent.replace(/^["'`]|["'`]$/g, '');
-                // Replace escaped newlines
-                aiContent = aiContent.replace(/\\n/g, '\n');
-            }
+                // 3. Clean up content (remove quotes if it looks like a stringified string)
+                if (typeof aiContent === 'string') {
+                    // If the content is wrapped in quotes or backticks, strip them
+                    aiContent = aiContent.replace(/^["'`]|["'`]$/g, '');
+                    // Replace escaped newlines
+                    aiContent = aiContent.replace(/\\n/g, '\n');
+                }
 
-            console.log('Extracted AI content (first 200 chars):', aiContent.substring(0, 200));
-            const aiMsg = { role: 'ai', content: aiContent, details: response, timestamp: new Date() };
+                console.log('Extracted AI content (first 200 chars):', aiContent.substring(0, 200));
+                const aiMsg = { role: 'ai', content: aiContent, details: response, timestamp: new Date() };
 
-            setChatHistory(prev => [...prev, aiMsg]);
+                setChatHistory(prev => [...prev, aiMsg]);
 
-            // Also save to Firestore in background if user is logged in (non-blocking)
-            if (user) {
-                saveMessageToFirestore(aiMsg).catch(err => {
-                    console.warn('Failed to save AI message to Firestore:', err.message);
-                });
-            }
-
-            // Increment chat count if not using promo - DATABASE ONLY
-            if (!chatLimit.hasPromo && user && deviceInfo) {
-                try {
-                    console.log('📤 Incrementing chat count in database...');
-                    const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
-                    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-                    const response = await fetch(`${apiUrl}/api/chat/increment`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            uid: user.uid,
-                            deviceFingerprint: deviceInfo.fingerprint,
-                            ipAddress: deviceInfo.ipAddress,
-                            timeZone
-                        })
+                // Also save to Firestore in background if user is logged in (non-blocking)
+                if (user) {
+                    saveMessageToFirestore(aiMsg).catch(err => {
+                        console.warn('Failed to save AI message to Firestore:', err.message);
                     });
+                }
 
-                    if (!response.ok) {
-                        throw new Error(`Failed to increment: ${response.statusText}`);
-                    }
-
-                    const result = await response.json();
-                    console.log('📨 Increment response:', result);
-
-                    // Update local state immediately for responsive UI
-                    setChatLimit(prev => {
-                        const updated = {
-                            ...prev,
-                            remaining: Math.max(0, prev.remaining - 1),
-                            canChat: prev.remaining > 1
-                        };
-                        console.log('💬 Chat count updated:', updated);
-                        return updated;
-                    });
-
-                    // Re-fetch the actual count from database after a short delay
-                    setTimeout(async () => {
-                        try {
-                            const limitResponse = await fetch(`${apiUrl}/api/chat/check-limit`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    uid: user.uid,
-                                    deviceFingerprint: deviceInfo.fingerprint
-                                })
-                            });
-                            const limitData = await limitResponse.json();
-                            if (limitData.success) {
-                                console.log('🔄 Refreshed count from database:', limitData);
-                                setChatLimit({
-                                    canChat: limitData.canChat,
-                                    remaining: limitData.remaining,
-                                    limit: limitData.limit || 2,
-                                    hasPromo: limitData.hasPromo || false
-                                });
-                            }
-                        } catch (err: any) {
-                            console.warn('Failed to refresh count:', err);
-                        }
-                    }, 1000);
-
-                } catch (error: any) {
-                    // Handle 429 (Too Many Requests) specifically - this is the limit being enforced
-                    if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
-                        console.log('🚫 Chat limit enforced by backend (this is normal protection)');
-                        // Update UI to show limit reached
-                        setChatLimit({
-                            canChat: false,
-                            remaining: 0,
-                            limit: 2,
-                            hasPromo: false
+                // Increment chat count if not using promo - DATABASE ONLY
+                if (!chatLimit.hasPromo && user && deviceInfo) {
+                    try {
+                        console.log('📤 Incrementing chat count in database...');
+                        const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+                        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+                        const response = await fetch(`${apiUrl}/api/chat/increment`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                uid: user.uid,
+                                deviceFingerprint: deviceInfo.fingerprint,
+                                ipAddress: deviceInfo.ipAddress,
+                                timeZone
+                            })
                         });
-                        // Show friendly message
-                        setTimeout(() => {
-                            setError(language === 'ta'
-                                ? 'இன்றைய அரட்டை வரம்பு எட்டப்பட்டது. நாளைக்கு மீண்டும் முயற்சிக்கவும்!'
-                                : 'Daily chat limit reached! Try again tomorrow or use a promo code.'
-                            );
-                            setShowPromoModal(true);
-                        }, 500);
-                    } else {
-                        console.error('❌ Error incrementing chat count:', error);
+
+                        if (!response.ok) {
+                            throw new Error(`Failed to increment: ${response.statusText}`);
+                        }
+
+                        const result = await response.json();
+                        console.log('📨 Increment response:', result);
+
+                        // Update local state immediately for responsive UI
+                        setChatLimit(prev => {
+                            const updated = {
+                                ...prev,
+                                remaining: Math.max(0, prev.remaining - 1),
+                                canChat: prev.remaining > 1
+                            };
+                            console.log('💬 Chat count updated:', updated);
+                            return updated;
+                        });
+
+                        // Re-fetch the actual count from database after a short delay
+                        setTimeout(async () => {
+                            try {
+                                const limitResponse = await fetch(`${apiUrl}/api/chat/check-limit`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        uid: user.uid,
+                                        deviceFingerprint: deviceInfo.fingerprint
+                                    })
+                                });
+                                const limitData = await limitResponse.json();
+                                if (limitData.success) {
+                                    console.log('🔄 Refreshed count from database:', limitData);
+                                    setChatLimit({
+                                        canChat: limitData.canChat,
+                                        remaining: limitData.remaining,
+                                        limit: limitData.limit || 2,
+                                        hasPromo: limitData.hasPromo || false
+                                    });
+                                }
+                            } catch (err: any) {
+                                console.warn('Failed to refresh count:', err);
+                            }
+                        }, 1000);
+
+                    } catch (error: any) {
+                        // Handle 429 (Too Many Requests) specifically - this is the limit being enforced
+                        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+                            console.log('🚫 Chat limit enforced by backend (this is normal protection)');
+                            // Update UI to show limit reached
+                            setChatLimit({
+                                canChat: false,
+                                remaining: 0,
+                                limit: 2,
+                                hasPromo: false
+                            });
+                            // Show friendly message
+                            setTimeout(() => {
+                                setError(language === 'ta'
+                                    ? 'இன்றைய அரட்டை வரம்பு எட்டப்பட்டது. நாளைக்கு மீண்டும் முயற்சிக்கவும்!'
+                                    : 'Daily chat limit reached! Try again tomorrow or use a promo code.'
+                                );
+                                setShowPromoModal(true);
+                            }, 500);
+                        } else {
+                            console.error('❌ Error incrementing chat count:', error);
+                        }
                     }
                 }
-            }
 
+            }
         } catch (err: any) {
             console.error('❌ AI Chat Error:', err);
             console.error('Error details:', {
@@ -652,22 +656,10 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 h-[calc(100vh-12rem)] flex flex-col">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center flex-shrink-0"
-            >
-                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400 flex items-center justify-center gap-3">
-                    <BrainCircuit className="w-8 h-8 text-purple-400" />
-                    {t.predictions.title}
-                </h2>
-                <p className="text-slate-400">{t.predictions.subtitle}</p>
-            </motion.div>
-
-            {/* Chat Interface */}
-            <div className="flex-1 glass-panel flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex flex-col min-h-[calc(100vh-8rem)] bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-900">
+            {/* Chat Messages Area */}
+            <div className="flex-1 overflow-y-auto">
+                <div className="max-w-5xl mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
                     {/* Promo Status Badge */}
                     {promoStatus?.hasActivePromo && promoStatus.promoCode && promoStatus.expiresAt && (
                         <PromoStatusBadge
@@ -692,7 +684,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                     <Sparkles className="w-8 h-8 text-white" />
                                 </div>
                                 <h3 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300 mb-2">
-                                    {isTamil ? "வணக்கம்! உங்கள் ஜோதிட கேள்விகளை கேளுங்கள் 🔮" : "Namaste! Ask me your astrology questions 🔮"}
+                                    {isTamil ? "வணக்கம்! உங்கள் ஜோதிட கேள்விகளை கேளுங்கள் 🔮" : "Hello! Ask me your astrology questions 🔮"}
                                 </h3>
                                 <p className="text-slate-400">
                                     {isTamil
@@ -797,11 +789,11 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                     )}
 
                     {chatHistory.map((msg, idx) => (
-                        <div key={idx} className={`flex gap-4 mb-6 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600'}`}>
-                                {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <span className="text-xl">🔮</span>}
+                        <div key={idx} className={`flex gap-3 md:gap-4 mb-6 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-indigo-500 to-purple-600'}`}>
+                                {msg.role === 'user' ? <User className="w-4 h-4 md:w-5 md:h-5 text-white" /> : <span className="text-lg md:text-xl">🔮</span>}
                             </div>
-                            <div className={`rounded-2xl p-5 max-w-[80%] shadow-lg text-sm md:text-base leading-relaxed ${msg.role === 'user' ? 'bg-blue-600/40 border border-blue-500/30 shadow-blue-500/10 text-blue-50' : 'bg-indigo-900/30 border border-indigo-500/20 shadow-indigo-500/10 text-slate-100'}`} style={{ fontFamily: 'Noto Sans Tamil, sans-serif' }}>
+                            <div className={`rounded-2xl p-3 md:p-5 max-w-[90%] md:max-w-[85%] lg:max-w-[70%] shadow-lg text-sm md:text-base leading-relaxed ${msg.role === 'user' ? 'bg-blue-600/40 border border-blue-500/30 shadow-blue-500/10 text-blue-50' : 'bg-indigo-900/30 border border-indigo-500/20 shadow-indigo-500/10 text-slate-100'}`} style={{ fontFamily: 'Noto Sans Tamil, sans-serif' }}>
                                 {msg.content}
                                 {msg.details?.bava_analysis_report && (
                                     <div className="mt-6 space-y-4">
@@ -845,40 +837,8 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                         </div>
                                     </div>
                                 )}
-                                {msg.details && !msg.details.bava_analysis_report && (
-                                    <div className="mt-6 space-y-3">
-                                        {msg.details.intent && (
-                                            <div className="bg-slate-800/40 rounded-xl border border-indigo-500/30 p-4">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span>📋</span>
-                                                    <span className="font-bold text-indigo-300 text-sm">Intent</span>
-                                                </div>
-                                                <p className="text-slate-300 text-sm">{msg.details.intent}</p>
-                                            </div>
-                                        )}
-                                        {msg.details.primary_analysis?.key_planet && (
-                                            <div className="bg-slate-800/40 rounded-xl border border-purple-500/30 p-4">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span>🪐</span>
-                                                    <span className="font-bold text-purple-300 text-sm">Key Planet</span>
-                                                </div>
-                                                <p className="text-slate-300 text-sm">
-                                                    {msg.details.primary_analysis.key_planet}
-                                                    {msg.details.primary_analysis.status && ` (${msg.details.primary_analysis.status})`}
-                                                </p>
-                                            </div>
-                                        )}
-                                        {msg.details.reasoning && (
-                                            <div className="bg-slate-800/40 rounded-xl border border-cyan-500/30 p-4">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span>💭</span>
-                                                    <span className="font-bold text-cyan-300 text-sm">Reasoning</span>
-                                                </div>
-                                                <p className="text-slate-300 text-sm leading-relaxed">{msg.details.reasoning}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                {/* Technical details hidden for cleaner user experience */}
+                                {/* Intent, Key Planet, and Reasoning are for internal use only */}
 
                                 {/* FEEDBACK WIDGET */}
                                 {msg.role === 'ai' && user && msg.id && (
@@ -937,11 +897,13 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
                     <div ref={chatEndRef} />
                 </div>
+            </div>
 
-                {/* Input Area */}
-                <div className="p-4 border-t border-white/10">
+            {/* Input Area */}
+            <div className="border-t border-white/10 p-3 md:p-4">
+                <div className="max-w-5xl mx-auto">
                     {/* Top bar with language selector, chat count, and promo button */}
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                         {/* Language Selector */}
                         <div className="flex items-center gap-2">
                             <span className="text-slate-400 text-sm">Answer in:</span>
@@ -1031,7 +993,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
 
                     {/* Question Input Form */}
-                    <form onSubmit={handleAskQuestion} className="flex gap-2">
+                    <form onSubmit={handleAskQuestion} className="flex gap-3">
                         <input
                             type="text"
                             value={question}
@@ -1041,9 +1003,9 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                 : t.predictions.askPlaceholder
                             }
                             disabled={!chatLimit.hasPromo && chatLimit.remaining <= 0}
-                            className={`flex-1 bg-slate-950 border rounded-full px-6 py-3 outline-none transition-all ${!chatLimit.hasPromo && chatLimit.remaining <= 0
-                                ? 'border-red-500/50 text-slate-600 cursor-not-allowed'
-                                : 'border-slate-700 focus:ring-2 focus:ring-purple-500'
+                            className={`flex-1 bg-white/5 border-2 rounded-3xl px-6 py-4 text-white placeholder:text-slate-400 outline-none transition-all shadow-lg ${!chatLimit.hasPromo && chatLimit.remaining <= 0
+                                ? 'border-red-500/30 text-slate-600 cursor-not-allowed'
+                                : 'border-purple-500/30 hover:border-purple-500/50 focus:border-purple-500 focus:shadow-purple-500/20'
                                 }`}
                         />
                         <button
@@ -1068,4 +1030,3 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 };
 
 export default AIPredictions;
-

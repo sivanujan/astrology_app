@@ -2399,7 +2399,7 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
 
     // Generate Advanced Rules Analysis
     // Generate Advanced Rules Analysis
-    const advancedRules = generateSpecialPredictions(planets, ascSignIndex, subathuvamScores, currentDasa);
+    const advancedRules = generateSpecialPredictions(planets, ascSignIndex, subathuvamScores, currentDasa, language);
 
     const comprehensivePlanets = planets.map((p: any) => {
         const houseNum = (p.signIndex - ascendant.signIndex + 12) % 12 + 1;

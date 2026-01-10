@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { TAMIL_RASI_NAMES, PLANET_SYMBOLS } from '../utils/constants';
+import { TAMIL_RASI_NAMES, PLANET_SYMBOLS, ZODIAC_SIGNS } from '../utils/constants';
 import { TAMIL_PLANET_ABBREVIATIONS, TAMIL_PLANET_NAMES } from '../utils/translations';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getNavamsaChartData } from '../utils/astrology';
@@ -19,11 +19,16 @@ interface SouthIndianChartProps {
 }
 
 const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { user } = useAuth();
     const [saving, setSaving] = React.useState(false);
     const [saveStatus, setSaveStatus] = React.useState<'idle' | 'success' | 'error' | 'exists'>('idle');
     const [showShareModal, setShowShareModal] = React.useState(false);
+
+    // Helper to get zodiac name in current language
+    const getZodiacName = (signIndex: number) => {
+        return language === 'ta' ? TAMIL_RASI_NAMES[signIndex] : ZODIAC_SIGNS[signIndex];
+    };
 
     const handleSaveChart = async () => {
         if (!user || !data) return;
@@ -130,8 +135,8 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                 onClose={() => setShowShareModal(false)}
                 shareData={{
                     name: data.userDetails.name,
-                    lagna: TAMIL_RASI_NAMES[data.ascendant.signIndex],
-                    moonSign: TAMIL_RASI_NAMES[data.planets.find((p: any) => p.name === 'Moon')?.signIndex || 0],
+                    lagna: getZodiacName(data.ascendant.signIndex),
+                    moonSign: getZodiacName(data.planets.find((p: any) => p.name === 'Moon')?.signIndex || 0),
                     birthDate: new Date(data.userDetails.date).toLocaleDateString(),
                     birthTime: data.userDetails.time,
                     birthPlace: data.userDetails.city
@@ -258,7 +263,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                     <div className="flex flex-col items-center p-3 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 rounded-lg border border-purple-500/40">
                         <span className="text-purple-300 text-xs mb-1 font-semibold">🌟 {t.chart?.lagna || 'Lagna'}</span>
                         <span className="text-white font-bold text-base">
-                            {TAMIL_RASI_NAMES[data.ascendant.signIndex]}
+                            {getZodiacName(data.ascendant.signIndex)}
                         </span>
                         <span className="text-purple-300 text-xs mt-1">
                             {Math.floor(data.ascendant.degree)}° {Math.round((data.ascendant.degree % 1) * 60)}'
@@ -276,7 +281,7 @@ const SouthIndianChart: React.FC<SouthIndianChartProps> = ({ data }) => {
                     onCenterContent={() => (
                         <div className="text-center p-4">
                             <div className="text-4xl font-serif text-slate-700 opacity-20 mb-2">ॐ</div>
-                            <div className="text-sm text-slate-500">{t.chart.lagna}: {TAMIL_RASI_NAMES[data.ascendant.signIndex]}</div>
+                            <div className="text-sm text-slate-500">{t.chart.lagna}: {getZodiacName(data.ascendant.signIndex)}</div>
                             <div className="text-xs text-slate-600 mt-1">
                                 {Math.floor(data.ascendant.degree)}° {Math.round((data.ascendant.degree % 1) * 60)}'
                             </div>

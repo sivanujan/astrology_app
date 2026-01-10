@@ -8,7 +8,7 @@ import GurujiPersonaModal from '../components/GurujiPersonaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useChartData } from '../contexts/ChartContext';
 import { calculatePlanetaryPositions, getNakshatra } from '../utils/astrology';
-import { ZODIAC_SIGNS, TAMIL_RASI_NAMES, NAKSHATRAS, TAMIL_NAKSHATRAS } from '../utils/constants';
+import { ZODIAC_SIGNS, TAMIL_RASI_NAMES, TAMIL_RASI_NAMES_TAMIL, NAKSHATRAS, TAMIL_NAKSHATRAS } from '../utils/constants';
 import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -39,8 +39,8 @@ const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewCha
         const lagnaIndex = data.ascendant.signIndex;
 
         setDetails({
-            rasi: language === 'ta' ? TAMIL_RASI_NAMES[rasiIndex] : ZODIAC_SIGNS[rasiIndex],
-            lagna: language === 'ta' ? TAMIL_RASI_NAMES[lagnaIndex] : ZODIAC_SIGNS[lagnaIndex],
+            rasi: language === 'ta' ? TAMIL_RASI_NAMES_TAMIL[rasiIndex] : ZODIAC_SIGNS[rasiIndex],
+            lagna: language === 'ta' ? TAMIL_RASI_NAMES_TAMIL[lagnaIndex] : ZODIAC_SIGNS[lagnaIndex],
             nakshatra: language === 'ta' ? TAMIL_NAKSHATRAS[moonNak.index] : NAKSHATRAS[moonNak.index],
             nakshatraPada: moonNak.pada,
             dateStr: chart.dob.toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-GB', {

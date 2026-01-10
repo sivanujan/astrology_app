@@ -13,6 +13,9 @@ const API_CONFIG = {
             sendVerification: '/api/auth/send-verification-email',
             sendPasswordReset: '/api/auth/send-password-reset',
             checkVerification: '/api/auth/check-verification',
+        },
+        chat: {
+            send: '/api/chat/send'
         }
     }
 };

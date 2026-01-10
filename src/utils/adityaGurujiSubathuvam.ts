@@ -513,7 +513,8 @@ export const generateSpecialPredictions = (
     planets: any[],
     ascendantSignIndex: number,
     subathuvamResults: Record<string, SubathuvamResult>,
-    currentDasa?: any
+    currentDasa?: any,
+    language: 'en' | 'ta' = 'en'
 ): { planet: string; prediction: string; type: string }[] => {
     const predictions: { planet: string; prediction: string; type: string }[] = [];
     const lagnadipathiName = SIGN_LORDS[ascendantSignIndex];
@@ -610,10 +611,14 @@ export const generateSpecialPredictions = (
         if (planet.name === 'Mars' && houseNumber === 10) {
             predictions.push({
                 planet: 'Mars',
-                type: 'Digbala (10th)',
+                type: language === 'ta' ? 'திக்பலம் (10th)' : 'Digbala (10th)',
                 prediction: isSubathuva
-                    ? "High Authority, Commander, Real Estate Success (Controlled Power)."
-                    : "Aggressive leadership, conflicts (Uncontrolled Power)."
+                    ? (language === 'ta'
+                        ? "உயர் அதிகாரம், தளபதி, ரியல் எஸ்டேட் வெற்றி (கட்டுப்படுத்தப்பட்ட சக்தி)."
+                        : "High Authority, Commander, Real Estate Success (Controlled Power).")
+                    : (language === 'ta'
+                        ? "தாக்குதல் தலைமைத்துவம், மோதல்கள் (கட்டுப்பாடற்ற சக்தி)."
+                        : "Aggressive leadership, conflicts (Uncontrolled Power).")
             });
             // Profession Case Study: Mars + Saturn
             if (saturn && (hasAspect(planet, saturn, [3, 7, 10]) || planet.signIndex === saturn.signIndex)) {
@@ -721,8 +726,10 @@ export const generateSpecialPredictions = (
         } else {
             predictions.push({
                 planet: lord5Name,
-                type: 'Progeny (Child Birth)',
-                prediction: "Favorable conditions for progeny (5th Lord well-placed)."
+                type: language === 'ta' ? 'சந்ததி (குழந்தை பிறப்பு)' : 'Progeny (Child Birth)',
+                prediction: language === 'ta'
+                    ? "சந்ததிக்கு சாதகமான நிலைமைகள் (5வது அதிபதி நல்ல நிலையில்)."
+                    : "Favorable conditions for progeny (5th Lord well-placed)."
             });
         }
     }

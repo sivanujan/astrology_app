@@ -33,6 +33,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import NotFound from './pages/NotFound';
 import Contact from './pages/Contact';
+import AIChat from './pages/AIChat';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
@@ -153,6 +154,14 @@ const AppRoutes = () => {
           </>
         ) : <Navigate to="/" />}
       />
+
+      {/* AI Chat - Full Window */}
+      <Route path="/ai-chat" element={
+        <ProtectedRoute>
+          <SEO title="AI Astrologer Chat - Get Instant Answers" />
+          <AIChat />
+        </ProtectedRoute>
+      } />
 
       {/* Protected Routes */}
       <Route path="/dashboard" element={
