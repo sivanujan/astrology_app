@@ -1196,7 +1196,7 @@ ${JSON.stringify(context, null, 2)}
             const lagnaRule = (dynamicRulesMap && dynamicRulesMap[mappedLagna]) ? dynamicRulesMap[mappedLagna] : LAGNA_SPECIFIC_RULES[mappedLagna];
 
             if (lagnaRule) {
-                intentPrompt = `\n\n *** SPECIAL GURUJI RULE FOR ${mappedLagna.toUpperCase()} LAGNA ***\n${lagnaRule} \n\nApply these specific rules strictly.`;
+                intentPrompt += `\n\n *** SPECIAL GURUJI RULE FOR ${mappedLagna.toUpperCase()} LAGNA ***\n${lagnaRule} \n\nApply these specific rules strictly.`;
             }
         }
 
@@ -1391,7 +1391,8 @@ CURRENT DASHA STATUS:
                 bhukti: { lord: "NOT CALCULATED", end_date: "Unknown" },
                 antharam: { lord: "NOT CALCULATED" }
             }),
-            dasa_schedule: getReadableDashaSchedule(chartData.dashaPeriods),
+            // Use provided periods OR the ones we calculated locally
+            dasa_schedule: getReadableDashaSchedule(chartData.dashaPeriods && chartData.dashaPeriods.length > 0 ? chartData.dashaPeriods : calculatedPeriods),
             HouseLordship: houseLords,
             HiddenHouses_6_8_12: hiddenHouseConnections,
             Planets: chartData.planets?.map((p: any) => ({
@@ -1471,7 +1472,6 @@ Your goal is to provide accurate predictions based ONLY on the provided JSON dat
 Your response MUST be visually formatted. DO NOT give plain text paragraphs!
 ALWAYS use:
 - Emojis for categories (💼 🏛️ 🏗️ ⭐ ✓ ⚠️ 💡)
-- Section dividers (use dashes: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━)
 - Bullet points with checkmarks (✓)
 - Star ratings (⭐⭐⭐⭐⭐)
 - Progress bars for percentages (████████████████░░░░ 85%)

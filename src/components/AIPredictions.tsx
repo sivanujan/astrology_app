@@ -41,23 +41,29 @@ const formatAIResponse = (text: string): string => {
     // Replace common patterns with formatted versions
     const patterns = [
         // Lagna/Ascendant headers
-        { regex: /(?:🌟\s*)?(?:Your Lagna|உங்கள் லக்னம்|Lagna|லக்னம்)(?:\s*\(Ascendant\))?/gi, replacement: '\n🌟 YOUR LAGNA (ASCENDANT)\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+        { regex: /(?:🌟\s*)?(?:Your Lagna|உங்கள் லக்னம்|Lagna|லக்னம்)(?:\s*\(Ascendant\))?/gi, replacement: '\n\n🌟 **YOUR LAGNA (ASCENDANT)**\n' },
 
         // Strength/Analysis headers
-        { regex: /(?:💪\s*)?(?:Strength Analysis|வலிமை பகுப்பாய்வு)/gi, replacement: '\n\n━━━━━━━━━━━━━━━━━━━━━━\n💪 STRENGTH ANALYSIS\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+        { regex: /(?:💪\s*)?(?:Strength Analysis|வலிமை பகுப்பாய்வு)/gi, replacement: '\n\n💪 **STRENGTH ANALYSIS**\n' },
 
         // Critical/Warning headers
-        { regex: /(?:⚠️\s*)?(?:Critical Weakness|முக்கிய பலவீனம்)/gi, replacement: '\n\n━━━━━━━━━━━━━━━━━━━━━━\n⚠️ CRITICAL WEAKNESS\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+        { regex: /(?:⚠️\s*)?(?:Critical Weakness|முக்கிய பலவீனம்)/gi, replacement: '\n\n⚠️ **CRITICAL WEAKNESS**\n' },
 
         // Personality/Effects headers
-        { regex: /(?:✨\s*)?(?:Personality Effects|ஆளுமை விளைவுகள்)/gi, replacement: '\n\n━━━━━━━━━━━━━━━━━━━━━━\n✨ PERSONALITY EFFECTS\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+        { regex: /(?:✨\s*)?(?:Personality Effects|ஆளுமை விளைவுகள்)/gi, replacement: '\n\n✨ **PERSONALITY EFFECTS**\n' },
+
+        // Final Verdict Headers (Standardizing)
+        { regex: /(?:⚡\s*)?(?:Final Verdict|முடிவுரை)/gi, replacement: '\n\n🎯 **FINAL VERDICT**\n' },
 
         // Basic Details/Info
-        { regex: /(?:📋\s*)?(?:Basic Details|அடிப்படை விவரங்கள்)/gi, replacement: '\n📋 Basic Details:\n' },
+        { regex: /(?:📋\s*)?(?:Basic Details|அடிப்படை விவரங்கள்)/gi, replacement: '\n📋 **Basic Details:**\n' },
 
         // Positive/Negative grouping
-        { regex: /Positive:/gi, replacement: '\n✅ Positive:\n' },
-        { regex: /Negative:/gi, replacement: '\n❌ Negative:\n' },
+        { regex: /Positive:/gi, replacement: '\n✅ **Positive:**\n' },
+        { regex: /Negative:/gi, replacement: '\n❌ **Negative:**\n' },
+
+        // SAFETY NET: Remove ANY long divider lines (more than 3 chars) completely
+        { regex: /[━─_-]{3,}/g, replacement: '' },
     ];
 
     patterns.forEach(({ regex, replacement }) => {
@@ -91,6 +97,13 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const [responseLanguage, setResponseLanguage] = useState<'en' | 'ta'>('en'); // LOCAL chat language, independent from app language
     const chatEndRef = useRef<HTMLDivElement>(null);
     const { user } = useAuth(); // Auth context
+
+    // Sync chat language with app language preference
+    useEffect(() => {
+        if (language === 'ta' || language === 'en') {
+            setResponseLanguage(language);
+        }
+    }, [language]);
 
     // Chat Limit State - START BLOCKED, then enable after API confirms
     const [chatLimit, setChatLimit] = useState({ canChat: false, remaining: 0, limit: 2, hasPromo: false });
@@ -825,7 +838,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     };
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-8rem)] bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-900">
+        <div className="flex flex-col min-h-[calc(100vh-8rem)] bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-900 overflow-x-hidden">
             {/* Chat Messages Area */}
             <div className="flex-1 overflow-y-auto">
                 <div className="max-w-5xl mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
