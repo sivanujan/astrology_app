@@ -448,6 +448,83 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 antaram: data.currentDasa?.antaram?.planet
             });
 
+            // DEBUG: Log the FULL currentDasa structure to see what fields exist
+            if (data.currentDasa) {
+                console.log("[AI Predictions] FULL currentDasa.maha structure:", data.currentDasa.maha);
+                console.log("[AI Predictions] FULL currentDasa.bhukti structure:", data.currentDasa.bhukti);
+            }
+
+            // CRITICAL FIX: Hydrate missing Dasha dates for existing charts
+            // If we have Moon longitude but missing dates, recalculate them NOW
+            const moon = data.planets?.find((p: any) => p.name === 'Moon');
+            const birthDataObject = data.birth_details?.dob || data.birthDate;
+
+            // Helper to get Date object safely from various formats
+            const getSafeDate = (d: any): Date | null => {
+                if (!d) return null;
+                if (d instanceof Date && !isNaN(d.getTime())) return d;
+                if (typeof d === 'string') {
+                    // Try standard parsing
+                    let parsed = new Date(d);
+                    if (!isNaN(parsed.getTime())) return parsed;
+
+                    // Try DD/MM/YYYY parsing (common in this app)
+                    // Matches 29/04/2000 or 29-04-2000
+                    const parts = d.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+                    if (parts) {
+                        // parts[1] is day, parts[2] is month, parts[3] is year
+                        // new Date(year, monthIndex, day)
+                        parsed = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
+                        if (!isNaN(parsed.getTime())) return parsed;
+                    }
+                    return null;
+                }
+                if (typeof d.toDate === 'function') return d.toDate(); // Firestore Timestamp
+                if (d.seconds) return new Date(d.seconds * 1000); // Raw Timestamp object
+                return null;
+            };
+
+            const birthDateObj = getSafeDate(birthDataObject);
+
+            // Determine if we need to regenerate Dasha
+            // Check if currentDasa is missing OR if dates are missing/strings
+            const needToRecalcDasa = !data.currentDasa?.maha?.startDate &&
+                !data.currentDasa?.maha?.start &&
+                moon &&
+                birthDateObj;
+
+            if (needToRecalcDasa) {
+                console.log('🔄 HYDRATING DASHA DATES: Recalculating Dasa schedule on-the-fly...', birthDateObj);
+                try {
+                    // Import dynamically - dashaCalculation.ts uses 'calculateVimshottariDasha'
+                    const { calculateVimshottariDasha, getCurrentDasha } = await import('../utils/dashaCalculation');
+
+                    if (birthDateObj) {
+                        // Calculate full life cycle (120 years)
+                        // Note: Signature is (moonLon, birthDate, years)
+                        const newDashaPeriods = calculateVimshottariDasha(moon.longitude, birthDateObj, 120);
+
+                        // getCurrentDasha in dashaCalculation.ts takes (moonLon, birthDate, currentDate)
+                        const newCurrentDasa = getCurrentDasha(moon.longitude, birthDateObj, new Date());
+
+                        // Check if we got valid results
+                        if (newCurrentDasa && newCurrentDasa.maha) {
+                            console.log('✅ RECALCULATED DASHA:', {
+                                maha: newCurrentDasa.maha.planet,
+                                start: newCurrentDasa.maha.start,
+                                end: newCurrentDasa.maha.end
+                            });
+
+                            // Update enrichedData with FRESH dates
+                            enrichedData.dashaPeriods = newDashaPeriods;
+                            enrichedData.currentDasa = newCurrentDasa;
+                        }
+                    }
+                } catch (calcErr) {
+                    console.error('❌ Failed to recalculate Dasha dates:', calcErr);
+                }
+            }
+
             // --- PROACTIVE ENRICHMENT: Calculate Yogas & Subathuvam if missing ---
             // The AI needs these pre-calculated values to follow rules accurately.
 

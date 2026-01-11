@@ -21,11 +21,23 @@ interface ChartProviderProps {
 }
 
 export const ChartProvider: React.FC<ChartProviderProps> = ({ children }) => {
+    // Helper to revive dates from JSON
+    const dateReviver = (key: string, value: any) => {
+        if (typeof value === 'string') {
+            // ISO 8601 date format detection
+            const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/;
+            if (dateRegex.test(value)) {
+                return new Date(value);
+            }
+        }
+        return value;
+    };
+
     // Initialize from localStorage if available
     const [chartData, setChartDataState] = useState<any | null>(() => {
         try {
             const saved = localStorage.getItem('astrology_chart_data');
-            return saved ? JSON.parse(saved) : null;
+            return saved ? JSON.parse(saved, dateReviver) : null;
         } catch (e) {
             console.error("Failed to load chart data", e);
             return null;

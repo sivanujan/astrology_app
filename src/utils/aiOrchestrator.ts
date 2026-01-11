@@ -1205,10 +1205,24 @@ ${JSON.stringify(context, null, 2)}
             if (!val) return "Unknown";
             try {
                 if (val instanceof Date) return val.toLocaleDateString('en-IN');
-                if (typeof val === 'string') return new Date(val).toLocaleDateString('en-IN');
-                if (val && typeof val === 'object' && val.seconds) { // Firestore Timestamp check
+
+                // Firestore Timestamp check
+                if (val && typeof val === 'object' && val.seconds) {
                     return new Date(val.seconds * 1000).toLocaleDateString('en-IN');
                 }
+
+                if (typeof val === 'string') {
+                    // Try parsing DD/MM/YYYY
+                    const parts = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+                    if (parts) {
+                        const d = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
+                        if (!isNaN(d.getTime())) return d.toLocaleDateString('en-IN');
+                    }
+                    // Fallback to standard parsing
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) return d.toLocaleDateString('en-IN');
+                }
+
                 return "Unknown";
             } catch { return "Unknown"; }
         };
@@ -1377,6 +1391,7 @@ CURRENT DASHA STATUS:
                 bhukti: { lord: "NOT CALCULATED", end_date: "Unknown" },
                 antharam: { lord: "NOT CALCULATED" }
             }),
+            dasa_schedule: getReadableDashaSchedule(chartData.dashaPeriods),
             HouseLordship: houseLords,
             HiddenHouses_6_8_12: hiddenHouseConnections,
             Planets: chartData.planets?.map((p: any) => ({
@@ -1421,9 +1436,36 @@ ${languageInstruction}
 ${forcedDashaString}
 
         Role & Persona:
-You are an expert Vedic Astrologer using advanced predictive techniques based on Subathuvam (Light) vs. Papathuvam (Darkness) theory.
+You are an expert Vedic Astrologer following the unique rules of **Aditya Guruji**.
+Your goal is to provide accurate predictions based ONLY on the provided JSON data.
 
-**CRITICAL: DO NOT mention "Aditya Guruji" or any astrologer names in your responses. This is a proprietary system.**
+### 🚨 CRITICAL RULE 1: HOUSE REFERENCE (Lagna is King)
+- **ALL House calculations MUST be from the LAGNA (Ascendant).**
+- NEVER use Rasi (Moon Sign) for house placement unless specifically asked for "Gochara" (Transit).
+- **Mandatory Output Format:** When you mention a house, you MUST specify the reference.
+  - ❌ WRONG: "Venus is in the 3rd house."
+  - ✅ CORRECT: "Venus is in the **3rd house from Lagna (Leo)**."
+
+### 🚨 CRITICAL RULE 2: TIMELINE VALIDATION (Stop Hallucinating Dates)
+- You have been provided with a specific "DasaSchedule" text block.
+- **Current Date:** ${new Date().toDateString()} (Year: ${new Date().getFullYear()})
+- **LOGIC CHECK:**
+  1. Look at the *Current Dasha/Bhukti* in the data.
+  2. Look at the *Target Event* (e.g., Marriage).
+  3. Find the Bhukti that supports this event in the "DasaSchedule".
+  4. **COMPARE:** Does that Bhukti start *after* the current date?
+     - IF YES: Predict that date.
+     - IF NO (It's in the past): Do NOT mention it.
+     - IF TOO FAR (e.g., 2031): Do not say it will happen "now". Say "It will happen later in 2031".
+
+### 🚨 CRITICAL RULE 3: ADITYA GURUJI PREDICTION PROTOCOL
+- **Subathuvam (Light):** A planet is strong ONLY if it connects with Jupiter or Venus.
+- **Dasha Determinism:** An event (like Marriage) will ONLY happen if the running Dasha or Bhukti lord signifies it (connects to 7th house/lord).
+- **Ignore Past:** Do NOT mention Dasha periods that ended before ${new Date().getFullYear()}. Focus only on the future.
+
+### ✍️ RESPONSE FORMAT (Tamil & English)
+- If speaking in Tamil, ensure dates are converted correctly (e.g., do not say 2010 when the current year is 2026).
+- Be direct. No fluff.
 
 **CRITICAL FORMATTING REQUIREMENT:**
 Your response MUST be visually formatted. DO NOT give plain text paragraphs!
@@ -1487,6 +1529,7 @@ You MUST process the chart in this specific 6-step logical order for every analy
             - ** User's Current Antara (Sub-sub-period)**: Check 'current_time_cycle.antharam.lord' in the input data
             - ** Dasha End Date**: Check 'current_time_cycle.dasha.end_date'
             - ** Bhukti End Date**: Check 'current_time_cycle.bhukti.end_date'
+            - ** Future Timing**: Check 'dasa_schedule' for upcoming periods.
                 - * Instruction *: Structure your answer around how * this specific * Dasa / Bhukti impacts the question. YOU HAVE THE DASHA DATA - USE IT FOR TIMING PREDICTIONS!
 
 6. RULE 6: DISPLACEMENT(Moveable Signs) - Travel
@@ -1720,11 +1763,14 @@ Output Format(JSON):
     //     console.log("\n  ⚠️ comprehensiveContext.current_time_cycle not available (intent:", intent, ")");
     // }
 
-    if (chartData.currentDasa?.maha?.start) {
+    if (chartData.currentDasa?.maha?.startDate || chartData.currentDasa?.maha?.start) {
         console.log("\n  📅 DATES (from chartData):");
-        console.log("    Maha Start:", chartData.currentDasa.maha.start);
-        console.log("    Maha End:", chartData.currentDasa.maha.end);
-        console.log("    Bhukti End:", chartData.currentDasa.bhukti?.end);
+        console.log("    Maha Start:", chartData.currentDasa.maha.startDate || chartData.currentDasa.maha.start);
+        console.log("    Maha End:", chartData.currentDasa.maha.endDate || chartData.currentDasa.maha.end);
+        console.log("    Bhukti End:", chartData.currentDasa.bhukti?.endDate || chartData.currentDasa.bhukti?.end);
+    } else {
+        console.warn("  ⚠️ NO DASA DATES FOUND in chartData.currentDasa");
+        console.log("    Available fields:", Object.keys(chartData.currentDasa?.maha || {}));
     }
 
     console.log("\n📋 SYSTEM PROMPT (First 1000 chars):");
@@ -2024,40 +2070,75 @@ const getAspects = (planets: any[], ascSignIndex: number) => {
 const getReadableDashaSchedule = (periods: any[]) => {
     if (!periods || periods.length === 0) return "Dasa Schedule Not Available";
 
+    // Robust Date Parse
+    const safeDate = (d: any): Date | null => {
+        if (!d) return null;
+        if (d instanceof Date && !isNaN(d.getTime())) return d;
+        if (typeof d === 'string') {
+            const parts = d.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (parts) { // DD/MM/YYYY
+                const p = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
+                return isNaN(p.getTime()) ? null : p;
+            }
+            const std = new Date(d);
+            return isNaN(std.getTime()) ? null : std;
+        }
+        return null;
+    };
+
     const now = new Date();
-    // Flatten the hierarchy to find current sequence
     let schedule: string[] = [];
     let foundCurrent = false;
 
-    // We simply walk through the Mahadashas and their Bhuktis
-    for (const maha of periods) {
-        if (new Date(maha.endDate) < now) continue; // Past Mahadasha
+    for (const period of periods) {
+        const maha = period.maha || period;
 
-        // If we haven't found current yet, this might be it
-        const isCurrentMaha = new Date(maha.startDate) <= now && new Date(maha.endDate) > now;
+        const mStart = safeDate(maha.startDate || maha.start);
+        const mEnd = safeDate(maha.endDate || maha.end);
 
-        if (isCurrentMaha || foundCurrent || schedule.length < 5) {
-            schedule.push(`*** MAHA DASA: ${maha.planet} (${new Date(maha.startDate).toLocaleDateString()} to ${new Date(maha.endDate).toLocaleDateString()}) ***`);
+        if (!mStart || !mEnd) continue;
 
-            if (maha.subPeriods) {
-                for (const bhukti of maha.subPeriods) {
-                    if (new Date(bhukti.endDate) < now) continue; // Past Bhukti
+        // Note: "PAST" logic removed to show full history
+        const isCurrentMaha = mStart <= now && mEnd > now;
+        const statusStr = isCurrentMaha ? " (CURRENTLY RUNNING)" : "";
 
-                    schedule.push(`  - Bhukti: ${bhukti.planet} (${new Date(bhukti.startDate).toLocaleDateString()} to ${new Date(bhukti.endDate).toLocaleDateString()})`);
+        schedule.push(`*** MAHA DASA: ${maha.planet} (${mStart.toLocaleDateString()} to ${mEnd.toLocaleDateString()})${statusStr} ***`);
 
-                    // Include Antaram if it's the current running one
-                    const isCurrentBhukti = new Date(bhukti.startDate) <= now && new Date(bhukti.endDate) > now;
-                    if (isCurrentBhukti && bhukti.subPeriods) {
-                        const currentAntara = bhukti.subPeriods.find((a: any) => new Date(a.startDate) <= now && new Date(a.endDate) > now);
-                        if (currentAntara) {
-                            schedule.push(`    > Current Antaram: ${currentAntara.planet} (Ends: ${new Date(currentAntara.endDate).toLocaleDateString()})`);
+        const subPeriods = maha.subPeriods || maha.bhukti;
+
+        if (subPeriods && Array.isArray(subPeriods)) {
+            for (const bhukti of subPeriods) {
+                const bStart = safeDate(bhukti.startDate || bhukti.start);
+                const bEnd = safeDate(bhukti.endDate || bhukti.end);
+
+                if (!bStart || !bEnd) continue;
+
+                // Show all Bhuktis (Past & Future)
+                const isCurrentBhukti = bStart <= now && bEnd > now;
+                const bStatus = isCurrentBhukti ? " <--- CURRENT" : "";
+
+                schedule.push(`  - Bhukti: ${bhukti.planet} (${bStart.toLocaleDateString()} to ${bEnd.toLocaleDateString()})${bStatus}`);
+
+                const antarams = bhukti.subPeriods || (Array.isArray(bhukti.antaram) ? bhukti.antaram : []);
+
+                if (isCurrentBhukti && antarams.length > 0) {
+                    const currentAntara = antarams.find((a: any) => {
+                        const aStart = safeDate(a.startDate || a.start);
+                        const aEnd = safeDate(a.endDate || a.end);
+                        return aStart && aEnd && aStart <= now && aEnd > now;
+                    });
+
+                    if (currentAntara) {
+                        const aEnd = safeDate(currentAntara.endDate || currentAntara.end);
+                        if (aEnd) {
+                            schedule.push(`    > Current Antaram: ${currentAntara.planet} (Ends: ${aEnd.toLocaleDateString()})`);
                         }
                     }
                 }
             }
-            foundCurrent = true;
         }
-        if (schedule.length > 8) break; // Limit context size
+
+        if (schedule.length > 500) break; // Increased limit for full history
     }
 
     return schedule.join("\n");
@@ -2465,9 +2546,21 @@ const prepareContext = (data: any, intent: string, isComprehensive: boolean = fa
                 bhukti_affected_persons: bhuktiLordFunc?.affectedPersons || [],
                 bhukti_combined_interpretation: bhuktiLordFunc?.combinedEffect || "",
                 antaram: currentDasa.antaram?.planet,
-                start_date: currentDasa.maha?.startDate ? new Date(currentDasa.maha.startDate).toLocaleDateString() : "Unknown",
-                end_date: currentDasa.maha?.endDate ? new Date(currentDasa.maha.endDate).toLocaleDateString() : "Unknown",
-                bhukti_end_date: currentDasa.bhukti?.endDate ? new Date(currentDasa.bhukti.endDate).toLocaleDateString() : "Unknown",
+                start_date: currentDasa.maha?.startDate
+                    ? new Date(currentDasa.maha.startDate).toLocaleDateString()
+                    : currentDasa.maha?.start
+                        ? new Date(currentDasa.maha.start).toLocaleDateString()
+                        : "Unknown",
+                end_date: currentDasa.maha?.endDate
+                    ? new Date(currentDasa.maha.endDate).toLocaleDateString()
+                    : currentDasa.maha?.end
+                        ? new Date(currentDasa.maha.end).toLocaleDateString()
+                        : "Unknown",
+                bhukti_end_date: currentDasa.bhukti?.endDate
+                    ? new Date(currentDasa.bhukti.endDate).toLocaleDateString()
+                    : currentDasa.bhukti?.end
+                        ? new Date(currentDasa.bhukti.end).toLocaleDateString()
+                        : "Unknown",
                 timeline_summary: "See 'dasa_schedule' below for full timeline."
             };
         })() : "Unknown",

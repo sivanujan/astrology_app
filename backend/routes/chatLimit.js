@@ -58,7 +58,7 @@ router.post('/check-limit', async (req, res) => {
             .get();
 
         const currentCount = usageDoc.exists ? usageDoc.data().count : 0;
-        const limit = 2;
+        const limit = 3;
         const remaining = Math.max(0, limit - currentCount);
 
         res.json({
@@ -83,8 +83,8 @@ router.post('/check-limit', async (req, res) => {
             success: true,
             canChat: true, // Allow chat by default if check fails
             hasPromo: false,
-            remaining: 2,
-            limit: 2,
+            remaining: 3,
+            limit: 3,
             currentCount: 0,
             warning: 'Using default limits due to system error'
         });
@@ -130,7 +130,7 @@ router.post('/increment', async (req, res) => {
             const currentCount = doc.exists ? doc.data().count : 0;
 
             // Only check limit if user does NOT have active promo
-            if (!hasActivePromo && currentCount >= 2) {
+            if (!hasActivePromo && currentCount >= 3) {
                 throw new Error('Chat limit exceeded');
             }
 
@@ -176,8 +176,8 @@ router.get('/usage/:uid', async (req, res) => {
             usage: {
                 date: data.date,
                 count: data.count || 0,
-                limit: 2,
-                remaining: Math.max(0, 2 - (data.count || 0)),
+                limit: 3,
+                remaining: Math.max(0, 3 - (data.count || 0)),
                 lastChatAt: data.lastChatAt?.toDate() || null
             }
         });

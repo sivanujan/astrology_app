@@ -665,11 +665,28 @@ export const calculateDashaPeriods = (birthDate: Date, moonLongitude: number) =>
 };
 
 export const getCurrentDasha = (periods: DashaPeriod[], date: Date = new Date()) => {
-    const maha = periods.find(p => date >= p.startDate && date < p.endDate);
+    // Ensure input date is a Date object
+    const targetDate = new Date(date);
+
+    const maha = periods.find(p => {
+        const start = new Date(p.startDate);
+        const end = new Date(p.endDate);
+        return targetDate >= start && targetDate < end;
+    });
+
     if (!maha) return null;
 
-    const bhukti = maha.subPeriods?.find(p => date >= p.startDate && date < p.endDate);
-    const antaram = bhukti?.subPeriods?.find(p => date >= p.startDate && date < p.endDate);
+    const bhukti = maha.subPeriods?.find(p => {
+        const start = new Date(p.startDate);
+        const end = new Date(p.endDate);
+        return targetDate >= start && targetDate < end;
+    });
+
+    const antaram = bhukti?.subPeriods?.find(p => {
+        const start = new Date(p.startDate);
+        const end = new Date(p.endDate);
+        return targetDate >= start && targetDate < end;
+    });
 
     return { maha, bhukti, antaram };
 };
