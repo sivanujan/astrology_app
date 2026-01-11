@@ -151,21 +151,39 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
             // CRITICAL: Ensure the parent chart document exists
             const chartRef = doc(db, `users/${user.uid}/charts/${chartId}`);
-            const chartSnapshot = await getDoc(chartRef);
 
-            if (!chartSnapshot.exists()) {
-                console.log('📄 Creating parent chart document:', chartId);
-                await setDoc(chartRef, {
-                    name: data.userDetails.name || 'Unknown',
-                    birthDate: data.birthDate,
-                    createdAt: serverTimestamp(),
-                    lastMessageAt: serverTimestamp()
+            try {
+                const chartSnapshot = await getDoc(chartRef);
+
+                if (!chartSnapshot.exists()) {
+                    console.log('📄 Creating parent chart document:', chartId);
+                    console.log('📍 Chart path:', `users/${user.uid}/charts/${chartId}`);
+
+                    await setDoc(chartRef, {
+                        userId: user.uid, // CRITICAL: Required for Firestore rules
+                        name: data.userDetails.name || 'Unknown',
+                        birthDate: data.birthDate,
+                        createdAt: serverTimestamp(),
+                        lastMessageAt: serverTimestamp()
+                    });
+                    console.log('✅ Parent chart document created successfully');
+                } else {
+                    console.log('📄 Parent chart exists, updating timestamp');
+                    // Update last message timestamp
+                    await setDoc(chartRef, {
+                        lastMessageAt: serverTimestamp()
+                    }, { merge: true });
+                    console.log('✅ Parent chart timestamp updated');
+                }
+            } catch (parentError: any) {
+                console.error('❌ ERROR with parent chart document:', parentError);
+                console.error('📋 Parent Error Details:', {
+                    code: parentError.code,
+                    message: parentError.message,
+                    path: `users/${user.uid}/charts/${chartId}`,
+                    userId: user.uid
                 });
-            } else {
-                // Update last message timestamp
-                await setDoc(chartRef, {
-                    lastMessageAt: serverTimestamp()
-                }, { merge: true });
+                // Continue anyway - maybe the subcollection will work
             }
 
             console.log('💾 Saving doc to Firestore:', {
@@ -190,6 +208,14 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
             console.log('✅ Message saved successfully to chart path');
         } catch (e: any) {
             console.error("❌ CRITICAL Error saving message:", e);
+            console.error("📋 Error Details:", {
+                code: e.code,
+                message: e.message,
+                name: e.name,
+                isAuthError: e.code === 'permission-denied',
+                userId: user?.uid,
+                hasUser: !!user
+            });
         }
     };
 

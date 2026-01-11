@@ -2706,6 +2706,11 @@ export const generateGurujiPersona = async (
             tamilPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
 Task: Perform a "Shocking & Deep Life Scan" focusing on the DARK SIDE of the personality.
 
+🚨 **CRITICAL RULE (DO NOT IGNORE):**
+1. **Lagna (Ascendant):** The User's Lagna is **${lagnaName}**. You MUST use this.
+2. **DO NOT RE-CALCULATE:** Do not try to calculate Lagna from birth details. Trust the JSON data 100%.
+3. **NO HALLUCINATIONS:** If JSON says "${lagnaName}", do NOT say it is something else.
+
 **INPUT DATA:**
 \`\`\`json
 ${JSON.stringify(enhancedContext, null, 2)}
@@ -2766,6 +2771,11 @@ Return ONLY Tamil text.`;
             englishPrompt = `You are an expert Vedic Astrologer (Aditya Guruji Avatar).
 Task: Perform a "Shocking & Deep Life Scan" focusing on the DARK SIDE of the personality.
 
+🚨 **CRITICAL RULE (DO NOT IGNORE):**
+1. **Lagna (Ascendant):** The User's Lagna is **${lagnaName}**. You MUST use this.
+2. **DO NOT RE-CALCULATE:** Do not try to calculate Lagna from birth details. Trust the JSON data 100%.
+3. **NO HALLUCINATIONS:** If JSON says "${lagnaName}", do NOT say it is something else.
+
 **INPUT DATA:**
 \`\`\`json
 ${JSON.stringify(enhancedContext, null, 2)}
@@ -2822,6 +2832,10 @@ Return ONLY English text.`;
 
 🚫 **Avoid:** Generic zodiac descriptions (e.g., "Capricorns are ambitious").
 ✅ **Focus:** Subathuvam (Light), Papathuvam (Darkness), and Planetary Lordship.
+
+🚨 **CRITICAL RULE (DO NOT IGNORE):**
+1. **Lagna (Ascendant):** The User's Lagna is **${lagnaName}**. You MUST use this.
+2. **DO NOT RE-CALCULATE:** Trust the JSON data 100%.
 
 **INPUT DATA:**
 \`\`\`json
@@ -2883,6 +2897,10 @@ Return ONLY Tamil text.`;
 
 🚫 **Avoid:** Generic zodiac descriptions (e.g., "Capricorns are ambitious").
 ✅ **Focus:** Subathuvam (Light), Papathuvam (Darkness), and Planetary Lordship.
+
+🚨 **CRITICAL RULE (DO NOT IGNORE):**
+1. **Lagna (Ascendant):** The User's Lagna is **${lagnaName}**. You MUST use this.
+2. **DO NOT RE-CALCULATE:** Trust the JSON data 100%.
 
 **INPUT DATA:**
 \`\`\`json
