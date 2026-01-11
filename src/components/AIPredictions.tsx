@@ -13,6 +13,66 @@ import ChatLimitWarning from './ChatLimitWarning';
 import PromoStatusBadge from './PromoStatusBadge';
 import { initDeviceTracking, generateFingerprint, getIPAddress } from '../utils/deviceFingerprint';
 
+// Typewriter Animation Component
+const TypewriterText: React.FC<{ text: string; speed?: number }> = ({ text, speed = 20 }) => {
+    const [displayedText, setDisplayedText] = useState('');
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        if (currentIndex < text.length) {
+            const timeout = setTimeout(() => {
+                setDisplayedText(prev => prev + text[currentIndex]);
+                setCurrentIndex(prev => prev + 1);
+            }, speed);
+            return () => clearTimeout(timeout);
+        }
+    }, [currentIndex, text, speed]);
+
+    return <div className="whitespace-pre-wrap">{displayedText}</div>;
+};
+
+// Format AI Response with Headers and Dividers
+const formatAIResponse = (text: string): string => {
+    if (!text) return text;
+
+    // Add section dividers and headers
+    let formatted = text;
+
+    // Replace common patterns with formatted versions
+    const patterns = [
+        // Lagna/Ascendant headers
+        { regex: /(?:🌟\s*)?(?:Your Lagna|உங்கள் லக்னம்|Lagna|லக்னம்)(?:\s*\(Ascendant\))?/gi, replacement: '\n🌟 YOUR LAGNA (ASCENDANT)\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+
+        // Strength/Analysis headers
+        { regex: /(?:💪\s*)?(?:Strength Analysis|வலிமை பகுப்பாய்வு)/gi, replacement: '\n\n━━━━━━━━━━━━━━━━━━━━━━\n💪 STRENGTH ANALYSIS\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+
+        // Critical/Warning headers
+        { regex: /(?:⚠️\s*)?(?:Critical Weakness|முக்கிய பலவீனம்)/gi, replacement: '\n\n━━━━━━━━━━━━━━━━━━━━━━\n⚠️ CRITICAL WEAKNESS\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+
+        // Personality/Effects headers
+        { regex: /(?:✨\s*)?(?:Personality Effects|ஆளுமை விளைவுகள்)/gi, replacement: '\n\n━━━━━━━━━━━━━━━━━━━━━━\n✨ PERSONALITY EFFECTS\n━━━━━━━━━━━━━━━━━━━━━━\n' },
+
+        // Basic Details/Info
+        { regex: /(?:📋\s*)?(?:Basic Details|அடிப்படை விவரங்கள்)/gi, replacement: '\n📋 Basic Details:\n' },
+
+        // Positive/Negative grouping
+        { regex: /Positive:/gi, replacement: '\n✅ Positive:\n' },
+        { regex: /Negative:/gi, replacement: '\n❌ Negative:\n' },
+    ];
+
+    patterns.forEach(({ regex, replacement }) => {
+        formatted = formatted.replace(regex, replacement);
+    });
+
+    // Add spacing after progress bars
+    formatted = formatted.replace(/(█+░+\s*\d+%)/g, '$1\n');
+
+    // Clean up multiple newlines
+    formatted = formatted.replace(/\n{3,}/g, '\n\n');
+
+    return formatted.trim();
+};
+
 interface AIPredictionsProps {
     data: any;
 }
@@ -37,6 +97,7 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
     const [promoStatus, setPromoStatus] = useState<{ hasActivePromo: boolean; promoCode?: string; expiresAt?: Date; duration?: string } | null>(null);
     const [showPromoModal, setShowPromoModal] = useState(false);
     const [deviceInfo, setDeviceInfo] = useState<{ fingerprint: string; ipAddress: string } | null>(null);
+    const [latestAIMessageIndex, setLatestAIMessageIndex] = useState<number>(-1); // Track the newest AI message for animation
 
     // Check for initial message from navigation (e.g., from "Wrong Prediction" button)
     useEffect(() => {
@@ -521,7 +582,12 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                 console.log('Extracted AI content (first 200 chars):', aiContent.substring(0, 200));
                 const aiMsg = { role: 'ai', content: aiContent, details: response, timestamp: new Date() };
 
-                setChatHistory(prev => [...prev, aiMsg]);
+                setChatHistory(prev => {
+                    const newHistory = [...prev, aiMsg];
+                    // Mark this as the latest AI message (for animation)
+                    setLatestAIMessageIndex(newHistory.length - 1);
+                    return newHistory;
+                });
 
                 // Also save to Firestore in background if user is logged in (non-blocking)
                 if (user) {
@@ -820,7 +886,16 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
                                 {msg.role === 'user' ? <User className="w-4 h-4 md:w-5 md:h-5 text-white" /> : <span className="text-lg md:text-xl">🔮</span>}
                             </div>
                             <div className={`rounded-2xl p-3 md:p-5 max-w-[90%] md:max-w-[85%] lg:max-w-[70%] shadow-lg text-sm md:text-base leading-relaxed ${msg.role === 'user' ? 'bg-blue-600/40 border border-blue-500/30 shadow-blue-500/10 text-blue-50' : 'bg-indigo-900/30 border border-indigo-500/20 shadow-indigo-500/10 text-slate-100'}`} style={{ fontFamily: 'Noto Sans Tamil, sans-serif' }}>
-                                {msg.content}
+                                {msg.role === 'ai' ? (
+                                    // Only animate the latest AI message, show others instantly
+                                    idx === latestAIMessageIndex ? (
+                                        <TypewriterText text={formatAIResponse(msg.content)} speed={15} />
+                                    ) : (
+                                        <div className="whitespace-pre-wrap">{formatAIResponse(msg.content)}</div>
+                                    )
+                                ) : (
+                                    msg.content
+                                )}
                                 {msg.details?.bava_analysis_report && (
                                     <div className="mt-6 space-y-4">
                                         <div className="p-4 bg-purple-900/20 rounded-lg border border-purple-800/30">
@@ -868,11 +943,16 @@ const AIPredictions: React.FC<AIPredictionsProps> = ({ data }) => {
 
                                 {/* FEEDBACK WIDGET */}
                                 {msg.role === 'ai' && user && msg.id && (
-                                    <FeedbackWidget
-                                        messageId={msg.id}
-                                        messagePath={`users/${user.uid}/charts/${`${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_')}/messages/${msg.id}`}
-                                        existingFeedback={msg.feedback}
-                                    />
+                                    <div className="mt-4 pt-3 border-t border-slate-700/50">
+                                        <div className="text-center mb-2">
+                                            <p className="text-sm text-slate-300">💬 Was this helpful?</p>
+                                        </div>
+                                        <FeedbackWidget
+                                            messageId={msg.id}
+                                            messagePath={`users/${user.uid}/charts/${`${data.userDetails.name}_${new Date(data.birthDate).getTime()}`.replace(/[^a-zA-Z0-9]/g, '_')}/messages/${msg.id}`}
+                                            existingFeedback={msg.feedback}
+                                        />
+                                    </div>
                                 )}
 
                                 {/* TIMESTAMP */}
