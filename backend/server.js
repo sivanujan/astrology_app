@@ -25,17 +25,11 @@ app.get('/api/health', (req, res) => {
 
 // Import Routes
 const authRoutes = require('./routes/auth');
-const deviceRegistrationRoutes = require('./routes/deviceRegistration');
 app.use('/api/auth', authRoutes);
-app.use('/api/auth', deviceRegistrationRoutes); // Device anti-abuse
 
 // Routes
 // app.use('/api/whatsapp', require('./routes/whatsapp')); // Deprecated
 app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/contact', require('./routes/contact'));
-app.use('/api/chat', require('./routes/chatLimit'));
-app.use('/api/promo', require('./routes/promoCodes'));
-app.use('/api/admin', require('./routes/admin'));
 // const userRoutes = require('./routes/user');
 // const ruleRoutes = require('./routes/rules');
 // app.use('/api/users', userRoutes);
@@ -60,7 +54,6 @@ app.use((err, req, res, next) => {
 });
 
 const { initJob } = require('./jobs/dailyForecast');
-const { checkDasaChanges } = require('./jobs/dasaMonitor');
 
 // Start Server
 const PORT = process.env.PORT || 5000;
@@ -70,9 +63,4 @@ app.listen(PORT, () => {
 
     // Initialize Jobs
     initJob();
-
-    // Run Dasa Monitor every 24 hours (86400000 ms)
-    // Also run once on startup for demonstration/checks
-    checkDasaChanges();
-    setInterval(checkDasaChanges, 86400000);
 });

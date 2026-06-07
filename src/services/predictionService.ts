@@ -74,16 +74,12 @@ export const predictionService = {
     },
 
     // --- DAILY FORECAST CACHING ---
-    getStoredDailyForecast: async (userId: string, date: string, language: string = 'en', contextKey: string = ''): Promise<string | null> => {
+    getStoredDailyForecast: async (userId: string, date: string, language: string = 'en'): Promise<string | null> => {
         try {
-            // ID Format: userId_yyyy-mm-dd_lang_context
+            // ID Format: userId_yyyy-mm-dd_lang
+            // date string should be consistently formatted (e.g. YYYY-MM-DD from toDateString or ISO split)
             const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
-            let docId = `${userId}_${cleanDate}_${language}`;
-            if (contextKey) {
-                const cleanContext = contextKey.replace(/[^a-zA-Z0-9]/g, '');
-                docId += `_${cleanContext}`;
-            }
-
+            const docId = `${userId}_${cleanDate}_${language}`;
             const docRef = doc(db, `daily_forecasts/${docId}`);
             const docSnap = await getDoc(docRef);
 
@@ -97,22 +93,16 @@ export const predictionService = {
         }
     },
 
-    saveDailyForecast: async (userId: string, date: string, prediction: string, language: string = 'en', contextKey: string = ''): Promise<void> => {
+    saveDailyForecast: async (userId: string, date: string, prediction: string, language: string = 'en'): Promise<void> => {
         try {
             const cleanDate = date.replace(/[^a-zA-Z0-9]/g, '-');
-            let docId = `${userId}_${cleanDate}_${language}`;
-            if (contextKey) {
-                const cleanContext = contextKey.replace(/[^a-zA-Z0-9]/g, '');
-                docId += `_${cleanContext}`;
-            }
-
+            const docId = `${userId}_${cleanDate}_${language}`;
             const docRef = doc(db, `daily_forecasts/${docId}`);
             await setDoc(docRef, {
                 userId,
                 date,
                 prediction,
                 language,
-                contextKey,
                 timestamp: serverTimestamp()
             });
         } catch (error) {

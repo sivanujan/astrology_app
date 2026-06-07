@@ -62,7 +62,7 @@ class EmailService {
     async loadTemplate(templateName, replacements = {}) {
         try {
             // Load template from project root
-            const templatePath = path.join(__dirname, '../', templateName);
+            const templatePath = path.join(__dirname, '../../', templateName);
             let htmlContent = await fs.readFile(templatePath, 'utf-8');
 
             // Replace all placeholders

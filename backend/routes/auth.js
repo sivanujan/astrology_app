@@ -18,20 +18,6 @@ router.post('/send-verification-email', async (req, res) => {
             });
         }
 
-        // DEVELOPMENT MODE: Skip Firebase Admin SDK to avoid rate limits
-        if (process.env.NODE_ENV === 'development') {
-            console.log('🔧 DEV MODE: Skipping Firebase link generation (use client-side sendEmailVerification instead)');
-
-            // In dev mode, tell frontend to use client-side method
-            return res.status(200).json({
-                success: true,
-                message: 'DEV MODE: Use client-side email verification',
-                devMode: true,
-                recipient: email
-            });
-        }
-
-        // PRODUCTION MODE: Use Firebase Admin SDK
         // Step 1: Configure action code - Firebase handles verification, then redirects to your site
         const actionCodeSettings = {
             // URL to redirect to after email verification
@@ -97,19 +83,6 @@ router.post('/send-password-reset', async (req, res) => {
             });
         }
 
-        // DEVELOPMENT MODE: Skip Firebase Admin SDK to avoid rate limits
-        if (process.env.NODE_ENV === 'development') {
-            console.log('🔧 DEV MODE: Skipping Firebase password reset link generation (use client-side instead)');
-
-            return res.status(200).json({
-                success: true,
-                message: 'DEV MODE: Use client-side password reset',
-                devMode: true,
-                recipient: email
-            });
-        }
-
-        // PRODUCTION MODE: Use Firebase Admin SDK
         // Generate password reset link - Firebase handles the UI
         const actionCodeSettings = {
             url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`,

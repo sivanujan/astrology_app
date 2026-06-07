@@ -47,7 +47,7 @@ const OverallStatsCard: React.FC<OverallStatsCardProps> = ({ stats }) => {
                 </div>
 
                 {/* Moderate */}
-                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 text-center">
+                <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p- text-center">
                     <div className="text-xs text-yellow-400 mb-2 font-medium">
                         {language === 'ta' ? 'சாதாரணம்' : 'Moderate'}
                     </div>

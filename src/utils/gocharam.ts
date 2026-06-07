@@ -16,7 +16,6 @@ export interface DayForecast {
     dateString: string;
     dasaLord: string;
     bhuktiLord: string;
-    antaramLord: string; // Added for advanced prediction context
     starRating: number; // 0 to 5
     verdict: string;
     prediction: string;
@@ -55,8 +54,6 @@ export interface DayForecast {
         unluckyTime: string;
         nakshatra: string;
         tara: string;
-        rahuKalam: string; // Rahu Kalam time period
-        yemagandam: string; // Yemagandam time period
     };
 }
 
@@ -154,43 +151,6 @@ const calculateDeepDasha = (antaramPeriod: DashaPeriod, targetDate: Date): { soo
     }
 
     return { sookshma: sookshmaPlanet, prana: pranaPlanet };
-};
-
-// Helper to calculate Rahu Kalam based on day of week
-const calculateRahuKalam = (date: Date): string => {
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-
-    // Rahu Kalam timings (approximate, based on 12-hour day division into 8 parts)
-    // Each day has a specific 1.5-hour period
-    const rahuKalamTimings: Record<number, string> = {
-        0: "16:30 - 18:00", // Sunday
-        1: "07:30 - 09:00", // Monday
-        2: "15:00 - 16:30", // Tuesday
-        3: "12:00 - 13:30", // Wednesday
-        4: "13:30 - 15:00", // Thursday
-        5: "10:30 - 12:00", // Friday
-        6: "09:00 - 10:30"  // Saturday
-    };
-
-    return rahuKalamTimings[dayOfWeek] || "Unknown";
-};
-
-// Helper to calculate Yemagandam based on day of week
-const calculateYemagandam = (date: Date): string => {
-    const dayOfWeek = date.getDay();
-
-    // Yemagandam timings (approximate)
-    const yemagandamTimings: Record<number, string> = {
-        0: "12:00 - 13:30", // Sunday
-        1: "10:30 - 12:00", // Monday
-        2: "09:00 - 10:30", // Tuesday
-        3: "07:30 - 09:00", // Wednesday
-        4: "06:00 - 07:30", // Thursday
-        5: "13:30 - 15:00", // Friday
-        6: "15:00 - 16:30"  // Saturday
-    };
-
-    return yemagandamTimings[dayOfWeek] || "Unknown";
 };
 
 
@@ -352,12 +312,6 @@ export const generate15DayForecast = (
     const lagnaSign = birthData.ascendant?.signIndex || 0;
 
     const dashaPeriods = calculateDashaPeriods(birthData.birthDate, moonLong);
-    console.log('[Generate15Day] Debug:', {
-        birthDate: birthData.birthDate,
-        moonLong,
-        firstDasa: dashaPeriods[0]?.planet,
-        dasaCount: dashaPeriods.length
-    });
 
     for (let i = 0; i < 15; i++) {
         const currentDate = new Date(startDate);
@@ -365,7 +319,6 @@ export const generate15DayForecast = (
 
         // 1. DASA ANALYSIS (60%)
         const currentDasa = getCurrentDasha(dashaPeriods, currentDate);
-        // console.log(`[Generate15Day] Day ${i} Dasa:`, currentDasa?.maha.planet, currentDasa?.bhukti?.planet);
         const dasaLord = currentDasa?.maha.planet || 'Unknown';
         const bhuktiLord = currentDasa?.bhukti?.planet || 'Unknown';
         const antaramLord = currentDasa?.antaram?.planet || 'Unknown';
@@ -488,7 +441,6 @@ export const generate15DayForecast = (
             dateString: currentDate.toDateString(),
             dasaLord,
             bhuktiLord,
-            antaramLord,
             starRating: rating,
             verdict: getStr(lang, `gocharam.status.${verdictKey}`), // Reuse/ensure keys exist
             prediction: generateDailyPrediction(
@@ -539,13 +491,11 @@ export const generate15DayForecast = (
                 color: "Red", // Placeholder or implement based on Star
                 dos: ["Focus on goals", "Pray to ancestors"],
                 donts: ["Avoid arguments", "No new loans"],
-                tithi: lang === 'ta' ? "சுக்ல பக்ஷம்" : "Shukla Paksha", // Placeholder - needs panchang calculation
-                yoga: lang === 'ta' ? "சித்த யோகம்" : "Siddha Yoga", // Placeholder - needs panchang calculation
+                tithi: getStr(lang, "gocharam.factors.tithiDefault", { n: "Shukla Paksha" }), // Placeholder
+                yoga: getStr(lang, "gocharam.factors.yogaDefault", { n: "Siddha" }), // Placeholder
                 unluckyTime: "10:30 - 12:00", // Placeholder (Rahu Kalam approx)
                 nakshatra: tara.starName,
-                tara: tara.taraLabel,
-                rahuKalam: calculateRahuKalam(currentDate),
-                yemagandam: calculateYemagandam(currentDate)
+                tara: tara.taraLabel
             }
         });
     }
@@ -554,7 +504,6 @@ export const generate15DayForecast = (
 };
 
 export interface DailySnapshotResult {
-    moon: GocharamResult;
     jupiter: GocharamResult;
     saturn: GocharamResult;
     sun: GocharamResult;
@@ -837,7 +786,6 @@ export const getDailySnapshot = (
     const jupiter = calculateJupiterTransit(rasiSign, lagnaSign, getP('Jupiter'), transits, lang);
     const saturn = calculateSaturnTransit(rasiSign, getP('Saturn'), transits, lang, saturnLong, birthMoonLong);
 
-    const moonTransit = calculatePlanetTransit('Moon', rasiSign, getP('Moon'), transits, [1, 3, 6, 7, 10, 11], [4, 8, 12], lang);
     const sun = calculatePlanetTransit('Sun', rasiSign, getP('Sun'), transits, [3, 6, 10, 11], [1, 2, 4, 5, 7, 8, 9, 12], lang);
     const mars = calculatePlanetTransit('Mars', rasiSign, getP('Mars'), transits, [3, 6, 11], [1, 2, 4, 5, 7, 8, 9, 10, 12], lang);
     const mercury = calculatePlanetTransit('Mercury', rasiSign, getP('Mercury'), transits, [2, 4, 6, 8, 10, 11], [1, 3, 5, 7, 9, 12], lang);
@@ -890,9 +838,8 @@ export const getDailySnapshot = (
     }
 
     return {
-        moon: moonTransit, jupiter, saturn, sun, mars, mercury, venus, rahu, ketu,
+        jupiter, saturn, sun, mars, mercury, venus, rahu, ketu,
         verdict: { title: verdictTitle, message: verdictMessage, type: verdictType },
         forecast15Days
     };
 };
-

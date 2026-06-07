@@ -9,50 +9,15 @@ const AdminLogin = () => {
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-
-        // LEGACY BYPASS (Optional - kept for user's existing habit if they really want it, but warned)
-        if (username === 'astrosivanujan' && (password === 'ROOtkiller#2238')) {
+        // Hardcoded credentials as requested
+        if (username === 'astrosivanujan' && password === 'ROOtkiller#2238') {
             localStorage.setItem('admin_authenticated', 'true');
-            // Note: This bypasses Firebase Auth, so Firestore will likely FAIL.
-            // We encourage using real email/pass.
             navigate('/admin/dashboard');
-            return;
-        }
-
-        try {
-            // Attempt Real Firebase Login
-            // Ensure input is treated as email
-            let email = username;
-            if (!email.includes('@')) {
-                // Heuristic: If they typed a username but we need email, maybe clean it up?
-                // But for now, let's assume they enter a valid email or we fail.
-                // Or we can try to append a domain if known.
-                // For safety, let's just try to allow them to fail and see error.
-                setError('Please enter a valid Admin Email Address');
-                return;
-            }
-
-            // Using the existing auth instance from firebase.ts
-            const { signInWithEmailAndPassword, getAuth } = await import('firebase/auth');
-            const auth = getAuth(); // or import { auth } from '../lib/firebase'
-
-            await signInWithEmailAndPassword(auth, email, password);
-
-            localStorage.setItem('admin_authenticated', 'true'); // Keep this for existing route guards
-            navigate('/admin/dashboard');
-
-        } catch (err: any) {
-            console.error(err);
-            if (err.code === 'auth/invalid-email') {
-                setError('Invalid email format.');
-            } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-                setError('Invalid credentials.');
-            } else {
-                setError('Login failed: ' + err.message);
-            }
+        } else {
+            setError('Invalid Username or Password');
+            setPassword(''); // Clear password on error
         }
     };
 

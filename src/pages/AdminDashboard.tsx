@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, MessageSquare, LogOut, Database, User, Tag } from 'lucide-react';
+import { Settings, MessageSquare, LogOut, Database, User } from 'lucide-react';
 import RulesManager from '../components/admin/RulesManager';
 import ChatInspector from '../components/admin/ChatInspector';
-import PromoCodeManager from '../components/admin/PromoCodeManager';
 import { useNavigate } from 'react-router-dom';
 
 import { collection, getCountFromServer } from 'firebase/firestore';
@@ -12,67 +11,25 @@ import { db } from '../lib/firebase';
 import UserList from '../components/admin/UserList';
 
 const AdminDashboard = () => {
-    const [activeTab, setActiveTab] = useState<'rules' | 'chats' | 'users' | 'promos'>('rules');
+    const [activeTab, setActiveTab] = useState<'rules' | 'chats' | 'users'>('rules');
     const [totalUsers, setTotalUsers] = useState<number | null>(null);
-    const [adminVerified, setAdminVerified] = useState(false);
-    const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
     const navigate = useNavigate();
 
-    // Strict Auth Check - Requires Real Firebase User + Admin Email
+    // Basic Auth Check
     React.useEffect(() => {
-        let mounted = true;
-
-        import('../lib/firebase').then(({ auth }) => {
-            const unsubscribe = auth.onAuthStateChanged(async (user) => {
-                if (!mounted) return;
-
-                if (!user) {
-                    console.warn("⚠️ No active Firebase User found. Redirecting to Login.");
-                    localStorage.removeItem('admin_authenticated');
-                    navigate('/admin/login');
-                    return;
-                }
-
-                // Check if user email is in admin whitelist
-                const { isAdmin } = await import('../config/adminConfig');
-                const userIsAdmin = isAdmin(user.email);
-
-                console.log('🔍 Admin check:', {
-                    email: user.email,
-                    isAdmin: userIsAdmin
-                });
-
-                if (!userIsAdmin) {
-                    console.error("🚫 UNAUTHORIZED: User is not an admin. Redirecting to home.");
-                    alert("Access Denied: You do not have admin privileges.\n\nYour email: " + user.email);
-                    navigate('/');
-                    setIsCheckingAdmin(false);
-                    return;
-                }
-
-                console.log("✅ Admin verified:", user.email);
-                setAdminVerified(true);
-                setIsCheckingAdmin(false);
-            });
-
-            return () => {
-                mounted = false;
-                unsubscribe();
-            };
-        });
+        const auth = localStorage.getItem('admin_authenticated');
+        if (auth !== 'true') {
+            navigate('/admin/login');
+        }
     }, [navigate]);
 
     // Fetch User Count
     React.useEffect(() => {
         async function fetchStats() {
             try {
-                const apiUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
-                const response = await fetch(`${apiUrl}/api/admin/stats`);
-                const data = await response.json();
-
-                if (data.success) {
-                    setTotalUsers(data.stats.totalUsers);
-                }
+                const coll = collection(db, 'users');
+                const snapshot = await getCountFromServer(coll);
+                setTotalUsers(snapshot.data().count);
             } catch (error) {
                 console.error('Error fetching stats:', error);
             }
@@ -80,41 +37,10 @@ const AdminDashboard = () => {
         fetchStats();
     }, []);
 
-    const handleLogout = async () => {
-        try {
-            // Sign out from Firebase Auth
-            const { auth } = await import('../lib/firebase');
-            await auth.signOut();
-
-            // Clear local storage
-            localStorage.removeItem('admin_authenticated');
-
-            // Navigate to login
-            navigate('/admin/login');
-        } catch (error) {
-            console.error('Error signing out:', error);
-            // Still clear localStorage and navigate even if signOut fails
-            localStorage.removeItem('admin_authenticated');
-            navigate('/admin/login');
-        }
+    const handleLogout = () => {
+        localStorage.removeItem('admin_authenticated');
+        navigate('/admin/login');
     };
-
-    // Show loading while checking admin status
-    if (isCheckingAdmin) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-                <div className="text-white text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-                    <p>Verifying admin access...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Don't render anything if not admin (will redirect)
-    if (!adminVerified) {
-        return null;
-    }
 
     return (
         <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden">
@@ -242,26 +168,6 @@ const AdminDashboard = () => {
                                 User List
                             </span>
                         </button>
-
-                        <button
-                            onClick={() => setActiveTab('promos')}
-                            className={`relative px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${activeTab === 'promos'
-                                ? 'text-white shadow-lg'
-                                : 'text-slate-400 hover:text-slate-200'
-                                }`}
-                        >
-                            {activeTab === 'promos' && (
-                                <motion.div
-                                    layoutId="activeTab"
-                                    className="absolute inset-0 bg-green-600 rounded-lg"
-                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                                />
-                            )}
-                            <span className="relative flex items-center gap-2">
-                                <Tag className="w-4 h-4" />
-                                Promo Codes
-                            </span>
-                        </button>
                     </div>
 
                     {/* Active View */}
@@ -275,7 +181,6 @@ const AdminDashboard = () => {
                         {activeTab === 'rules' && <RulesManager />}
                         {activeTab === 'chats' && <ChatInspector />}
                         {activeTab === 'users' && <UserList />}
-                        {activeTab === 'promos' && <PromoCodeManager />}
                     </motion.div>
                 </div>
             </main>

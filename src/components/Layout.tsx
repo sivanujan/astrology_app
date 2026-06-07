@@ -1,41 +1,21 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart, ChevronDown, FileText, Activity, Phone, LogOut } from 'lucide-react';
+import { Star, Moon, Sun, MapPin, Sparkles, Languages, Clock, MessageCircle, Lock, LayoutDashboard, Menu, X, Heart, ChevronDown, FileText, Activity } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import PlanetaryBackground from './PlanetaryBackground';
 import Logo from '/logo2.png';
 import FeatureAccessPopup from './FeatureAccessPopup';
-import WelcomeFeaturesModal from './WelcomeFeaturesModal';
 import Footer from './Footer';
-import DevToolsBlocker from './DevToolsBlocker';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { language, setLanguage, t } = useLanguage();
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
     const [showFeaturePopup, setShowFeaturePopup] = React.useState(false);
-    const [showWelcomeModal, setShowWelcomeModal] = React.useState(false);
-
-    React.useEffect(() => {
-        const handleContextMenu = (e: MouseEvent) => {
-            e.preventDefault();
-        };
-        document.addEventListener('contextmenu', handleContextMenu);
-        return () => document.removeEventListener('contextmenu', handleContextMenu);
-    }, []);
-
-    React.useEffect(() => {
-        const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
-        if (!hasSeenWelcome) {
-            // Small delay to ensure smooth entrance
-            const timer = setTimeout(() => setShowWelcomeModal(true), 1500);
-            return () => clearTimeout(timer);
-        }
-    }, []);
 
     const navItems = [
         { type: 'link', path: '/', label: t.nav.birthDetails, icon: MapPin, color: 'text-blue-400' },
@@ -47,22 +27,18 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             items: [
                 { path: '/chart', label: t.nav.chart, icon: Moon, color: 'text-yellow-300' },
                 { path: '/dasha', label: t.dasha.title, icon: Clock, color: 'text-green-400' },
-                { path: '/analysis', label: t.analysis.title, icon: FileText, color: 'text-pink-400', protected: true },
-                { path: '/daily-snapshot', label: t.nav.dailySnapshot, icon: Sun, color: 'text-orange-400', protected: true }
+                { path: '/daily-snapshot', label: t.nav.dailySnapshot, icon: Sun, color: 'text-orange-400', protected: true },
+                { path: '/analysis', label: t.analysis.title, icon: FileText, color: 'text-pink-400', protected: true }
             ]
         },
         { type: 'link', path: '/predictions', label: t.nav.predictions, icon: Sparkles, color: 'text-teal-400', protected: true },
-        { type: 'link', path: '/marriage-tools', label: language === 'ta' ? 'திருமண கருவிகள்' : 'Marriage Tools', icon: Heart, color: 'text-red-400' },
-        { type: 'link', path: '/contact', label: language === 'ta' ? 'தொடர்புக்கு' : 'Contact Us', icon: Phone, color: 'text-indigo-400' }
+        { type: 'link', path: '/marriage-tools', label: language === 'ta' ? 'திருமண கருவிகள்' : 'Marriage Tools', icon: Heart, color: 'text-red-400' }
     ];
 
 
 
     return (
         <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950 text-white selection:bg-purple-500/30">
-            {/* Advanced Security Shield */}
-            <DevToolsBlocker />
-
             {/* Animated Star Field */}
             <div className="fixed inset-0 z-0 pointer-events-none">
                 {[...Array(100)].map((_, i) => (
@@ -193,25 +169,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                             {/* Auth Buttons */}
                             <div className="flex items-center gap-3 mr-4">
                                 {user ? (
-                                    <>
-                                        <button
-                                            onClick={() => navigate('/dashboard')}
-                                            className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap ml-6"
-                                        >
-                                            <LayoutDashboard className="w-4 h-4" />
-                                            <span className="hidden lg:inline">{t.nav.dashboard}</span>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                logout();
-                                                navigate('/');
-                                            }}
-                                            className="flex items-center gap-2 px-3 py-2 bg-red-600/20 text-red-300 rounded-lg hover:bg-red-600/30 transition-colors border border-red-500/30 whitespace-nowrap"
-                                        >
-                                            <LogOut className="w-4 h-4" />
-                                            <span className="hidden lg:inline">{language === 'ta' ? 'வெளியேறு' : 'Logout'}</span>
-                                        </button>
-                                    </>
+                                    <button
+                                        onClick={() => navigate('/dashboard')}
+                                        className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 whitespace-nowrap ml-6"
+                                    >
+                                        <LayoutDashboard className="w-4 h-4" />
+                                        <span className="hidden lg:inline">{t.nav.dashboard}</span>
+                                    </button>
                                 ) : (
                                     <>
                                         <button
@@ -262,29 +226,16 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                                     {/* Mobile Auth Buttons */}
                                     <div className="flex flex-col gap-2 pb-4 border-b border-white/10">
                                         {user ? (
-                                            <>
-                                                <button
-                                                    onClick={() => {
-                                                        navigate('/dashboard');
-                                                        setIsMenuOpen(false);
-                                                    }}
-                                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 w-full"
-                                                >
-                                                    <LayoutDashboard className="w-4 h-4" />
-                                                    <span>{t.nav.dashboard}</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        logout();
-                                                        navigate('/');
-                                                        setIsMenuOpen(false);
-                                                    }}
-                                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-red-600/20 text-red-300 rounded-lg hover:bg-red-600/30 transition-colors border border-red-500/30 w-full"
-                                                >
-                                                    <LogOut className="w-4 h-4" />
-                                                    <span>{language === 'ta' ? 'வெளியேறு' : 'Logout'}</span>
-                                                </button>
-                                            </>
+                                            <button
+                                                onClick={() => {
+                                                    navigate('/dashboard');
+                                                    setIsMenuOpen(false);
+                                                }}
+                                                className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition-colors border border-purple-500/30 w-full"
+                                            >
+                                                <LayoutDashboard className="w-4 h-4" />
+                                                <span>{t.nav.dashboard}</span>
+                                            </button>
                                         ) : (
                                             <div className="flex gap-2 w-full">
                                                 <button
@@ -409,14 +360,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <FeatureAccessPopup
                 isOpen={showFeaturePopup}
                 onClose={() => setShowFeaturePopup(false)}
-            />
-
-            <WelcomeFeaturesModal
-                isOpen={showWelcomeModal}
-                onClose={() => {
-                    setShowWelcomeModal(false);
-                    localStorage.setItem('hasSeenWelcome', 'true');
-                }}
             />
         </div>
     );

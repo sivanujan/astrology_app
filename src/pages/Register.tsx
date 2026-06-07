@@ -99,9 +99,7 @@ const Register: React.FC = () => {
             await register(email, password, name);
             setShowVerificationModal(true);
         } catch (err: any) {
-            if (err.code === 'DEVICE_LIMIT_EXCEEDED') {
-                setError(err.message || 'You can only create 1 account per day from this device. Please try again tomorrow or log in to your existing account.');
-            } else if (err.code === 'auth/email-already-in-use') {
+            if (err.code === 'auth/email-already-in-use') {
                 setError(t.auth.emailInUse);
             } else {
                 setError(err.message || 'Failed to register');

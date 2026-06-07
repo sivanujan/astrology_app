@@ -55,40 +55,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const register = async (email: string, password: string, name: string): Promise<UserCredential> => {
         console.log('Starting registration for:', email);
-
-        // ANTI-ABUSE: Check device fingerprint before allowing registration
-        try {
-            const { generateFingerprint, getIPAddress } = await import('../utils/deviceFingerprint');
-            const deviceFingerprint = await generateFingerprint();
-            const ipAddress = await getIPAddress();
-
-            console.log('🔍 Checking device registration eligibility...');
-
-            // Check if device can register today
-            const checkResult = await apiCall('/api/auth/check-device-registration', {
-                method: 'POST',
-                body: JSON.stringify({
-                    deviceFingerprint,
-                    ipAddress
-                })
-            });
-
-            if (!checkResult.success || !checkResult.canRegister) {
-                const error: any = new Error(checkResult.message || 'Registration blocked');
-                error.code = 'DEVICE_LIMIT_EXCEEDED';
-                error.resetTime = checkResult.resetTime;
-                throw error;
-            }
-
-            console.log('✅ Device check passed');
-        } catch (error: any) {
-            if (error.code === 'DEVICE_LIMIT_EXCEEDED') {
-                throw error; // Re-throw to show user-friendly message
-            }
-            console.warn('⚠️ Device check failed, proceeding anyway:', error);
-            // Don't block registration if check fails due to technical error
-        }
-
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         console.log('User created:', userCredential.user.uid);
 
@@ -108,14 +74,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 if (result.success) {
                     console.log('✅ Custom verification email sent successfully!');
-
-                    // If in dev mode, use client-side method
-                    if (result.devMode) {
-                        console.log('🔧 DEV MODE: Using client-side email verification');
-                        const { sendEmailVerification } = await import('firebase/auth');
-                        await sendEmailVerification(userCredential.user);
-                        console.log('✅ Client-side verification email sent');
-                    }
                 } else {
                     console.error('Failed to send verification email:', result.message);
                 }
@@ -141,27 +99,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 createdAt: new Date(),
                 updatedAt: new Date()
             });
-
-            // Record device registration to prevent abuse
-            try {
-                const { generateFingerprint, getIPAddress } = await import('../utils/deviceFingerprint');
-                const deviceFingerprint = await generateFingerprint();
-                const ipAddress = await getIPAddress();
-
-                await apiCall('/api/auth/record-device-registration', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        deviceFingerprint,
-                        ipAddress,
-                        uid: userCredential.user.uid
-                    })
-                });
-
-                console.log('📝 Device registration recorded');
-            } catch (error) {
-                console.warn('⚠️ Failed to record device registration:', error);
-                // Don't fail registration if this part fails
-            }
         }
         return userCredential;
     };

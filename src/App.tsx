@@ -25,50 +25,18 @@ import EmailVerification from './pages/EmailVerification';
 import Dashboard from './pages/Dashboard';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
-import AdminPromoCodes from './pages/AdminPromoCodes';
 import DashaPredictionsPage from './pages/DashaPredictionsPage';
 import SEO from './components/SEO';
 import InstallPWA from './components/InstallPWA';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import NotFound from './pages/NotFound';
-import Contact from './pages/Contact';
-import AIChat from './pages/AIChat';
 
 const AppRoutes = () => {
   const { chartData, setChartData } = useChartData();
 
   // ... (existing hydration logic)
-  // Check if we have data in state, storage, or URL params (for sharing)
-  // Check if we have data in state, storage, or URL params (for sharing)
-  // Check URL query parameters for 'promo' and store it
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const promoCode = params.get('promo');
-      if (promoCode) {
-        localStorage.setItem('active_promo_code', promoCode);
-        console.log('🎟️ Promo Code Applied from URL:', promoCode);
-
-        // Optional: clear params from URL without reload to be clean
-        const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-        window.history.replaceState({ path: newUrl }, '', newUrl);
-
-        // Optional: show a toast/alert - keeping it simple for now
-        // alert(`Promo code ${promoCode} applied!`);
-      }
-    }
-  }, []);
-
-  const urlParamsValid = React.useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.has('n') && params.has('d') && params.has('t');
-    }
-    return false;
-  }, []); // Empty dependency array means it checks once on mount, which is fine for initial route check
-
-  const hasData = chartData || localStorage.getItem('astrology_chart_data') || urlParamsValid;
+  const hasData = chartData || localStorage.getItem('astrology_chart_data');
 
   return (
     <Routes>
@@ -77,12 +45,6 @@ const AppRoutes = () => {
         <>
           <SEO title="Free Horoscope & Astrology Predictions" description="Generate your complete Vedic Astrology chart and get instant predictions about career, marriage, and health." />
           <InputForm />
-        </>
-      } />
-      <Route path="/contact" element={
-        <>
-          <SEO title="Contact Us - AstroZen" />
-          <Contact />
         </>
       } />
       <Route path="/login" element={
@@ -137,12 +99,6 @@ const AppRoutes = () => {
           <AdminDashboard />
         </>
       } />
-      <Route path="/admin/promo-codes" element={
-        <>
-          <SEO title="Promo Code Management" />
-          <AdminPromoCodes />
-        </>
-      } />
 
       {/* Semi-Protected / Public but needs data */}
       <Route
@@ -155,14 +111,6 @@ const AppRoutes = () => {
         ) : <Navigate to="/" />}
       />
 
-      {/* AI Chat - Full Window */}
-      <Route path="/ai-chat" element={
-        <ProtectedRoute>
-          <SEO title="AI Astrologer Chat - Get Instant Answers" />
-          <AIChat />
-        </ProtectedRoute>
-      } />
-
       {/* Protected Routes */}
       <Route path="/dashboard" element={
         <ProtectedRoute>
@@ -172,12 +120,14 @@ const AppRoutes = () => {
       } />
 
       <Route path="/analysis" element={
-        hasData ? (
-          <>
-            <SEO title="Detailed Chart Analysis" />
-            <ChartAnalysis data={chartData} />
-          </>
-        ) : <Navigate to="/" />
+        <ProtectedRoute>
+          {hasData ? (
+            <>
+              <SEO title="Detailed Chart Analysis" />
+              <ChartAnalysis data={chartData} />
+            </>
+          ) : <Navigate to="/" />}
+        </ProtectedRoute>
       } />
 
       <Route path="/dasha" element={

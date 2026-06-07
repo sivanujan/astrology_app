@@ -65,7 +65,7 @@ const runDailyJob = async () => {
                 const payload = JSON.stringify({
                     title: title,
                     body: insight,
-                    url: '/dashboard'
+                    url: '/forecast'
                 });
 
                 try {

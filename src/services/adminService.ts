@@ -38,10 +38,9 @@ export const adminService = {
             const rulesRef = collection(db, 'astrology_rules');
             const snapshot = await getDocs(rulesRef);
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AstrologyRule));
-        } catch (error: any) {
-            // Rules fetching is optional - AI works without custom rules
-            console.warn('⚠️ Custom rules unavailable (Firestore permissions):', error.message);
-            return []; // Return empty array, AI uses built-in rules
+        } catch (error) {
+            console.error("Error fetching rules:", error);
+            return [];
         }
     },
 

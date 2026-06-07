@@ -6,21 +6,6 @@ body {
   background: linear-gradient(135deg, #1e1b4b 0%, #581c87 50%, #0f172a 100%);
   background-attachment: fixed;
   min-height: 100vh;
-  /* Prevent Selection & Dragging */
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-/* Allow selection in inputs */
-input,
-textarea {
-  -webkit-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
 }
 
 .glass-panel {

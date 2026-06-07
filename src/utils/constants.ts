@@ -10,13 +10,6 @@ export const TAMIL_RASI_NAMES = [
     "Dhanusu", "Makaram", "Kumbam", "Meenam"
 ];
 
-// Tamil script versions
-export const TAMIL_RASI_NAMES_TAMIL = [
-    "மேஷம்", "ரிஷபம்", "மிதுனம்", "கடகம்",
-    "சிம்மம்", "கன்னி", "துலாம்", "விருச்சிகம்",
-    "தனுசு", "மகரம்", "கும்பம்", "மீனம்"
-];
-
 export const NAKSHATRAS = [
     "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
     "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni",
@@ -40,11 +33,6 @@ export const PLANETS = [
 export const PLANET_SYMBOLS = {
     Sun: "Su", Moon: "Mo", Mars: "Ma", Mercury: "Me",
     Jupiter: "Ju", Venus: "Ve", Saturn: "Sa", Rahu: "Ra", Ketu: "Ke"
-};
-
-export const PLANET_UNICODE = {
-    Sun: "☉", Moon: "☽", Mars: "♂", Mercury: "☿",
-    Jupiter: "♃", Venus: "♀", Saturn: "♄", Rahu: "🐲", Ketu: "🐍"
 };
 
 // 0=Aries, 1=Taurus, ... 11=Pisces

@@ -74,7 +74,7 @@ self.addEventListener('activate', (event) => {
 
 // Push Event Listener
 self.addEventListener('push', (event) => {
-    let data = { title: 'New Prediction', body: 'Check your daily forecast', url: '/dashboard' };
+    let data = { title: 'New Prediction', body: 'Check your daily forecast', url: '/forecast' };
 
     if (event.data) {
         data = JSON.parse(event.data.text());

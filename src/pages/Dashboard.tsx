@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X, Clock, Activity, MapPin, Search, Filter, MoreVertical, Share2, Download, Copy, Moon, Bell, BellOff } from 'lucide-react';
+import { Plus, Calendar, Star, LogOut, User as UserIcon, Trash2, MessageCircle, Sparkles, X, Clock, Activity, MapPin, Search, Filter, MoreVertical, Share2, Download, Copy, Moon } from 'lucide-react';
 
 import GurujiPredictions from '../components/GurujiPredictions';
 import GurujiPersonaModal from '../components/GurujiPersonaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useChartData } from '../contexts/ChartContext';
 import { calculatePlanetaryPositions, getNakshatra } from '../utils/astrology';
-import { ZODIAC_SIGNS, TAMIL_RASI_NAMES, TAMIL_RASI_NAMES_TAMIL, NAKSHATRAS, TAMIL_NAKSHATRAS } from '../utils/constants';
-import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { ZODIAC_SIGNS, TAMIL_RASI_NAMES, NAKSHATRAS, TAMIL_NAKSHATRAS } from '../utils/constants';
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useLanguage } from '../contexts/LanguageContext';
-import SuccessToast from '../components/SuccessToast';
 
 interface SavedChart {
     id: string;
@@ -22,12 +21,9 @@ interface SavedChart {
     latitude: number;
     longitude: number;
     createdAt: Date;
-    dasaAlerts?: boolean;
-    currentDasa?: any;      // Add Dasha data
-    dashaPeriods?: any[];   // Add Dasha periods
 }
 
-const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewChart, onSubscribe, language, isSubscribed }: any) => {
+const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewChart, language }: any) => {
     const [details, setDetails] = useState<any>(null);
 
     useEffect(() => {
@@ -39,8 +35,8 @@ const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewCha
         const lagnaIndex = data.ascendant.signIndex;
 
         setDetails({
-            rasi: language === 'ta' ? TAMIL_RASI_NAMES_TAMIL[rasiIndex] : ZODIAC_SIGNS[rasiIndex],
-            lagna: language === 'ta' ? TAMIL_RASI_NAMES_TAMIL[lagnaIndex] : ZODIAC_SIGNS[lagnaIndex],
+            rasi: language === 'ta' ? TAMIL_RASI_NAMES[rasiIndex] : ZODIAC_SIGNS[rasiIndex],
+            lagna: language === 'ta' ? TAMIL_RASI_NAMES[lagnaIndex] : ZODIAC_SIGNS[lagnaIndex],
             nakshatra: language === 'ta' ? TAMIL_NAKSHATRAS[moonNak.index] : NAKSHATRAS[moonNak.index],
             nakshatraPada: moonNak.pada,
             dateStr: chart.dob.toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-GB', {
@@ -64,7 +60,7 @@ const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewCha
             {/* Decorative Glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[50px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/2" />
 
-            {/* Header: Name, Subscribe, Delete */}
+            {/* Header: Name & Delete */}
             <div className="flex justify-between items-start mb-6 relative z-10">
                 <div className="flex-1 min-w-0 pr-4">
                     <h3 className="text-2xl font-bold text-white truncate leading-tight tracking-tight mb-1" title={chart.name}>
@@ -74,28 +70,13 @@ const ChartCard = ({ chart, onDelete, onViewPrediction, onViewPersona, onViewCha
                         <span>{language === 'ta' ? 'உருவாக்கப்பட்டது:' : 'Created:'} {details.dateStr}</span>
                     </div>
                 </div>
-
-                <div className="flex items-center gap-1 opacity-100 transition-opacity">
-                    {/* Subscription Button */}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onSubscribe(chart); }}
-                        className={`p-2 rounded-full transition-all duration-300 ${chart.dasaAlerts
-                            ? 'text-yellow-400 bg-yellow-400/10 hover:bg-yellow-400/20'
-                            : 'text-slate-500 hover:text-white hover:bg-white/10'
-                            }`}
-                        title={chart.dasaAlerts ? "Disable Alerts" : "Enable Dasa Alerts"}
-                    >
-                        {chart.dasaAlerts ? <Bell className="w-5 h-5 fill-current" /> : <Bell className="w-5 h-5" />}
-                    </button>
-
-                    <button
-                        onClick={(e) => onDelete(e, chart.id)}
-                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-all duration-300 transform translate-x-2 group-hover:translate-x-0"
-                        title="Delete Chart"
-                    >
-                        <Trash2 className="w-5 h-5" />
-                    </button>
-                </div>
+                <button
+                    onClick={(e) => onDelete(e, chart.id)}
+                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0"
+                    title="Delete Chart"
+                >
+                    <Trash2 className="w-5 h-5" />
+                </button>
             </div>
 
             {/* Key Astrological Details */}
@@ -184,11 +165,6 @@ const Dashboard: React.FC = () => {
     const [personaData, setPersonaData] = useState<any | null>(null);
     const [showPersonaModal, setShowPersonaModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [toastState, setToastState] = useState({
-        isVisible: false,
-        message: '',
-        subMessage: ''
-    });
 
     useEffect(() => {
         if (!user) {
@@ -201,17 +177,12 @@ const Dashboard: React.FC = () => {
     const loadUserCharts = async () => {
         if (!user) return;
         try {
-            console.log('[Dashboard] Loading charts for user:', user.uid);
             const chartsRef = collection(db, 'charts');
             const q = query(chartsRef, where('userId', '==', user.uid));
             const querySnapshot = await getDocs(q);
-            console.log('[Dashboard] Query returned', querySnapshot.size, 'documents');
-
             const loadedCharts: SavedChart[] = [];
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
-                console.log('[Dashboard] Processing document:', doc.id, data);
-
                 loadedCharts.push({
                     id: doc.id,
                     name: data.name || 'Unnamed Chart',
@@ -220,18 +191,13 @@ const Dashboard: React.FC = () => {
                     latitude: data.birth_details?.latitude || 0,
                     longitude: data.birth_details?.longitude || 0,
                     createdAt: data.createdAt?.toDate() || new Date(),
-                    dasaAlerts: data.dasaAlerts || false,
-                    currentDasa: data.currentDasa || null,        // Load Dasha from Firebase
-                    dashaPeriods: data.dashaPeriods || []         // Load Dasha periods
                 });
             });
-
-            console.log('[Dashboard] Loaded charts:', loadedCharts);
             // Sort by Created At Descending
             loadedCharts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
             setCharts(loadedCharts);
         } catch (error) {
-            console.error('[Dashboard] Failed to load charts:', error);
+            console.error('Failed to load charts:', error);
         } finally {
             setLoading(false);
         }
@@ -253,82 +219,12 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    const handleSubscribe = async (chart: SavedChart) => {
-        if (!user || !user.email) {
-            alert("Please ensure you are logged in with a valid email.");
-            return;
-        }
-
-        const isSubscribed = chart.dasaAlerts;
-        const action = isSubscribed ? 'unsubscribe' : 'subscribe';
-        const endpoint = isSubscribed
-            ? 'http://localhost:5000/api/notifications/unsubscribe-email'
-            : 'http://localhost:5000/api/notifications/subscribe-email';
-
-        // Optimistic UI Update
-        const updatedCharts = charts.map(c =>
-            c.id === chart.id ? { ...c, dasaAlerts: !isSubscribed } : c
-        );
-        setCharts(updatedCharts);
-
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chartId: chart.id,
-                    email: user.email,
-                    uid: user.uid,
-                    chartName: chart.name
-                })
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                // Update Firestore
-                const chartRef = doc(db, 'charts', chart.id);
-                await updateDoc(chartRef, { dasaAlerts: !isSubscribed });
-
-                if (action === 'subscribe') {
-                    setToastState({
-                        isVisible: true,
-                        message: 'Dasa Alerts Activated! 🌟',
-                        subMessage: `You'll receive a welcome email at ${user.email}. We'll notify you of significant changes.`
-                    });
-                } else {
-                    setToastState({
-                        isVisible: true,
-                        message: 'Unsubscribed Successfully',
-                        subMessage: 'You will no longer receive alerts for this chart.'
-                    });
-                }
-            } else {
-                // Revert on failure
-                setCharts(charts);
-                setToastState({
-                    isVisible: true,
-                    message: 'Subscription Update Failed',
-                    subMessage: data.message || 'Please try again later.'
-                });
-            }
-        } catch (err) {
-            console.error(err);
-            setCharts(charts); // Revert
-            setToastState({
-                isVisible: true,
-                message: 'Connection Error',
-                subMessage: 'Failed to connect to server. Please check your internet connection.'
-            });
-        }
-    };
-
     const handleNewChart = () => {
         navigate('/');
     };
 
     const handleViewChart = (chart: SavedChart) => {
         try {
-            // Use saved data from Firebase - no recalculation needed!
             const calculatedData = calculatePlanetaryPositions(chart.dob, chart.latitude, chart.longitude);
             setChartData({
                 ...calculatedData,
@@ -339,11 +235,8 @@ const Dashboard: React.FC = () => {
                     place: chart.place,
                     lat: chart.latitude,
                     lng: chart.longitude,
-                    city: chart.place
-                },
-                currentDasa: chart.currentDasa,
-                dashaPeriods: chart.dashaPeriods,
-                birthDate: chart.dob
+                    city: chart.place // Add city for consistency
+                }
             });
             navigate('/chart');
         } catch (e) {
@@ -363,9 +256,7 @@ const Dashboard: React.FC = () => {
                 lat: chart.latitude,
                 lng: chart.longitude
             },
-            birthDate: chart.dob,
-            currentDasa: chart.currentDasa,      // Include Dasha from Firebase
-            dashaPeriods: chart.dashaPeriods     // Include Dasha periods
+            birthDate: chart.dob
         });
         setShowPredictionModal(true);
     };
@@ -480,7 +371,6 @@ const Dashboard: React.FC = () => {
                                 key={chart.id}
                                 chart={chart}
                                 onDelete={handleDeleteChart}
-                                onSubscribe={handleSubscribe}
                                 onViewChart={handleViewChart}
                                 onViewPrediction={handleShowPrediction}
                                 onViewPersona={handleShowPersona}
@@ -524,16 +414,10 @@ const Dashboard: React.FC = () => {
                         birthDetails={personaData.birthDetails}
                         chartId={personaData.chartId}
                     />
-                )}
-            <SuccessToast
-                isVisible={toastState.isVisible}
-                onClose={() => setToastState(prev => ({ ...prev, isVisible: false }))}
-                message={toastState.message}
-                subMessage={toastState.subMessage}
-            />
+                )
+            }
         </div >
     );
 };
 
 export default Dashboard;
-

@@ -44,7 +44,7 @@ const DashaProgressBar: React.FC<DashaProgressBarProps> = ({
             <div className="relative w-full h-2 bg-slate-700/50 rounded-full overflow-hidden">
                 {/* Progress Fill */}
                 <div
-                    className={`h-full bg-gradient-to-r ${isActive ? getBarColor() : progress >= 100 ? 'from-green-500 to-green-600' : 'from-slate-600 to-slate-700'} transition-all duration-500`}
+                    className={`h-full bg-gradient-to-r ${isActive ? getBarColor() : 'from-slate-600 to-slate-700'} transition-all duration-500`}
                     style={{ width: `${progress}%` }}
                 />
 
