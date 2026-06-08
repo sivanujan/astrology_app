@@ -4,8 +4,10 @@ export const generatePDF = async (data: any, language: 'en' | 'ta') => {
     try {
         console.log('Requesting PDF generation from server...');
 
+        const pdfApiUrl = import.meta.env.VITE_PDF_API_URL || 'http://localhost:3001';
+
         // Call backend API
-        const response = await fetch('http://localhost:3001/api/generate-pdf', {
+        const response = await fetch(`${pdfApiUrl}/api/generate-pdf`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
